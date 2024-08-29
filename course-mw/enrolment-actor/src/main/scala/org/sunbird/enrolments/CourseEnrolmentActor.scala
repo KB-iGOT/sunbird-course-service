@@ -328,9 +328,13 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         // code for  find root cause of null value in prod(16-02-2023)
         try {
             val activeStatus = dataMap.get(JsonKey.ACTIVE);
+            val enrolled_date = dataMap.get(JsonKey.ENROLLED_DATE);
             logger.info(requestContext, "upsertEnrollment :: IsNew :: " + isNew + " ActiveStatus :: " + activeStatus + " DataMap is :: " + dataMap+ " DataBatchMap:: "+ dataBatchMap)
             if (activeStatus == null) {
                 throw new Exception("Active Value is null in upsertEnrollment");
+            }
+            if (enrolled_date == null) {
+                throw new Exception("enrolled date Value is null in upsertEnrollment");
             }
         } catch {
             case e: Exception =>
