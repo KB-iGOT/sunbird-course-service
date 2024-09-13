@@ -90,7 +90,7 @@ public class CourseBatchManagementActor extends BaseActor {
         createCourseBatch(request);
         break;
       case "updateBatch":
-        updateCourseBatch(request,false);
+        updateCourseBatch(request,true);
         break;
       case "getBatch":
         getCourseBatch(request);

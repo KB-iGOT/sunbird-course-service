@@ -30,6 +30,7 @@ public class RequestInterceptor {
     restrictedUriList.add("/v1/content/state/update");
 
     short var = 1;
+    apiHeaderIgnoreMap.put("/v1/course/batch/update", var);
     apiHeaderIgnoreMap.put("/service/health", var);
     apiHeaderIgnoreMap.put("/v1/page/assemble", var);
     apiHeaderIgnoreMap.put("/v1/dial/assemble", var);
