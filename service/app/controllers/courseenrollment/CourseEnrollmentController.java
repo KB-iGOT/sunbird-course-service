@@ -41,6 +41,10 @@ public class CourseEnrollmentController extends BaseController {
                   fields.addAll(Arrays.asList(JsonKey.NAME, JsonKey.DESCRIPTION, JsonKey.LEAF_NODE_COUNT, JsonKey.APP_ICON));
                   queryParams.put("fields", fields.toArray(new String[0]));
               }
+              if(queryParams.containsKey("courseIds")) {
+                  List<String> courseIds = new ArrayList<>(Arrays.asList(queryParams.get("courseIds")[0].split(",")));
+                  request.put("courseIds",courseIds );
+              }
               String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
               if(isPrivate){
                   userId = uid;
