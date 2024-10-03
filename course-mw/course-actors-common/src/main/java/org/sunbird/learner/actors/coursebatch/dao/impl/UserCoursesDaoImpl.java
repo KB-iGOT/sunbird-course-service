@@ -148,16 +148,32 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   public List<Map<String, Object>> listEnrolments(RequestContext requestContext, String userId, List<String> courseIdList) {
     Map<String, Object> primaryKey = new HashMap<>();
     primaryKey.put(JsonKey.USER_ID, userId);
-    if(!CollectionUtils.isEmpty(courseIdList)){
+
+    List<Map<String, Object>> userCoursesList;
+
+    if (courseIdList != null && courseIdList.size() == 1) {
       primaryKey.put(JsonKey.COURSE_ID_KEY, courseIdList);
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+    } else {
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+      if (courseIdList != null && !courseIdList.isEmpty() && userCoursesList != null) {
+        List<Map<String, Object>> filteredList = new ArrayList<>();
+        for (Map<String, Object> enrolment : userCoursesList) {
+          String enrolmentCourseId = (String) enrolment.get(JsonKey.COURSE_ID);
+          if (courseIdList.contains(enrolmentCourseId)) {
+            filteredList.add(enrolment);
+          }
+        }
+        userCoursesList = filteredList;
+      }
     }
-    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
-    List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+
     if (CollectionUtils.isEmpty(userCoursesList)) {
       return null;
-    } else {
-      return userCoursesList;
     }
+    return userCoursesList;
   }
 
   @Override
