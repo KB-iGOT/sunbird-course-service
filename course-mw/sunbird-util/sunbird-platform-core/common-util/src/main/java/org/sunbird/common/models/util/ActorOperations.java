@@ -177,7 +177,8 @@ public enum ActorOperations {
   UPDATE_EVENT_SET("updateEventSet"),
   DELETE_EVENT_SET("deleteEventSet"),
   DELETE_EVENT("deleteEvent"),
-  COURSE_BATCH_DATE_NOTIFICATION("courseBatchDateNotification");
+  COURSE_BATCH_DATE_NOTIFICATION("courseBatchDateNotification"),
+  CREATE_EVENT_BATCH("createEventBatch");
 
   private String value;
 

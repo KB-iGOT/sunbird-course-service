@@ -106,4 +106,19 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
       }
     }
   }
+
+  public void validateEnrollEvent(Request eventRequestDto) {
+    validateParam(
+            (String) eventRequestDto.getRequest().get(JsonKey.COURSE_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.EVENT_ID+"/"+JsonKey.COLLECTION_ID);
+    validateParam(
+            (String) eventRequestDto.getRequest().get(JsonKey.BATCH_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.BATCH_ID);
+    validateParam(
+            (String) eventRequestDto.getRequest().get(JsonKey.USER_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.USER_ID);
+  }
 }

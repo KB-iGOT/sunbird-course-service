@@ -18,6 +18,7 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.models.course.batch.CourseBatch;
+import org.sunbird.models.event.batch.EventBatch;
 import scala.concurrent.Future;
 
 import java.text.ParseException;
@@ -242,4 +243,48 @@ public class CourseBatchUtil {
     }
     return value;
   }
+
+  public static Map<String, Object> cassandraEventMapping(EventBatch courseBatch, String pattern) {
+    SimpleDateFormat dateFormat = ProjectUtil.getDateFormatter(pattern);
+    SimpleDateFormat dateTimeFormat = ProjectUtil.getDateFormatter();
+    dateFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)));
+    dateTimeFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)));
+    Map<String, Object> courseBatchMap = mapper.convertValue(courseBatch, Map.class);
+    changeInDateFormatAll.forEach(key -> {
+      try {
+        if (courseBatchMap.containsKey(key))
+          courseBatchMap.put(key, setEndOfDay(key, dateTimeFormat.parse(dateTimeFormat.format(courseBatchMap.get(key))), dateFormat));
+      } catch (ParseException e) {
+        logger.error(null, "CourseBatchUtil:cassandraCourseMapping: Exception occurred with message = " + e.getMessage(), e);
+      }
+    });
+    return courseBatchMap;
+  }
+
+  public static Map<String, Object> esEventMapping(EventBatch eventBatch, String pattern) throws Exception {
+    SimpleDateFormat dateFormat = ProjectUtil.getDateFormatter(pattern);
+    SimpleDateFormat dateTimeFormat = ProjectUtil.getDateFormatter();
+    dateFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)));
+    dateTimeFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)));
+    Map<String, Object> esCourseMap = mapper.convertValue(eventBatch, Map.class);
+    if (eventBatch.getStartTime() != null && eventBatch.getEndTime() != null) {
+      esCourseMap.put(JsonKey.START_TIME, eventBatch.getStartDate());
+      esCourseMap.put(JsonKey.END_TIME, eventBatch.getEndDate());
+    }
+    changeInDateFormat.forEach(key -> {
+      if (null != esCourseMap.get(key))
+        esCourseMap.put(key, dateTimeFormat.format(esCourseMap.get(key)));
+      else
+        esCourseMap.put(key, null);
+    });
+    changeInSimpleDateFormat.forEach(key -> {
+      if (null != esCourseMap.get(key))
+        esCourseMap.put(key, dateFormat.format(esCourseMap.get(key)));
+      else
+        esCourseMap.put(key, null);
+    });
+    esCourseMap.put(CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN, eventBatch.getCertTemplates());
+    return esCourseMap;
+  }
+
 }

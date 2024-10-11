@@ -101,6 +101,8 @@ public class CourseBatchManagementActor extends BaseActor {
       case "updateStartBatchesStatus":
         updateStartBatchesStatus(request);
         break;
+      case "createEventBatch":
+        createEventBatch(request);
       default:
         onReceiveUnsupportedOperation(request.getOperation());
         break;
@@ -837,4 +839,65 @@ public class CourseBatchManagementActor extends BaseActor {
             PropertiesCache.getInstance()
                     .getProperty(JsonKey.SUNBIRD_BATCH_UPDATE_NOTIFICATIONS_ENABLED));
   }
+
+  private void createEventBatch(Request actorMessage) throws Throwable {
+    Map<String, Object> request = actorMessage.getRequest();
+    Map<String, Object> targetObject;
+    List<Map<String, Object>> correlatedObject = new ArrayList<>();
+    String courseBatchId = ProjectUtil.getUniqueIdFromTimestamp(actorMessage.getEnv());
+    Map<String, String> headers =
+            (Map<String, String>) actorMessage.getContext().get(JsonKey.HEADER);
+    String requestedBy = (String) actorMessage.getContext().get(JsonKey.REQUESTED_BY);
+
+    if (Util.isNotNull(request.get(JsonKey.PARTICIPANTS))) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.invalidRequestParameter,
+              ProjectUtil.formatMessage(
+                      ResponseCode.invalidRequestParameter.getErrorMessage(), PARTICIPANTS));
+    }
+    CourseBatch courseBatch = JsonUtil.convertFromString(request, CourseBatch.class);
+    courseBatch.setStatus(setCourseBatchStatus(actorMessage.getRequestContext(), (String) request.get(JsonKey.START_DATE)));
+    String courseId = (String) request.get(JsonKey.COURSE_ID);
+    Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseId, headers);
+    courseBatch.setCreatedDate(ProjectUtil.getTimeStamp());
+    if(StringUtils.isBlank(courseBatch.getCreatedBy()))
+      courseBatch.setCreatedBy(requestedBy);
+    validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
+    validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
+    courseBatch.setBatchId(courseBatchId);
+    String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
+    if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      if (MapUtils.isEmpty(courseBatch.getBatchAttributes()) ||
+              courseBatch.getBatchAttributes().get(JsonKey.CURRENT_BATCH_SIZE) == null ||
+              Integer.parseInt((String) courseBatch.getBatchAttributes().get(JsonKey.CURRENT_BATCH_SIZE)) < 1) {
+        ProjectCommonException.throwClientErrorException(
+                ResponseCode.currentBatchSizeInvalid, ResponseCode.currentBatchSizeInvalid.getErrorMessage());
+      }
+    }
+    Response result = courseBatchDao.create(actorMessage.getRequestContext(), courseBatch);
+    result.put(JsonKey.BATCH_ID, courseBatchId);
+
+    Map<String, Object> esCourseMap = CourseBatchUtil.esCourseMapping(courseBatch, dateFormat);
+    CourseBatchUtil.syncCourseBatchForeground(actorMessage.getRequestContext(),
+            courseBatchId, esCourseMap);
+    sender().tell(result, self());
+
+    targetObject =
+            TelemetryUtil.generateTargetObject(
+                    courseBatchId, TelemetryEnvKey.BATCH, JsonKey.CREATE, null);
+    TelemetryUtil.generateCorrelatedObject(
+            (String) request.get(JsonKey.COURSE_ID), JsonKey.COURSE, null, correlatedObject);
+
+    Map<String, String> rollUp = new HashMap<>();
+    rollUp.put("l1", (String) request.get(JsonKey.COURSE_ID));
+    TelemetryUtil.addTargetObjectRollUp(rollUp, targetObject);
+    TelemetryUtil.telemetryProcessingCall(request, targetObject, correlatedObject, actorMessage.getContext());
+
+    //  updateBatchCount(courseBatch);
+    updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+    if (courseNotificationActive()) {
+      batchOperationNotifier(actorMessage, courseBatch, null);
+    }
+  }
+
 }

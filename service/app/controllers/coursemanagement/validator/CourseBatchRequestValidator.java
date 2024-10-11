@@ -346,4 +346,24 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             PropertiesCache.getInstance()
                     .getProperty(JsonKey.COURSE_BATCH_ENROLL_END_DATE_LESS));
   }
+
+  public void validateCreateEventBatchRequest(Request request) {
+
+    validateParam(
+            (String) request.getRequest().get(JsonKey.EVENT_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.EVENT_ID+"/"+JsonKey.COLLECTION_ID);
+    validateParam(
+            (String) request.getRequest().get(JsonKey.NAME),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.NAME);
+    validateEnrolmentType(request);
+    String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
+    String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
+    String enrollmentEndDate = (String) request.getRequest().get(JsonKey.ENROLLMENT_END_DATE);
+    validateStartDate(startDate);
+    validateEndDate(startDate, endDate);
+    validateEnrollmentEndDate(enrollmentEndDate, startDate, endDate);
+    validateCreatedForAndMentors(request);
+  }
 }
