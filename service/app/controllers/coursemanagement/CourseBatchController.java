@@ -32,10 +32,6 @@ public class CourseBatchController extends BaseController {
   @Named("search-handler-actor")
   private ActorRef compositeSearchActorRef;
 
-    @Inject
-    @Named("event-batch-management-actor")
-    private ActorRef eventsActorRef;
-
   public CompletionStage<Result> createBatch(Http.Request httpRequest) {
     return handleRequest(
         courseBatchActorRef,
@@ -134,22 +130,6 @@ public class CourseBatchController extends BaseController {
                 ActorOperations.UPDATE_START_BATCHES_STATUS.getValue(),
                 "",
                 null,
-                httpRequest);
-    }
-
-    public CompletionStage<Result> createEventBatch(Http.Request httpRequest) {
-        return handleRequest(
-                eventsActorRef,
-                ActorOperations.CREATE_EVENT_BATCH.getValue(),
-                httpRequest.body().asJson(),
-                (request) -> {
-                    Request req = (Request) request;
-                    String eventId = req.getRequest().containsKey(JsonKey.EVENT_ID) ? JsonKey.EVENT_ID : JsonKey.COLLECTION_ID;
-                    req.getRequest().put(JsonKey.EVENT_ID, req.getRequest().get(eventId));
-                    new CourseBatchRequestValidator().validateCreateEventBatchRequest(req);
-                    return null;
-                },
-                getAllRequestHeaders(httpRequest),
                 httpRequest);
     }
 }
