@@ -73,7 +73,7 @@ public class EventsActor extends BaseActor {
                             ResponseCode.invalidRequestParameter.getErrorMessage(), PARTICIPANTS));
         }
         EventBatch eventBatch = JsonUtil.convertFromString(request, EventBatch.class);
-        eventBatch.setStatus(setCourseBatchStatus(actorMessage.getRequestContext(), (String) request.get(JsonKey.START_DATE)));
+        eventBatch.setStatus(setEventBatchStatus(actorMessage.getRequestContext(), (String) request.get(JsonKey.START_DATE)));
         String eventId = (String) request.get(JsonKey.EVENT_ID);
         Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),eventId, headers);
         eventBatch.setCreatedDate(ProjectUtil.getTimeStamp());
@@ -110,20 +110,20 @@ public class EventsActor extends BaseActor {
         TelemetryUtil.addTargetObjectRollUp(rollUp, targetObject);
         TelemetryUtil.telemetryProcessingCall(request, targetObject, correlatedObject, actorMessage.getContext());
 
-        //  updateBatchCount(courseBatch);
+        //  updateBatchCount(eventBatch);
         updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
         if (courseNotificationActive()) {
             batchOperationNotifier(actorMessage, eventBatch, null);
         }
     }
 
-    private int setCourseBatchStatus(RequestContext requestContext, String startDate) {
+    private int setEventBatchStatus(RequestContext requestContext, String startDate) {
         try {
             SimpleDateFormat dateFormatter = ProjectUtil.getDateFormatter(dateFormat);
             dateFormatter.setTimeZone(TimeZone.getTimeZone(timeZone));
             Date todayDate = dateFormatter.parse(dateFormatter.format(new Date()));
             Date requestedStartDate = dateFormatter.parse(startDate);
-            logger.info(requestContext, "CourseBatchManagementActor:setCourseBatchStatus: todayDate="
+            logger.info(requestContext, "EventsActor:setEventBatchStatus: todayDate="
                     + todayDate + ", requestedStartDate=" + requestedStartDate);
             if (todayDate.compareTo(requestedStartDate) == 0) {
                 return ProjectUtil.ProgressStatus.STARTED.getValue();
@@ -131,21 +131,21 @@ public class EventsActor extends BaseActor {
                 return ProjectUtil.ProgressStatus.NOT_STARTED.getValue();
             }
         } catch (ParseException e) {
-            logger.error(requestContext, "CourseBatchManagementActor:setCourseBatchStatus: Exception occurred with error message = " + e.getMessage(), e);
+            logger.error(requestContext, "EventsActor:setEventBatchStatus: Exception occurred with error message = " + e.getMessage(), e);
         }
         return ProjectUtil.ProgressStatus.NOT_STARTED.getValue();
     }
 
     private Map<String, Object> getContentDetails(RequestContext requestContext, String courseId, Map<String, String> headers) {
         Map<String, Object> ekStepContent = ContentUtil.getContent(courseId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory"));
-        logger.info(requestContext, "CourseBatchManagementActor:getEkStepContent: courseId: " + courseId, null,
+        logger.info(requestContext, "EventsActor:getEkStepContent: courseId: " + courseId, null,
                 ekStepContent);
         String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
         Integer leafNodesCount = (Integer) ((Map<String, Object>) ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("leafNodesCount", 0);
         if (null == ekStepContent ||
                 ekStepContent.size() == 0 ||
                 !validCourseStatus.contains(status) || leafNodesCount == 0) {
-            logger.info(requestContext, "CourseBatchManagementActor:getEkStepContent: Invalid courseId = " + courseId);
+            logger.info(requestContext, "EventsActor:getEkStepContent: Invalid courseId = " + courseId);
             throw new ProjectCommonException(
                     ResponseCode.invalidCourseId.getErrorCode(),
                     ResponseCode.invalidCourseId.getErrorMessage(),
@@ -167,14 +167,14 @@ public class EventsActor extends BaseActor {
         }
     }
 
-    private void validateMentors(EventBatch courseBatch, String authToken, RequestContext requestContext) {
-        List<String> mentors = courseBatch.getMentors();
+    private void validateMentors(EventBatch eventBatch, String authToken, RequestContext requestContext) {
+        List<String> mentors = eventBatch.getMentors();
         if (CollectionUtils.isNotEmpty(mentors)) {
             mentors = mentors.stream().distinct().collect(Collectors.toList());
-            courseBatch.setMentors(mentors);
-            String batchCreatorRootOrgId = getRootOrg(courseBatch.getCreatedBy(), authToken);
+            eventBatch.setMentors(mentors);
+            String batchCreatorRootOrgId = getRootOrg(eventBatch.getCreatedBy(), authToken);
             List<Map<String, Object>> mentorDetailList = userOrgService.getUsersByIds(mentors, authToken);
-            logger.info(requestContext, "CourseBatchManagementActor::validateMentors::mentorDetailList : " + mentorDetailList);
+            logger.info(requestContext, "EventsActor::validateMentors::mentorDetailList : " + mentorDetailList);
             if (CollectionUtils.isNotEmpty(mentorDetailList)) {
                 Map<String, Map<String, Object>> mentorDetails =
                         mentorDetailList.stream().collect(Collectors.toMap(map -> (String) map.get(JsonKey.ID), map -> map));
@@ -198,7 +198,7 @@ public class EventsActor extends BaseActor {
                     }
                 }
             } else {
-                logger.info(requestContext, "Invalid mentors for batchId: " + courseBatch.getBatchId() + ", mentors: " + mentors);
+                logger.info(requestContext, "Invalid mentors for batchId: " + eventBatch.getBatchId() + ", mentors: " + mentors);
                 throw new ProjectCommonException(
                         ResponseCode.invalidUserId.getErrorCode(),
                         ResponseCode.invalidUserId.getErrorMessage(),
@@ -211,7 +211,7 @@ public class EventsActor extends BaseActor {
 
         try {
             Map<String, Object> result = userOrgService.getOrganisationById(orgId);
-            logger.debug(requestContext, "CourseBatchManagementActor:isOrgValid: orgId = "
+            logger.debug(requestContext, "EventsActor:isOrgValid: orgId = "
                     + (MapUtils.isNotEmpty(result) ? result.get(ID) : null));
             return ((MapUtils.isNotEmpty(result) && orgId.equals(result.get(ID))));
         } catch (Exception e) {
@@ -239,23 +239,23 @@ public class EventsActor extends BaseActor {
         return rootOrg;
     }
 
-    private void updateCollection(RequestContext requestContext, Map<String, Object> courseBatch, Map<String, Object> contentDetails) {
+    private void updateCollection(RequestContext requestContext, Map<String, Object> eventBatch, Map<String, Object> contentDetails) {
         List<Map<String, Object>> batches = (List<Map<String, Object>>) contentDetails.getOrDefault("batches", new ArrayList<>());
         Map<String, Object> data =  new HashMap<>();
-        data.put("batchId", courseBatch.getOrDefault(JsonKey.BATCH_ID, ""));
-        data.put("name", courseBatch.getOrDefault(JsonKey.NAME, ""));
-        data.put("createdFor", courseBatch.getOrDefault(JsonKey.COURSE_CREATED_FOR, new ArrayList<>()));
-        data.put("startDate", courseBatch.getOrDefault(JsonKey.START_DATE, ""));
-        data.put("endDate", courseBatch.getOrDefault(JsonKey.END_DATE, null));
-        data.put("startTime", courseBatch.getOrDefault(JsonKey.START_TIME, null));
-        data.put("endTime", courseBatch.getOrDefault(JsonKey.END_TIME, null));
-        data.put("enrollmentType", courseBatch.getOrDefault(JsonKey.ENROLLMENT_TYPE, ""));
-        data.put("status", courseBatch.getOrDefault(JsonKey.STATUS, ""));
-        data.put("batchAttributes", courseBatch.getOrDefault(CourseJsonKey.BATCH_ATTRIBUTES, new HashMap<String, Object>()));
-        data.put("enrollmentEndDate", getEnrollmentEndDate((String) courseBatch.getOrDefault(JsonKey.ENROLLMENT_END_DATE, null), (String) courseBatch.getOrDefault(JsonKey.END_DATE, null)));
-        batches.removeIf(map -> StringUtils.equalsIgnoreCase((String) courseBatch.getOrDefault(JsonKey.BATCH_ID, ""), (String) map.get("batchId")));
+        data.put("batchId", eventBatch.getOrDefault(JsonKey.BATCH_ID, ""));
+        data.put("name", eventBatch.getOrDefault(JsonKey.NAME, ""));
+        data.put("createdFor", eventBatch.getOrDefault(JsonKey.COURSE_CREATED_FOR, new ArrayList<>()));
+        data.put("startDate", eventBatch.getOrDefault(JsonKey.START_DATE, ""));
+        data.put("endDate", eventBatch.getOrDefault(JsonKey.END_DATE, null));
+        data.put("startTime", eventBatch.getOrDefault(JsonKey.START_TIME, null));
+        data.put("endTime", eventBatch.getOrDefault(JsonKey.END_TIME, null));
+        data.put("enrollmentType", eventBatch.getOrDefault(JsonKey.ENROLLMENT_TYPE, ""));
+        data.put("status", eventBatch.getOrDefault(JsonKey.STATUS, ""));
+        data.put("batchAttributes", eventBatch.getOrDefault(CourseJsonKey.BATCH_ATTRIBUTES, new HashMap<String, Object>()));
+        data.put("enrollmentEndDate", getEnrollmentEndDate((String) eventBatch.getOrDefault(JsonKey.ENROLLMENT_END_DATE, null), (String) eventBatch.getOrDefault(JsonKey.END_DATE, null)));
+        batches.removeIf(map -> StringUtils.equalsIgnoreCase((String) eventBatch.getOrDefault(JsonKey.BATCH_ID, ""), (String) map.get("batchId")));
         batches.add(data);
-        ContentUtil.updateCollection(requestContext, (String) courseBatch.getOrDefault(JsonKey.EVENT_ID, ""), new HashMap<String, Object>() {{ put("batches", batches);}});
+        ContentUtil.updateCollection(requestContext, (String) eventBatch.getOrDefault(JsonKey.EVENT_ID, ""), new HashMap<String, Object>() {{ put("batches", batches);}});
     }
 
     private Object getEnrollmentEndDate(String enrollmentEndDate, String endDate) {
@@ -279,8 +279,8 @@ public class EventsActor extends BaseActor {
                         .getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED));
     }
 
-    private void batchOperationNotifier(Request actorMessage, EventBatch courseBatch, Map<String, Object> participantMentorMap) {
-        logger.debug(actorMessage.getRequestContext(), "CourseBatchManagementActor: batchoperationNotifier called");
+    private void batchOperationNotifier(Request actorMessage, EventBatch eventBatch, Map<String, Object> participantMentorMap) {
+        logger.debug(actorMessage.getRequestContext(), "EventActor: batchoperationNotifier called");
         Request batchNotification = new Request(actorMessage.getRequestContext());
         batchNotification.getContext().putAll(actorMessage.getContext());
         batchNotification.setOperation(ActorOperations.COURSE_BATCH_NOTIFICATION.getValue());
@@ -298,9 +298,9 @@ public class EventsActor extends BaseActor {
 
         } else {
             batchNotificationMap.put(JsonKey.OPERATION_TYPE, JsonKey.ADD);
-            batchNotificationMap.put(JsonKey.ADDED_MENTORS, courseBatch.getMentors());
+            batchNotificationMap.put(JsonKey.ADDED_MENTORS, eventBatch.getMentors());
         }
-        batchNotificationMap.put(JsonKey.COURSE_BATCH, courseBatch);
+        batchNotificationMap.put(JsonKey.COURSE_BATCH, eventBatch);
         batchNotification.setRequest(batchNotificationMap);
         courseBatchNotificationActorRef.tell(batchNotification, getSelf());
     }
