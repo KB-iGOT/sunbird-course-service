@@ -1143,5 +1143,8 @@ public final class JsonKey {
   public static final String END_DATE_BATCH = "end_date";
   public static final String ADD_EXTRA_HOURS_MINS = "addExtraHrsAndMins.start_date_end_date";
   public static final String STANDALONE_ASSESSMENT ="Standalone Assessment";
+  public static final String EVENT_ID = "eventId";
+  public static final String LEARNER_EVENT_DB = "learnerEvent_db";
+  public static final String LEARNER_ENROLMENT_DB = "learnerEnrolment_db";
   private JsonKey() {}
 }

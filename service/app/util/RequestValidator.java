@@ -1012,4 +1012,80 @@ public final class RequestValidator {
         ResponseCode.getResponse(errorCode).getErrorMessage(),
         ERROR_CODE);
   }
+
+  public static void validateUpdateEvent(Request contentRequestDto) {
+    List<Map<String, Object>> list =
+            (List<Map<String, Object>>) (contentRequestDto.getRequest().get(JsonKey.EVENTS));
+    if (CollectionUtils.isNotEmpty(list)) {
+      for (Map<String, Object> map : list) {
+        if (null != map.get(JsonKey.LAST_UPDATED_TIME)) {
+          boolean bool =
+                  ProjectUtil.isDateValidFormat(
+                          "yyyy-MM-dd HH:mm:ss:SSSZ", (String) map.get(JsonKey.LAST_UPDATED_TIME));
+          if (!bool) {
+            throw new ProjectCommonException(
+                    ResponseCode.dateFormatError.getErrorCode(),
+                    ResponseCode.dateFormatError.getErrorMessage(),
+                    ERROR_CODE);
+          }
+        }
+        if (null != map.get(JsonKey.LAST_COMPLETED_TIME)) {
+          boolean bool =
+                  ProjectUtil.isDateValidFormat(
+                          "yyyy-MM-dd HH:mm:ss:SSSZ", (String) map.get(JsonKey.LAST_COMPLETED_TIME));
+          if (!bool) {
+            throw new ProjectCommonException(
+                    ResponseCode.dateFormatError.getErrorCode(),
+                    ResponseCode.dateFormatError.getErrorMessage(),
+                    ERROR_CODE);
+          }
+        }
+        if (map.containsKey(JsonKey.EVENT_ID)) {
+
+          if (null == map.get(JsonKey.EVENT_ID)) {
+            throw new ProjectCommonException(
+                    ResponseCode.eventIdRequired.getErrorCode(),
+                    ResponseCode.eventIdRequiredError.getErrorMessage(),
+                    ERROR_CODE);
+          }
+          if (ProjectUtil.isNull(map.get(JsonKey.STATUS))) {
+            throw new ProjectCommonException(
+                    ResponseCode.contentStatusRequired.getErrorCode(),
+                    ResponseCode.contentStatusRequired.getErrorMessage(),
+                    ERROR_CODE);
+          }
+
+        } else {
+          throw new ProjectCommonException(
+                  ResponseCode.eventIdRequired.getErrorCode(),
+                  ResponseCode.eventIdRequiredError.getErrorMessage(),
+                  ERROR_CODE);
+        }
+      }
+    }
+
+    // Validation for enrolment sync
+    if (CollectionUtils.isEmpty(list)) {
+      contentRequestDto.getRequest().put(JsonKey.EVENT_ID, contentRequestDto.getOrDefault(JsonKey.EVENT_ID, ""));
+      if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.EVENT_ID, ""))) {
+        throw new ProjectCommonException(
+                ResponseCode.eventIdRequired.getErrorCode(),
+                ResponseCode.eventIdRequiredError.getErrorMessage(),
+                ERROR_CODE);
+      }
+      if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.BATCH_ID, ""))) {
+        throw new ProjectCommonException(
+                ResponseCode.courseBatchIdRequired.getErrorCode(),
+                ResponseCode.courseBatchIdRequired.getErrorMessage(),
+                ERROR_CODE);
+      }
+
+      if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.USER_ID, ""))) {
+        throw new ProjectCommonException(
+                ResponseCode.userIdRequired.getErrorCode(),
+                ResponseCode.userIdRequired.getErrorMessage(),
+                ERROR_CODE);
+      }
+    }
+  }
 }

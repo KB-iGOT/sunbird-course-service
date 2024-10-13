@@ -182,4 +182,62 @@ public class LearnerController extends BaseController {
         });
     }
   }
+
+
+  /**
+   * Updates the state of an event based on the incoming HTTP request.
+   * <p>
+   * This method processes the JSON payload of the request, validates it,
+   * transforms necessary fields, and forwards the request to an actor for
+   * further processing. It also logs relevant information and handles
+   * exceptions that may occur during the process.
+   *
+   * @param httpRequest The incoming HTTP request containing the event update data.
+   * @return A CompletionStage<Result> representing the outcome of the event update operation.
+   */
+  public CompletionStage<Result> updateEventState(Http.Request httpRequest) {
+    // Extracting the request body as JSON
+    JsonNode requestData = httpRequest.body().asJson();
+    String loggingHeaders = httpRequest.attrs().getOptional(Attrs.X_LOGGING_HEADERS).orElse(null);
+    String requestedBy = httpRequest.attrs().getOptional(Attrs.USER_ID).orElse(null);
+    String requestedFor = httpRequest.attrs().getOptional(Attrs.REQUESTED_FOR).orElse(null);
+    String apiDebugLog = "UpdateEventState Request: " + requestData.toString() + " RequestedBy: " + requestedBy + " RequestedFor: " + requestedFor + " ";
+    try {
+      Request reqObj = (Request) mapper.RequestMapper.mapRequest(requestData, Request.class);
+      // Validating the request
+      RequestValidator.validateUpdateEvent(reqObj);
+      // Transforming the user ID for the request
+      reqObj = transformUserId(reqObj);
+      reqObj.setOperation("updateEventConsumption");
+      // Setting additional request attributes
+      reqObj.setRequestId(httpRequest.attrs().getOptional(Attrs.REQUEST_ID).orElse(null));
+      reqObj.setEnv(getEnvironment());
+      HashMap<String, Object> innerMap = new HashMap<>();
+      innerMap.put(JsonKey.REQUESTED_BY, requestedBy);
+      // Adding the requestedFor attribute if it is not blank
+      if (StringUtils.isNotBlank(requestedFor))
+        innerMap.put(SunbirdKey.REQUESTED_FOR, requestedFor);
+      if (Boolean.FALSE.equals(reqObj.contains(JsonKey.EVENTS))) {
+        // If not, populate the innerMap with event and batch IDs
+        innerMap.put(JsonKey.EVENT_ID, reqObj.getOrDefault(JsonKey.EVENT_ID, ""));
+        innerMap.put(JsonKey.BATCH_ID, reqObj.getOrDefault(JsonKey.BATCH_ID, ""));
+      } else {
+        // If events are present, add them to the innerMap
+        innerMap.put(JsonKey.EVENTS, reqObj.get(JsonKey.EVENTS));
+      }
+      innerMap.put(JsonKey.USER_ID, reqObj.getRequest().get(JsonKey.USER_ID));
+      reqObj.setRequest(innerMap);
+      // Sending the request to the actor for processing
+      CompletionStage<Result> result = actorResponseHandler(contentConsumptionActor, reqObj, timeout, null, httpRequest);
+      return result.thenApplyAsync(r -> {
+        logger.info(null, apiDebugLog + ":: ResponseStatus: " + r.status() + " Headers: " + loggingHeaders);
+        return r;
+      });
+    } catch (Exception e) {
+      return CompletableFuture.completedFuture(createCommonExceptionResponse(e, httpRequest)).thenApplyAsync(r -> {
+        logger.info(null, apiDebugLog + ":: ResponseStatus: " + r.status() + " Headers: " + loggingHeaders + " ErrMessage: " + e.getMessage());
+        return r;
+      });
+    }
+  }
 }
