@@ -136,19 +136,19 @@ public class EventsActor extends BaseActor {
         return ProjectUtil.ProgressStatus.NOT_STARTED.getValue();
     }
 
-    private Map<String, Object> getContentDetails(RequestContext requestContext, String courseId, Map<String, String> headers) {
-        Map<String, Object> ekStepContent = ContentUtil.getContent(courseId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory"));
-        logger.info(requestContext, "EventsActor:getEkStepContent: courseId: " + courseId, null,
+    private Map<String, Object> getContentDetails(RequestContext requestContext, String eventId, Map<String, String> headers) {
+        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory"));
+        logger.info(requestContext, "EventsActor:getEkStepContent: eventId: " + eventId, null,
                 ekStepContent);
         String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
         Integer leafNodesCount = (Integer) ((Map<String, Object>) ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("leafNodesCount", 0);
         if (null == ekStepContent ||
                 ekStepContent.size() == 0 ||
                 !validCourseStatus.contains(status) || leafNodesCount == 0) {
-            logger.info(requestContext, "EventsActor:getEkStepContent: Invalid courseId = " + courseId);
+            logger.info(requestContext, "EventsActor:getEkStepContent: Invalid EvetntId = " + eventId);
             throw new ProjectCommonException(
-                    ResponseCode.invalidCourseId.getErrorCode(),
-                    ResponseCode.invalidCourseId.getErrorMessage(),
+                    ResponseCode.invalidEventId.getErrorCode(),
+                    ResponseCode.invalidEventId.getErrorMessage(),
                     ResponseCode.CLIENT_ERROR.getResponseCode());
         }
         return (Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>());
