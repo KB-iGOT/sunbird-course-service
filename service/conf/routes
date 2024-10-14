@@ -101,3 +101,4 @@ DELETE  /v1/event/discard/:id               @controllers.eventmanagement.EventCo
 POST    /v1/user/event/state/read           @controllers.eventmanagement.EventConsumptionController.getUserEventState(request: play.mvc.Http.Request)
 PATCH   /v1/user/event/state/update     	@controllers.eventmanagement.EventConsumptionController.updateUserEventState(request: play.mvc.Http.Request)
 POST    /v2/event/batch/create			    @controllers.eventmanagement.EventsController.createEventBatch(request: play.mvc.Http.Request)
+POST    /v2/event/enroll                    @controllers.eventmanagement.EventsController.enrollEvent(request: play.mvc.Http.Request)

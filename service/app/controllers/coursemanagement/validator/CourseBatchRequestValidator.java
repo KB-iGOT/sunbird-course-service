@@ -366,4 +366,19 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
     validateEnrollmentEndDate(enrollmentEndDate, startDate, endDate);
     validateCreatedForAndMentors(request);
   }
+  
+  public void validateEventEnroll(Request courseRequestDto) {
+    validateParam(
+            (String) courseRequestDto.getRequest().get(JsonKey.EVENT_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.EVENT_ID+"/"+JsonKey.COLLECTION_ID);
+    validateParam(
+            (String) courseRequestDto.getRequest().get(JsonKey.BATCH_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.BATCH_ID);
+    validateParam(
+            (String) courseRequestDto.getRequest().get(JsonKey.USER_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.USER_ID);
+  }
 }

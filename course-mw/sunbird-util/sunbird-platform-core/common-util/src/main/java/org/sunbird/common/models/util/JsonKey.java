@@ -1145,5 +1145,8 @@ public final class JsonKey {
   public static final String STANDALONE_ASSESSMENT ="Standalone Assessment";
   public static final String EVENT_ID = "eventId";
   public static final String EVENT_BATCH_DB = "eventBatchDB";
+  public static final String USER_EVENT_DB = "userEventDb";
+  public static final String EVENT_ID_KEY = "eventid";
+  public static final String EVENT_BATCH = "eventBatch";
   private JsonKey() {}
 }

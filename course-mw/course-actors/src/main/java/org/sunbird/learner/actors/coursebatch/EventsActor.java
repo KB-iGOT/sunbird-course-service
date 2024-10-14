@@ -5,6 +5,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
+import org.sunbird.common.CassandraUtil;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.*;
@@ -12,21 +13,40 @@ import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.util.JsonUtil;
+import org.sunbird.kafka.client.InstructionEventGenerator;
+import org.sunbird.learner.actors.coursebatch.dao.BatchUserDao;
+import org.sunbird.learner.actors.coursebatch.dao.UserEventsDao;
+import org.sunbird.learner.actors.coursebatch.dao.impl.BatchUserDaoImpl;
+import org.sunbird.learner.actors.coursebatch.dao.impl.UserEventsDaoImpl;
 import org.sunbird.learner.actors.eventbatch.EventBatchDao;
 import org.sunbird.learner.actors.eventbatch.impl.EventBatchDaoImpl;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.learner.util.CourseBatchUtil;
 import org.sunbird.learner.util.Util;
+import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.event.batch.EventBatch;
+import org.sunbird.models.user.events.UserEvents;
+import org.sunbird.redis.RedisCache;
 import org.sunbird.telemetry.util.TelemetryUtil;
 import org.sunbird.userorg.UserOrgService;
 import org.sunbird.userorg.UserOrgServiceImpl;
+import org.sunbird.common.models.util.ProjectUtil;
+
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Month;
+import java.time.ZoneId;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,6 +59,9 @@ public class EventsActor extends BaseActor {
     private String timeZone = ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE);
     private List<String> validCourseStatus = Arrays.asList("Live", "Unlisted");
     private UserOrgService userOrgService = UserOrgServiceImpl.getInstance();
+    private UserEventsDao userEventsDao = new UserEventsDaoImpl();
+    private BatchUserDao batchUserDao = new BatchUserDaoImpl();
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @Inject
     @Named("course-batch-notification-actor")
@@ -50,6 +73,8 @@ public class EventsActor extends BaseActor {
         String requestedOperation = request.getOperation();
         switch (requestedOperation) {
             case "createEventBatch" : createEventBatch(request);
+                break;
+            case "enrollEvent" : eventEnroll(request);
                 break;
             default:
                 onReceiveUnsupportedOperation(request.getOperation());
@@ -303,5 +328,231 @@ public class EventsActor extends BaseActor {
         batchNotificationMap.put(JsonKey.COURSE_BATCH, eventBatch);
         batchNotification.setRequest(batchNotificationMap);
         courseBatchNotificationActorRef.tell(batchNotification, getSelf());
+    }
+
+    private void eventEnroll(Request request) throws Throwable {
+        String eventId = (String) request.get(JsonKey.EVENT_ID);
+        String userId = (String) request.get(JsonKey.USER_ID);
+        String batchId = (String) request.get(JsonKey.BATCH_ID);
+
+        EventBatch batchData = eventBatchDao.readById(eventId, batchId, request.getRequestContext());
+        UserEvents enrolmentData = userEventsDao.read(request.getRequestContext(), userId, eventId, batchId);
+        BatchUser batchUserData = batchUserDao.read(request.getRequestContext(), batchId, userId);
+
+        validateEnrolment(batchData, enrolmentData, true);
+
+        Map<String, Object> dataBatch = createBatchUserMapping(batchId, userId, batchUserData);
+        Map<String, Object> data = createUserEnrolmentMap(
+                userId, eventId, batchId, enrolmentData,
+                (String) request.getContext().getOrDefault(JsonKey.REQUEST_ID, ""),
+                request.getRequestContext()
+        );
+
+        boolean hasAccess = ContentUtil.getContentV4Read(
+                eventId,
+                (Map<String, String>) request.getContext().getOrDefault(JsonKey.HEADER, new HashMap<>())
+        );
+
+        if (hasAccess) {
+            upsertEnrollment(
+                    userId, eventId, batchId, data, dataBatch,
+                    enrolmentData == null, request.getRequestContext()
+            );
+
+            sender().tell(successResponse(), self());
+            generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
+            notifyUser(userId, batchData, JsonKey.ADD);
+
+            Map<String, Object> dataMap = new HashMap<>();
+            Map<String, Object> requestMap = new HashMap<>();
+            requestMap.put(JsonKey.EVENT_ID, eventId);
+            requestMap.put(JsonKey.USER_ID, userId);
+            requestMap.put(JsonKey.BATCH_ID, batchId);
+            dataMap.put("edata", requestMap);
+
+            String topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic");
+            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap);
+
+        } else {
+            throw new ProjectCommonException("","",ResponseCode.CLIENT_ERROR.getResponseCode());
+        }
+    }
+
+    private void validateEnrolment(EventBatch batchData, UserEvents enrolmentData, Boolean isEnrol){
+        if (batchData == null) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.invalidCourseBatchId,
+                    ResponseCode.invalidCourseBatchId.getErrorMessage());
+        }
+        if (!(ProjectUtil.EnrolmentType.inviteOnly.getVal().equalsIgnoreCase(batchData.getEnrollmentType()) ||
+                ProjectUtil.EnrolmentType.open.getVal().equalsIgnoreCase(batchData.getEnrollmentType()))) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.enrollmentTypeValidation,
+                    ResponseCode.enrollmentTypeValidation.getErrorMessage());
+        }
+
+        LocalDate endDate = batchData.getEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate enrollmentEndDate = batchData.getEnrollmentEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+        if (batchData.getStatus() == 2 ||
+                (batchData.getEndDate() != null &&
+                        LocalDateTime.now().isAfter(endDate.atStartOfDay()))) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted,
+                    ResponseCode.courseBatchAlreadyCompleted.getErrorMessage());
+        }
+
+        if (isEnrol && batchData.getEnrollmentEndDate() != null &&
+                LocalDateTime.now().isAfter(enrollmentEndDate.atTime(LocalTime.MAX))) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchEnrollmentDateEnded,
+                    ResponseCode.courseBatchEnrollmentDateEnded.getErrorMessage());
+        }
+
+        if (isEnrol && enrolmentData != null && enrolmentData.isActive()) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse,
+                    ResponseCode.userAlreadyEnrolledCourse.getErrorMessage());
+        }
+
+        if (!isEnrol && (enrolmentData == null || !enrolmentData.isActive())) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.userNotEnrolledCourse,
+                    ResponseCode.userNotEnrolledCourse.getErrorMessage());
+        }
+
+        if (!isEnrol && ProjectUtil.ProgressStatus.COMPLETED.getValue() == enrolmentData.getStatus()) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted,
+                    ResponseCode.courseBatchAlreadyCompleted.getErrorMessage());
+        }
+    }
+
+    public  Map<String, Object> createBatchUserMapping(String batchId, String userId, BatchUser batchUserData) {
+        Map<String, Object> batchUserMap = new HashMap<>();
+        batchUserMap.put(JsonKey.BATCH_ID, batchId);
+        batchUserMap.put(JsonKey.USER_ID, userId);
+        batchUserMap.put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.ACTIVE.getValue());
+
+        if (batchUserData == null) {
+            batchUserMap.put(JsonKey.COURSE_ENROLL_DATE, ProjectUtil.getTimeStamp());
+        } else {
+            batchUserMap.put(JsonKey.COURSE_ENROLL_DATE, batchUserData.getEnrolledDate());
+        }
+        return batchUserMap;
+    }
+
+    public Map<String, Object> createUserEnrolmentMap(
+            String userId,
+            String eventId,
+            String batchId,
+            UserEvents enrolmentData,
+            String requestedBy,
+            RequestContext requestContext) {
+
+        Map<String, Object> enrolmentMap = new HashMap<>();
+
+        enrolmentMap.put(JsonKey.USER_ID, userId);
+        enrolmentMap.put(JsonKey.EVENT_ID, eventId);
+        enrolmentMap.put(JsonKey.BATCH_ID, batchId);
+        enrolmentMap.put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.ACTIVE.getValue());
+
+        if (enrolmentData == null) {
+            enrolmentMap.put(JsonKey.ADDED_BY, requestedBy);
+            enrolmentMap.put(JsonKey.COURSE_ENROLL_DATE, ProjectUtil.getTimeStamp());
+            enrolmentMap.put(JsonKey.STATUS, ProjectUtil.ProgressStatus.NOT_STARTED.getValue());
+            enrolmentMap.put(JsonKey.DATE_TIME, new Timestamp(new Date().getTime()));
+            enrolmentMap.put(JsonKey.COURSE_PROGRESS, 0);
+        } else {
+            //logger.info(String.format( (requestContext "user-enrollment-null-tag, userId: %s, courseId: %s, batchId: %s, %s", userId, eventId, batchId));
+        }
+
+        return enrolmentMap;
+    }
+
+    public void upsertEnrollment(
+            String userId,
+            String eventId,
+            String batchId,
+            Map<String, Object> data,
+            Map<String, Object> dataBatch,
+            boolean isNew,
+            RequestContext requestContext) throws Exception {
+
+        // Convert the column mappings using CassandraUtil
+        Map<String, Object> dataMap = CassandraUtil.changeCassandraColumnMapping(data);
+        Map<String, Object> dataBatchMap = CassandraUtil.changeCassandraColumnMapping(dataBatch);
+
+        // Debugging for potential null values
+        try {
+            Object activeStatus = dataMap.get(JsonKey.ACTIVE);
+            Object enrolledDate = dataMap.get(JsonKey.ENROLLED_DATE);
+
+            //logger.info("upsertEnrollment :: IsNew DataBatchMap :: " );
+
+            if (activeStatus == null) {
+                throw new Exception("Active Value is null in upsertEnrollment");
+            }
+            if (enrolledDate == null) {
+                throw new Exception("Enrolled date Value is null in upsertEnrollment");
+            }
+        } catch (Exception e) {
+           // logger.severe(String.format( "Exception in upsertEnrollment: user :: %s | Exception: %s", userId, e.getMessage()));
+            throw new Exception("Exception in upsertEnrollment: " + e);
+        }
+
+        // Perform insert or update based on 'isNew' flag
+        if (isNew) {
+            userEventsDao.insertV2(requestContext, dataMap);
+            batchUserDao.insertBatchLookupRecord(requestContext, dataBatchMap);
+        } else {
+            userEventsDao.updateV2(requestContext, userId, eventId, batchId, dataMap);
+            batchUserDao.updateBatchLookupRecord(requestContext, batchId, userId, dataBatchMap, dataMap);
+        }
+    }
+
+    public void notifyUser(String userId, EventBatch batchData, String operationType) {
+        boolean isNotifyUser = Boolean.parseBoolean(
+                PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED)
+        );
+        if (isNotifyUser) {
+            Request request = new Request();
+            request.setOperation(ActorOperations.COURSE_BATCH_NOTIFICATION.getValue());
+            request.put(JsonKey.USER_ID, userId);
+            request.put(JsonKey.EVENT_BATCH, batchData);
+            request.put(JsonKey.OPERATION_TYPE, operationType);
+
+            courseBatchNotificationActorRef.tell(request, getSelf());
+        }
+    }
+
+    public void generateTelemetryAudit(
+            String userId,
+            String eventId,
+            String batchId,
+            Map<String, Object> data,
+            String correlation,
+            String state,
+            Map<String, Object> context) {
+
+        // Create a new context map and populate it
+        Map<String, Object> contextMap = new HashMap<>(context);
+        contextMap.put(JsonKey.ACTOR_ID, userId);
+        contextMap.put(JsonKey.ACTOR_TYPE, "User");
+
+        // Generate the targeted object
+        Map<String, Object> targetedObject = TelemetryUtil.generateTargetObject(userId, JsonKey.USER, state, null);
+        Map<String, Object> rollup = new HashMap<>();
+        rollup.put("l1", eventId);
+        targetedObject.put(JsonKey.ROLLUP, rollup);
+
+        // Generate correlation objects
+        List<Map<String, Object>> correlationObject = new ArrayList<>();
+        TelemetryUtil.generateCorrelatedObject(eventId, JsonKey.COURSE, correlation, correlationObject);
+        TelemetryUtil.generateCorrelatedObject(batchId, TelemetryEnvKey.BATCH, "user.batch", correlationObject);
+
+        // Prepare the request map
+        Map<String, Object> request = new HashMap<>();
+        request.put(JsonKey.USER_ID, userId);
+        request.put(JsonKey.EVENT_ID, eventId);
+        request.put(JsonKey.BATCH_ID, batchId);
+        request.put(JsonKey.COURSE_ENROLL_DATE, data.get(JsonKey.COURSE_ENROLL_DATE));
+        request.put(JsonKey.ACTIVE, data.get(JsonKey.ACTIVE));
+
+        // Call the telemetry processing method
+        TelemetryUtil.telemetryProcessingCall(request, targetedObject, correlationObject, contextMap, "enrol");
     }
 }
