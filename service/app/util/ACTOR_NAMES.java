@@ -13,6 +13,7 @@ import org.sunbird.learner.actors.certificate.service.CourseBatchCertificateActo
 import org.sunbird.learner.actors.course.CourseManagementActor;
 import org.sunbird.learner.actors.coursebatch.CourseBatchManagementActor;
 import org.sunbird.learner.actors.coursebatch.CourseBatchNotificationActor;
+import org.sunbird.learner.actors.coursebatch.EventsActor;
 import org.sunbird.learner.actors.event.EventManagementActor;
 import org.sunbird.learner.actors.event.EventSetManagementActor;
 import org.sunbird.learner.actors.health.HealthActor;
@@ -48,7 +49,8 @@ public enum ACTOR_NAMES {
   //Scala Actors
   COURSE_ENROLMENT_ACTOR(CourseEnrolmentActor.class, "course-enrolment-actor"),
   CONTENT_CONSUMPTION_ACTOR(ContentConsumptionActor.class, "content-consumption-actor"),
-  GROUP_AGGREGATES_ACTORS(GroupAggregatesActor.class, "group-aggregates-actor");
+  GROUP_AGGREGATES_ACTORS(GroupAggregatesActor.class, "group-aggregates-actor"),
+  EVENTS_ACTOR(EventsActor.class, "event-batch-management-actor"),;
 
   private ACTOR_NAMES(Class clazz, String name) {
     actorClass = clazz;

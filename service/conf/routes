@@ -100,5 +100,5 @@ DELETE  /v1/eventset/discard/:id            @controllers.eventmanagement.EventSe
 DELETE  /v1/event/discard/:id               @controllers.eventmanagement.EventController.discard(id: String, request: play.mvc.Http.Request)
 POST    /v1/user/event/state/read           @controllers.eventmanagement.EventConsumptionController.getUserEventState(request: play.mvc.Http.Request)
 PATCH   /v1/user/event/state/update     	@controllers.eventmanagement.EventConsumptionController.updateUserEventState(request: play.mvc.Http.Request)
-
 PATCH    /v1/event/state/update     	@controllers.LearnerController.updateEventState(request: play.mvc.Http.Request)
+POST    /v2/event/batch/create			    @controllers.eventmanagement.EventsController.createEventBatch(request: play.mvc.Http.Request)

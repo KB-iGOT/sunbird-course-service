@@ -858,5 +858,6 @@ public interface ResponseMessage {
     String NOT_OPEN_BATCH ="NOT_OPEN_BATCH";
     String EVENT_ID_MISSING_ERROR = "EVENT_ID_REQUIRED_ERROR";
     String EVENT_ID_MISSING = "EVENT_ID_REQUIRED_ERROR";
+    String INVALID_EVENT_ID = "INVALID_EVENT_ID";
   }
 }
