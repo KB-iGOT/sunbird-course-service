@@ -842,6 +842,11 @@ public enum ResponseCode {
   notOpenBatch(
           ResponseMessage.Key.NOT_OPEN_BATCH,
           ResponseMessage.Message.NOT_OPEN_BATCH),
+  eventIdRequired(
+          ResponseMessage.Key.EVENT_ID_MISSING_ERROR,
+          ResponseMessage.Message.EVENT_ID_MISSING_ERROR),
+  eventIdRequiredError(
+          ResponseMessage.Key.EVENT_ID_MISSING, ResponseMessage.Message.EVENT_ID_MISSING),
   invalidEventId(ResponseMessage.Key.INVALID_EVENT_ID, ResponseMessage.Message.INVALID_COURSE_ID),
 
   accessDeniedToEnrolOrUnenrolCourse(ResponseMessage.Key.USER_DOES_NOT_HAVE_ACCESS,ResponseMessage.Message.USER_DOES_NOT_HAVE_ACCESS),

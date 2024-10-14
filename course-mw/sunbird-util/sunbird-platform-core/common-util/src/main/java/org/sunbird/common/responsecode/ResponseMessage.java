@@ -463,6 +463,8 @@ public interface ResponseMessage {
     String CURRENT_BATCH_SIZE_PARAMETER = "Request body has invalid/missing parameter 'currentBatchSize' in batchAttributes.";
     String COURSE_DOES_NOT_HAVE_BATCH = "Course doesn't have any batch.";
     String NOT_OPEN_BATCH ="Not an open batch";
+    String EVENT_ID_MISSING_ERROR = "Please provide event id.";
+    String EVENT_ID_MISSING = "Event id is mandatory.";
   }
 
   interface Key {
@@ -854,6 +856,8 @@ public interface ResponseMessage {
     String CURRENT_BATCH_SIZE_INVALID =  "INVALID_FIELD_CURRENT_BATCH_SIZE";
     String COURSE_DOES_NOT_HAVE_BATCH = "COURSE_DOES_NOT_HAVE_BATCH";
     String NOT_OPEN_BATCH ="NOT_OPEN_BATCH";
+    String EVENT_ID_MISSING_ERROR = "EVENT_ID_REQUIRED_ERROR";
+    String EVENT_ID_MISSING = "EVENT_ID_REQUIRED_ERROR";
     String INVALID_EVENT_ID = "INVALID_EVENT_ID";
   }
 }
