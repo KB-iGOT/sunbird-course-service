@@ -36,9 +36,25 @@ public class EventManagementActor extends BaseActor {
             case "getEnrol":
                 getUserEventEnrollment(request);
                 break;
+            case "getEventState":
+                getUserEventState(request);
+                break;
             default:
                 onReceiveUnsupportedOperation(requestedOperation);
                 break;
+        }
+    }
+
+    private void getUserEventState(Request request) {
+        logger.info(request.getRequestContext(), "EventManagementActor: getUserEventState = " );
+        try {
+            List<Map<String, Object>> result = eventBatchDao.getUserEventState(request);
+            Response response = new Response();
+            response.put(JsonKey.EVENTS, result);
+            sender().tell(response, self());
+        } catch (Exception e) {
+            logger.error(request.getRequestContext(), "Exception in getUserEventState for user: ", e);
+            throw e;
         }
     }
 

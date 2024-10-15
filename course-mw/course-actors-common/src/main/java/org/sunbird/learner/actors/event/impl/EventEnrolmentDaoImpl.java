@@ -40,12 +40,13 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
             userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
             for (Map<String, Object> enrollment : userEnrollmentList) {
-                String eventId = (String) enrollment.get(JsonKey.EVENTID);
+                String contentId= (String) enrollment.get(JsonKey.CONTENT_ID);
+                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID);
                 String userid = (String) enrollment.get(JsonKey.USER_ID);
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
-                List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid,eventId,batchId);
+                Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get(JsonKey.CONTENT_ID));
+                List<Map<String, Object>> batchDetails = getBatchList(request, contentId,contextId, batchId);
+                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid,contentId,contextId,batchId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
                 enrollment.put("userEventConsumption", userEventConsumption);
@@ -54,15 +55,17 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         return userEnrollmentList;
     }
 
-    private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String eventId,String batchId) {
+    private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String contentId,String contextId,String batchId) {
         List<Map<String, Object>> userEventConsumption = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         if (userId != null && !userId.isEmpty()) {
             propertyMap.put(JsonKey.USER_ID_KEY, userId);
         }
-        if (eventId != null && !eventId.isEmpty()) {
-            propertyMap.put(JsonKey.CONTENT_ID_KEY, eventId);
-            propertyMap.put(JsonKey.CONTEXT_ID, eventId);
+        if (contentId != null && !contentId.isEmpty()) {
+            propertyMap.put(JsonKey.CONTENT_ID_KEY, contentId);
+        }
+        if (contextId != null && !contextId.isEmpty()) {
+            propertyMap.put(JsonKey.CONTEXT_ID, contextId);
         }
         if (batchId != null && !batchId.isEmpty()) {
             propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
@@ -80,14 +83,13 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         return userEventConsumption;
     }
 
-    @Override
-    public List<Map<String, Object>> getBatchList(Request request, String eventId, String batchId) {
-        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + eventId + " batchId = " + batchId);
+    public List<Map<String, Object>> getBatchList(Request request, String contentId,String contextId, String batchId) {
+        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + contentId + " batchId = " + batchId);
         List<Map<String, Object>> userBatchList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
-        if (eventId != null && !eventId.isEmpty()) {
-            propertyMap.put(JsonKey.CONTENT_ID_KEY, eventId);
-            propertyMap.put(JsonKey.CONTEXT_ID, eventId);
+
+        if (contextId != null && !contextId.isEmpty()) {
+            propertyMap.put(JsonKey.EVENTID, contextId);
         }
         if (batchId != null && !batchId.isEmpty()) {
             propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
@@ -124,21 +126,18 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 propertyMap,
                 request.getRequestContext()
         );
-        if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
-            userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
-            for (Map<String, Object> enrollment : userEnrollmentList) {
-                 eventId = (String) enrollment.get(JsonKey.EVENTID);
-                 String userid = (String) enrollment.get(JsonKey.USER_ID);
-                 batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
-                List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, eventId,batchId);
-                enrollment.put("event", contentDetails);
-                enrollment.put("batchDetails", batchDetails);
-                enrollment.put("userEventConsumption", userEventConsumption);
-            }
-        }
+        userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
         return userEnrollmentList;
+    }
+
+    @Override
+    public List<Map<String, Object>> getUserEventState(Request request) {
+        String userId = (String) request.get(JsonKey.USER_ID);
+        String contentId = (String) request.get(JsonKey.EVENT_ID);
+        String contextId = (String) request.get(JsonKey.EVENT_ID);
+        String batchId = (String) request.get(JsonKey.BATCH_ID);
+        List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request,userId,contentId,contextId,batchId);
+        return userEventConsumption;
     }
 
     private Map<String, Object> getEventDetails(RequestContext requestContext, String eventId) {
@@ -149,7 +148,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.EVENT_REDIS_TTL));
             String cacheResponse = redisCacheUtil.get(key,null,ttl);
             ObjectMapper mapper = new ObjectMapper();
-            if (cacheResponse != null && !cacheResponse.isEmpty()) {
+            if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
                 logger.info(requestContext, "EventEnrolmentDaoImpl:getContentDetails: Data reading from cache ", null,
                         null);
                 return mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
