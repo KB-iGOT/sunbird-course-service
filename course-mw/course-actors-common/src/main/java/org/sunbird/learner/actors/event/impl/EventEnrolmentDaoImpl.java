@@ -45,10 +45,10 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
                 List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                //List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
-                //enrollment.put("userEventConsumption", userEventConsumption);
+                enrollment.put("userEventConsumption", userEventConsumption);
             }
         }
         return userEnrollmentList;
@@ -128,10 +128,10 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                  batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
                 List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                //List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
-                //enrollment.put("userEventConsumption", userEventConsumption);
+                enrollment.put("userEventConsumption", userEventConsumption);
             }
         }
         return userEnrollmentList;
