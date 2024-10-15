@@ -76,9 +76,9 @@ public final class Util {
     dbInfoMap.put(JsonKey.CONTENT_HIERARCHY_STORE_DB, getDbInfoObject(ProjectUtil.getConfigValue(JsonKey.CONTENT_HIERARCHY_STORE_KEY_SPACE_NAME), "content_hierarchy"));
     dbInfoMap.put(JsonKey.USER_KARMA_POINTS_DB, getDbInfoObject(KEY_SPACE_NAME, "user_karma_points_summary"));
     dbInfoMap.put(
-            JsonKey.LEARNER_EVENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_event_consumption"));
+            JsonKey.LEARNER_EVENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_entity_consumption"));
     dbInfoMap.put(
-            JsonKey.LEARNER_ENROLMENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_event_enrolments"));
+            JsonKey.LEARNER_ENROLMENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_entity_enrolments"));
     dbInfoMap.put(JsonKey.EVENT_BATCH_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "event_batch"));
     dbInfoMap.put(
             JsonKey.USER_EVENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_entity_enrolments"));

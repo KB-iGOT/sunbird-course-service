@@ -589,9 +589,10 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       val contentIds: util.List[String] = new util.ArrayList[String]()
       val inputContent: util.Map[String, AnyRef] = eventList.get(0)
       val batchId = inputContent.get(JsonKey.BATCH_ID).asInstanceOf[String]
-      val eventId = inputContent.get(JsonKey.EVENT_ID).asInstanceOf[String]
+      val contentId = inputContent.get(JsonKey.EVENT_ID).asInstanceOf[String]
+      val contextId = inputContent.get(JsonKey.EVENT_ID).asInstanceOf[String]
       // Retrieve batch details
-      val batchDetailsList: List[java.util.Map[String, AnyRef]] = getBatches(requestContext, batchId, eventId, null).toList
+      val batchDetailsList: List[java.util.Map[String, AnyRef]] = getBatches(requestContext, batchId, contentId, null).toList
       if (batchDetailsList.nonEmpty) {
         val batchDetails: java.util.Map[String, AnyRef] = batchDetailsList.get(0)
         // Check batch status
@@ -603,9 +604,12 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           val userId = inputContent.get(JsonKey.USER_ID).asInstanceOf[String]
           // Process event consumption if the user ID is valid
           if (validUserIds.contains(userId)) {
-            val existingContents = getEventsConsumption(userId, eventId, batchId, requestContext).groupBy(x => x.get("eventid").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
-            val existingContent = existingContents.getOrElse(eventId, new java.util.HashMap[String, AnyRef])
-            val updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId))
+            val existingContents = getEventsConsumption(userId, contentId,contextId, batchId, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
+            val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
+            var updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId))
+            updatedContent.remove("eventId")
+            updatedContent.put("contentid", contentId)
+            updatedContent.put("contextid",contextId)
             val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
             /*val contentInfoMap = ContentUtil.getContentReadV3(eventId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
@@ -614,18 +618,18 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             /*pushInstructionEvent(requestContext, userId, batchId, eventId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)*/
             // Insert updated content into the database
             cassandraOperation.batchInsertLogged(requestContext, eventConsumptionDBInfo.getKeySpace, eventConsumptionDBInfo.getTableName, updatedContentList)
-            val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
+            val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, contentId,contextId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
             if(updatedContent.get("status").asInstanceOf[Int] == 2) {
-              pushKaramPointsKafkaTopic(userId, eventId, batchId);
+              pushKaramPointsKafkaTopic(userId, contentId, batchId);
             }
           }
         }
       } else {
-        logger.info(requestContext, "EventConsumptionActor: addContent : No batch details found for batchId: " + batchId + "eventId:" + eventId)
+        logger.info(requestContext, "EventConsumptionActor: addContent : No batch details found for batchId: " + batchId + "eventId:" + contentId)
         throw new ProjectCommonException(ResponseCode.invalidRequestData.getErrorCode,
-          s"""No batch details found for, batchId: $batchId, eventId: $eventId""", ResponseCode.CLIENT_ERROR.getResponseCode)
+          s"""No batch details found for, batchId: $batchId, eventId: $contentId""", ResponseCode.CLIENT_ERROR.getResponseCode)
       }
       contentIds.map(id => responseMessage.put(id, JsonKey.SUCCESS))
       val response = new Response()
@@ -673,13 +677,14 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
    * @param requestContext The context of the request.
    * @return A list of maps containing event consumption records.
    */
-  def getEventsConsumption(userId: String, eventId: String, batchId: String, requestContext: RequestContext): java.util.List[java.util.Map[String, AnyRef]] = {
+  def getEventsConsumption(userId: String, contentId: String,contextId:String, batchId: String, requestContext: RequestContext): java.util.List[java.util.Map[String, AnyRef]] = {
     // Constructing filters for querying event consumption records
     val filters = new java.util.HashMap[String, AnyRef]() {
       {
         put("userid", userId)
-        put("batchId", batchId)
-        put("eventId", eventId)
+        put("batchid", batchId)
+        put("contentid", contentId)
+        put("contextid", contextId)
       }
     }
     val response = cassandraOperation.getRecords(requestContext, eventConsumptionDBInfo.getKeySpace, eventConsumptionDBInfo.getTableName, filters, null)
@@ -688,7 +693,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
   }
 
 
-  def getLatestReadDetailsForEventStateUpdate(userId: String, batchId: String, contents: List[java.util.Map[String, AnyRef]]) = {
+  def getLatestReadDetailsForEventStateUpdate(userId: String, batchId: String,contentId:String,contextId:String, contents: List[java.util.Map[String, AnyRef]]) = {
     val lastAccessContent: java.util.Map[String, AnyRef] = contents.groupBy(x => x.getOrDefault(JsonKey.LAST_ACCESS_TIME_KEY, null).asInstanceOf[Date]).maxBy(_._1)._2.get(0)
     val updateMap = new java.util.HashMap[String, AnyRef] () {{
       put("lastreadcontentid", lastAccessContent.get(JsonKey.CONTENT_ID_KEY))
@@ -699,9 +704,10 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
     }}
     val selectMap = new util.HashMap[String, AnyRef]() {{
-      put("batchId", batchId)
-      put("userId", userId)
-      put("eventId", lastAccessContent.get(JsonKey.EVENT_ID))
+      put("batchid", batchId)
+      put("userid", userId)
+      put("contentid", contentId)
+      put("contextid", contextId)
     }}
     (selectMap, updateMap)
   }
