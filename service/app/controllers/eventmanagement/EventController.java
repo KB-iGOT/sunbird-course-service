@@ -41,20 +41,49 @@ public class EventController extends BaseController {
                 httpRequest);
     }
 
-    public CompletionStage<Result> getEnrolledCourses(String uid, Http.Request httpRequest) {
+    public CompletionStage<Result> getEnrolledEventsList(String uid, Http.Request httpRequest) {
         return handleRequest(actorRef, "listEnrol",
                 httpRequest.body().asJson(),
                 (req) -> {
                     Request request = (Request) req;
                     Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
-                    if(queryParams.containsKey("fields")) {
-                        Set<String> fields = new HashSet<>(Arrays.asList(queryParams.get("fields")[0].split(",")));
-                        fields.addAll(Arrays.asList(JsonKey.NAME, JsonKey.DESCRIPTION, JsonKey.LEAF_NODE_COUNT, JsonKey.APP_ICON));
-                        queryParams.put("fields", fields.toArray(new String[0]));
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+
+                    request
+                            .getContext()
+                            .put(JsonKey.URL_QUERY_STRING, getQueryString(queryParams));
+                    request
+                            .getContext()
+                            .put(JsonKey.BATCH_DETAILS, httpRequest.queryString().get(JsonKey.BATCH_DETAILS));
+                    if (queryParams.containsKey("cache")) {
+                        request.getContext().put("cache", Boolean.parseBoolean(queryParams.get("cache")[0]));
+                    } else
+                        request.getContext().put("cache", true);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+    public CompletionStage<Result> getEnrolledEvent(String uid, Http.Request httpRequest) {
+        return handleRequest(actorRef, "getEnrol",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    if (queryParams.containsKey("eventId")) {
+                        String eventId = queryParams.get("eventId")[0]; // Single eventId
+                        request.put("eventId", eventId);
                     }
-                    if(queryParams.containsKey("courseIds")) {
-                        List<String> courseIds = new ArrayList<>(Arrays.asList(queryParams.get("courseIds")[0].split(",")));
-                        request.put("courseIds",courseIds );
+                    // Extract 'batchId' as a single value, not a list
+                    if (queryParams.containsKey(JsonKey.BATCH_ID)) {
+                        String batchId = queryParams.get(JsonKey.BATCH_ID)[0]; // Single batchId
+                        request.put(JsonKey.BATCH_ID, batchId);
                     }
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);

@@ -178,7 +178,7 @@ public final class ContentUtil {
     try {
       String baseContentreadUrl = JsonKey.EKSTEP_BASE_URL + "/content/v4/read/" + eventId;
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
-      logger.info(null, "making call for content read ==" + eventId);
+      logger.info(null, "making call for content read ==" + baseContentreadUrl);
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
       logger.info(null, "Content read response", null, new HashMap<>(){{put("response", response);}});
       Map<String, Object> data = mapper.readValue(response, Map.class);
@@ -396,21 +396,21 @@ public final class ContentUtil {
     return flag;
   }
 
-  public static boolean updateEventCollection(RequestContext requestContext, String collectionId, Map<String, Object> data) {
-    String response = "";
-    try {
-      String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
-      Request request = new Request();
-      request.put("content", data);
-      response =
-              HttpUtil.sendPatchRequest(
-                      contentUpdateBaseUrl
-                              + PropertiesCache.getInstance().getProperty(JsonKey.EVENT_UPDATE_URL)
-                              + collectionId, JsonUtil.serialize(request),
-                      headerMap);
-    } catch (Exception e) {
-      logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
+    public static boolean updateEventCollection(RequestContext requestContext, String collectionId, Map<String, Object> data) {
+        String response = "";
+        try {
+            String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
+            Request request = new Request();
+            request.put("content", data);
+            response =
+                    HttpUtil.sendPatchRequest(
+                            contentUpdateBaseUrl
+                                    + PropertiesCache.getInstance().getProperty(JsonKey.EVENT_UPDATE_URL)
+                                    + collectionId, JsonUtil.serialize(request),
+                            headerMap);
+        } catch (Exception e) {
+            logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
+        }
+        return JsonKey.SUCCESS.equalsIgnoreCase(response);
     }
-    return JsonKey.SUCCESS.equalsIgnoreCase(response);
-  }
 }

@@ -25,10 +25,13 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     public LoggerUtil logger = new LoggerUtil(this.getClass());
 
     @Override
-    public List<Map<String, Object>> getEnrolmentList(Request request, String userId, List<String> courseIdList) {
+    public List<Map<String, Object>> getEnrolmentList(Request request, String userId) {
+        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
         List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
-        propertyMap.put(JsonKey.USER_ID_KEY, userId);
+        if (userId != null && !userId.isEmpty()) {
+            propertyMap.put(JsonKey.USER_ID_KEY, userId);
+        }
         Response res = cassandraOperation.getRecordsByProperties(request.getRequestContext(),
                 JsonKey.KEYSPACE_SUNBIRD_COURSES,
                 JsonKey.TABLE_USER_EVENT_ENROLMENTS,
@@ -40,12 +43,12 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 String eventId = (String) enrollment.get(JsonKey.EVENTID);
                 String userid = (String) enrollment.get(JsonKey.USER_ID);
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                Map<String, Object> contentDetails = getContentDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
+                Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
                 List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                //List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
-                enrollment.put("userEventConsumption", userEventConsumption);
+                //enrollment.put("userEventConsumption", userEventConsumption);
             }
         }
         return userEnrollmentList;
@@ -54,10 +57,15 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String batchId, String eventId) {
         List<Map<String, Object>> userEventConsumption = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
-        propertyMap.put(JsonKey.USER_ID_KEY, userId);
-        propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
-        propertyMap.put(JsonKey.EVENTID, eventId);
-
+        if (userId != null && !userId.isEmpty()) {
+            propertyMap.put(JsonKey.USER_ID_KEY, userId);
+        }
+        if (batchId != null && !batchId.isEmpty()) {
+            propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
+        }
+        if (eventId != null && !eventId.isEmpty()) {
+            propertyMap.put(JsonKey.EVENTID, eventId);
+        }
         Response res = cassandraOperation.getRecordsByCompositeKey(
                 JsonKey.KEYSPACE_SUNBIRD_COURSES,
                 JsonKey.TABLE_USER_EVENT_CONSUMPTION,
@@ -72,10 +80,15 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
     @Override
     public List<Map<String, Object>> getBatchList(Request request, String eventId, String batchId) {
+        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + eventId + " batchId = " + batchId);
         List<Map<String, Object>> userBatchList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
-        propertyMap.put(JsonKey.EVENTID, eventId);
-        propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
+        if (eventId != null && !eventId.isEmpty()) {
+            propertyMap.put(JsonKey.EVENTID, eventId);
+        }
+        if (batchId != null && !batchId.isEmpty()) {
+            propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
+        }
         Response res = cassandraOperation.getRecordsByCompositeKey(
                 JsonKey.KEYSPACE_SUNBIRD_COURSES,
                 JsonKey.TABLE_USER_EVENT_BATCHES,
@@ -88,11 +101,46 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         return userBatchList;
     }
 
-    private Map<String, Object> getContentDetails(RequestContext requestContext, String eventId) {
+    @Override
+    public List<Map<String, Object>> getUserEventEnrollment(Request request, String userId,String eventId ,String batchId){
+        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getUserEventEnrollment: UserId = " + userId + " eventId = " + eventId + " batchId = " + batchId);
+        List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
+        Map<String, Object> propertyMap = new HashMap<>();
+        if (userId != null && !userId.isEmpty()) {
+            propertyMap.put(JsonKey.USER_ID_KEY, userId);
+        }
+        if (eventId != null && !eventId.isEmpty()) {
+            propertyMap.put(JsonKey.EVENTID, eventId);
+        }
+        if (batchId != null && batchId.isEmpty()) {
+            propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
+        }
+        Response res = cassandraOperation.getRecordsByCompositeKey(JsonKey.KEYSPACE_SUNBIRD_COURSES,
+                JsonKey.TABLE_USER_EVENT_ENROLMENTS,
+                propertyMap,
+                request.getRequestContext()
+        );
+        if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
+            userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
+            for (Map<String, Object> enrollment : userEnrollmentList) {
+                 eventId = (String) enrollment.get(JsonKey.EVENTID);
+                 String userid = (String) enrollment.get(JsonKey.USER_ID);
+                 batchId = (String) enrollment.get(JsonKey.BATCH_ID);
+                Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
+                List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
+                //List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                enrollment.put("event", contentDetails);
+                enrollment.put("batchDetails", batchDetails);
+                //enrollment.put("userEventConsumption", userEventConsumption);
+            }
+        }
+        return userEnrollmentList;
+    }
+
+    private Map<String, Object> getEventDetails(RequestContext requestContext, String eventId) {
+        logger.info(requestContext, "EventEnrolmentDaoImpl:getEventDetails: eventId: " + eventId, null, null);
         Map<String, Object> response = new HashMap<>();
         try {
-            logger.info(requestContext, "EventEnrolmentDaoImpl:getContentDetails: eventIdId: " + eventId, null,
-                    null);
             String key = getCacheKey(eventId);
             int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.EVENT_REDIS_TTL));
             String cacheResponse = redisCacheUtil.get(key,null,ttl);
