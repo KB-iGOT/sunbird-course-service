@@ -401,7 +401,7 @@ public final class ContentUtil {
         try {
             String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
             Request request = new Request();
-            request.put("content", data);
+            request.put("event", data);
             response =
                     HttpUtil.sendPatchRequest(
                             contentUpdateBaseUrl
