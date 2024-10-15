@@ -370,17 +370,6 @@ public class EventsActor extends BaseActor {
             sender().tell(successResponse(), self());
             generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
             notifyUser(userId, batchData, JsonKey.ADD);
-
-            Map<String, Object> dataMap = new HashMap<>();
-            Map<String, Object> requestMap = new HashMap<>();
-            requestMap.put(JsonKey.EVENT_ID, eventId);
-            requestMap.put(JsonKey.USER_ID, userId);
-            requestMap.put(JsonKey.BATCH_ID, batchId);
-            dataMap.put("edata", requestMap);
-
-            String topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic");
-            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap);
-
         } else {
             throw new ProjectCommonException(ResponseCode.accessDeniedToEnrolEvent.getErrorCode(), ResponseCode.accessDeniedToEnrolEvent.getErrorMessage(),ResponseCode.CLIENT_ERROR.getResponseCode());
         }
