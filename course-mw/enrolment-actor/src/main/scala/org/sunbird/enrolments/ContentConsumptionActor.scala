@@ -295,7 +295,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                 updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
             }
         } else {
-          if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
+          if (inputStatus >= 2) {
                 updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
                 updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
                 updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
@@ -605,7 +605,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           if (validUserIds.contains(userId)) {
             val existingContents = getEventsConsumption(userId, eventId, batchId, requestContext).groupBy(x => x.get("eventid").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(eventId, new java.util.HashMap[String, AnyRef])
-            val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
+            val updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId))
             val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
             /*val contentInfoMap = ContentUtil.getContentReadV3(eventId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
@@ -617,7 +617,9 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
-            pushKaramPointsKafkaTopic(userId, eventId, batchId);
+            if(updatedContent.get("status").asInstanceOf[Int] == 2) {
+              pushKaramPointsKafkaTopic(userId, eventId, batchId);
+            }
           }
         }
       } else {
@@ -721,4 +723,52 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
   }
 
 
+  def processEventConsumption(inputContent: java.util.Map[String, AnyRef], existingContent: java.util.Map[String, AnyRef], userId: String) = {
+    var inputStatus = inputContent.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number].intValue()
+    if (inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
+      inputStatus = 2;
+      inputContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
+    }
+    val updatedContent = new java.util.HashMap[String, AnyRef]()
+    updatedContent.putAll(inputContent)
+    val parsedMap = new java.util.HashMap[String, AnyRef]()
+    jsonFields.foreach(field =>
+      if(inputContent.containsKey(field)) {
+        parsedMap.put(field, mapper.writeValueAsString(inputContent.get(field)))
+      }
+    )
+    updatedContent.putAll(parsedMap)
+    val inputCompletedTime = parseDate(inputContent.getOrDefault(JsonKey.LAST_COMPLETED_TIME, "").asInstanceOf[String])
+    val inputAccessTime = parseDate(inputContent.getOrDefault(JsonKey.LAST_ACCESS_TIME, "").asInstanceOf[String])
+    if(MapUtils.isNotEmpty(existingContent)) {
+      val existingAccessTime = if(parseDate(existingContent.get(JsonKey.LAST_ACCESS_TIME).asInstanceOf[Date]) == null) parseDate(existingContent.getOrDefault(JsonKey.OLD_LAST_ACCESS_TIME, "").asInstanceOf[String]) else parseDate(existingContent.get(JsonKey.LAST_ACCESS_TIME).asInstanceOf[Date])
+      updatedContent.put(JsonKey.LAST_ACCESS_TIME, compareTime(existingAccessTime, inputAccessTime))
+      val inputProgress = inputContent.getOrDefault(JsonKey.PROGRESS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number].intValue()
+      val existingProgress = Option(existingContent.getOrDefault(JsonKey.PROGRESS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number]).getOrElse(0.asInstanceOf[Number]).intValue()
+      updatedContent.put(JsonKey.PROGRESS, List(inputProgress, existingProgress).max.asInstanceOf[AnyRef])
+      val existingStatus = Option(existingContent.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number]).getOrElse(0.asInstanceOf[Number]).intValue()
+      val existingCompletedTime = if (parseDate(existingContent.get(JsonKey.LAST_COMPLETED_TIME).asInstanceOf[Date]) == null) parseDate(existingContent.getOrDefault(JsonKey.OLD_LAST_COMPLETED_TIME, "").asInstanceOf[String]) else parseDate(existingContent.get(JsonKey.LAST_COMPLETED_TIME).asInstanceOf[Date])
+      if(inputStatus >= existingStatus) {
+        if(inputStatus >= 2 ) {
+          updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
+          updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
+          updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(existingCompletedTime, inputCompletedTime))
+        }
+      } else {
+        updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
+      }
+    } else {
+      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
+        updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
+        updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
+        updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
+      } else {
+        updatedContent.put(JsonKey.PROGRESS, 0.asInstanceOf[AnyRef])
+      }
+      updatedContent.put(JsonKey.LAST_ACCESS_TIME, compareTime(null, inputAccessTime))
+    }
+    updatedContent.put(JsonKey.LAST_UPDATED_TIME, ProjectUtil.getTimeStamp)
+    updatedContent.put(JsonKey.USER_ID, userId)
+    updatedContent
+  }
 }
