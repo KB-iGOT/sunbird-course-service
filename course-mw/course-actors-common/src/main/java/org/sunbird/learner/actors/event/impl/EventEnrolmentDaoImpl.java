@@ -45,7 +45,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
                 List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid,eventId,batchId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
                 enrollment.put("userEventConsumption", userEventConsumption);
@@ -54,18 +54,20 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         return userEnrollmentList;
     }
 
-    private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String batchId, String eventId) {
+    private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String eventId,String batchId) {
         List<Map<String, Object>> userEventConsumption = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         if (userId != null && !userId.isEmpty()) {
             propertyMap.put(JsonKey.USER_ID_KEY, userId);
         }
+        if (eventId != null && !eventId.isEmpty()) {
+            propertyMap.put(JsonKey.CONTENT_ID_KEY, eventId);
+            propertyMap.put(JsonKey.CONTEXT_ID, eventId);
+        }
         if (batchId != null && !batchId.isEmpty()) {
             propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
         }
-        if (eventId != null && !eventId.isEmpty()) {
-            propertyMap.put(JsonKey.EVENTID, eventId);
-        }
+
         Response res = cassandraOperation.getRecordsByCompositeKey(
                 JsonKey.KEYSPACE_SUNBIRD_COURSES,
                 JsonKey.TABLE_USER_EVENT_CONSUMPTION,
@@ -84,7 +86,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         List<Map<String, Object>> userBatchList = new ArrayList<>();
         Map<String, Object> propertyMap = new HashMap<>();
         if (eventId != null && !eventId.isEmpty()) {
-            propertyMap.put(JsonKey.EVENTID, eventId);
+            propertyMap.put(JsonKey.CONTENT_ID_KEY, eventId);
+            propertyMap.put(JsonKey.CONTEXT_ID, eventId);
         }
         if (batchId != null && !batchId.isEmpty()) {
             propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
@@ -110,7 +113,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             propertyMap.put(JsonKey.USER_ID_KEY, userId);
         }
         if (eventId != null && !eventId.isEmpty()) {
-            propertyMap.put(JsonKey.EVENTID, eventId);
+            propertyMap.put(JsonKey.CONTENT_ID_KEY, eventId);
+            propertyMap.put(JsonKey.CONTEXT_ID, eventId);
         }
         if (batchId != null && batchId.isEmpty()) {
             propertyMap.put(JsonKey.BATCH_ID_KEY, batchId);
@@ -128,7 +132,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                  batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get("eventid"));
                 List<Map<String, Object>> batchDetails = getBatchList(request, eventId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, batchId, eventId);
+                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, eventId,batchId);
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
                 enrollment.put("userEventConsumption", userEventConsumption);
