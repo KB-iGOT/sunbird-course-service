@@ -136,6 +136,7 @@ public class EventsActor extends BaseActor {
         TelemetryUtil.telemetryProcessingCall(request, targetObject, correlatedObject, actorMessage.getContext());
 
         //  updateBatchCount(eventBatch);
+        esCourseMap.put(JsonKey.VERSION_KEY,contentDetails.get(JsonKey.VERSION_KEY));
         updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
         if (courseNotificationActive()) {
             batchOperationNotifier(actorMessage, eventBatch, null);
@@ -162,7 +163,7 @@ public class EventsActor extends BaseActor {
     }
 
     private Map<String, Object> getContentDetails(RequestContext requestContext, String eventId, Map<String, String> headers) {
-        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory"));
+        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory","versionKey"));
         logger.info(requestContext, "EventsActor:getEkStepContent: eventId: " + eventId, null,
                 ekStepContent);
         String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
@@ -267,6 +268,7 @@ public class EventsActor extends BaseActor {
     private void updateCollection(RequestContext requestContext, Map<String, Object> eventBatch, Map<String, Object> contentDetails) {
         List<Map<String, Object>> batches = (List<Map<String, Object>>) contentDetails.getOrDefault("batches", new ArrayList<>());
         Map<String, Object> data =  new HashMap<>();
+        Map<String,Object> event = new HashMap<>();
         data.put("batchId", eventBatch.getOrDefault(JsonKey.BATCH_ID, ""));
         data.put("name", eventBatch.getOrDefault(JsonKey.NAME, ""));
         data.put("createdFor", eventBatch.getOrDefault(JsonKey.COURSE_CREATED_FOR, new ArrayList<>()));
@@ -278,9 +280,15 @@ public class EventsActor extends BaseActor {
         data.put("status", eventBatch.getOrDefault(JsonKey.STATUS, ""));
         data.put("batchAttributes", eventBatch.getOrDefault(CourseJsonKey.BATCH_ATTRIBUTES, new HashMap<String, Object>()));
         data.put("enrollmentEndDate", getEnrollmentEndDate((String) eventBatch.getOrDefault(JsonKey.ENROLLMENT_END_DATE, null), (String) eventBatch.getOrDefault(JsonKey.END_DATE, null)));
+        data.put("eventId",eventBatch.get(JsonKey.EVENT_ID));
+        data.put("identifier",eventBatch.get(JsonKey.EVENT_ID));
+        data.put("description",eventBatch.getOrDefault(JsonKey.DESCRIPTION,""));
         batches.removeIf(map -> StringUtils.equalsIgnoreCase((String) eventBatch.getOrDefault(JsonKey.BATCH_ID, ""), (String) map.get("batchId")));
         batches.add(data);
-        ContentUtil.updateEventCollection(requestContext, (String) eventBatch.getOrDefault(JsonKey.EVENT_ID, ""), new HashMap<String, Object>() {{ put("batches", batches);}});
+        event.put("batches", batches);
+        event.put("versionKey",eventBatch.get(JsonKey.VERSION_KEY));
+        event.put("identifier",eventBatch.get(JsonKey.EVENT_ID));
+        ContentUtil.updateEventCollection(requestContext, (String) eventBatch.getOrDefault(JsonKey.EVENT_ID, ""), event);
     }
 
     private Object getEnrollmentEndDate(String enrollmentEndDate, String endDate) {

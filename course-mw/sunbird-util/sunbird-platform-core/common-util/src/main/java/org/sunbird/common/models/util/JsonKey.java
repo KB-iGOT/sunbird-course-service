@@ -1156,8 +1156,8 @@ public final class JsonKey {
   public static final String USER_EVENT_DB = "userEventDb";
   public static final String EVENT_ID_KEY = "eventid";
   public static final String EVENT_BATCH = "eventBatch";
-    public static final String CONTEXT_ID = "contextId";
-  public static final String EVENT_UPDATE_URL = "event.update.url";
+  public static final String CONTEXT_ID = "contextId";
+  public static final String EVENT_UPDATE_URL = "/event/v4/update/";
   public static final String CONTEXT_ID_KEY = "contextid";
   private JsonKey() {}
 }
