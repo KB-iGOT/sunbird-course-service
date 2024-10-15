@@ -295,9 +295,10 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                 updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
             }
         } else {
-            if(inputStatus >= 2) {
+          if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
                 updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
                 updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
+                updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
             } else {
                 updatedContent.put(JsonKey.PROGRESS, 0.asInstanceOf[AnyRef])
             }
@@ -530,7 +531,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     // Process enrollment sync if no events are present
     if (CollectionUtils.isEmpty(eventList)) {
       // TO DO : Kafka Topic need to be created and checked as per the requirement.
-      processEnrolmentSyncForEventStateUpdate(request, requestBy, requestedFor)
+      /*processEnrolmentSyncForEventStateUpdate(request, requestBy, requestedFor)*/
     } else {
       val requestContext = request.getRequestContext
       val finalContentList = request.getRequest.getOrDefault(JsonKey.EVENTS, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
@@ -602,20 +603,21 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           val userId = inputContent.get(JsonKey.USER_ID).asInstanceOf[String]
           // Process event consumption if the user ID is valid
           if (validUserIds.contains(userId)) {
-            val existingContents = getEventsConsumption(userId, eventId, batchId, requestContext).groupBy(x => x.get("eventId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
+            val existingContents = getEventsConsumption(userId, eventId, batchId, requestContext).groupBy(x => x.get("eventid").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(eventId, new java.util.HashMap[String, AnyRef])
             val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
             val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-            val contentInfoMap = ContentUtil.getContentReadV3(eventId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
-            val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
+            /*val contentInfoMap = ContentUtil.getContentReadV3(eventId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+            val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]*/
             // TO DO : Kafka Topic need to be created and checked as per the requirement.
-            pushInstructionEvent(requestContext, userId, batchId, eventId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
+            /*pushInstructionEvent(requestContext, userId, batchId, eventId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)*/
             // Insert updated content into the database
             cassandraOperation.batchInsertLogged(requestContext, eventConsumptionDBInfo.getKeySpace, eventConsumptionDBInfo.getTableName, updatedContentList)
-            val updateData = getLatestReadDetails(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
+            val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
+            pushKaramPointsKafkaTopic(userId, eventId, batchId);
           }
         }
       } else {
@@ -678,8 +680,45 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         put("eventId", eventId)
       }
     }
-    val response = cassandraOperation.getRecords(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, filters, null)
+    val response = cassandraOperation.getRecords(requestContext, eventConsumptionDBInfo.getKeySpace, eventConsumptionDBInfo.getTableName, filters, null)
     // Extracting and returning the list of event consumption records from the response
     response.getResult.getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
   }
+
+
+  def getLatestReadDetailsForEventStateUpdate(userId: String, batchId: String, contents: List[java.util.Map[String, AnyRef]]) = {
+    val lastAccessContent: java.util.Map[String, AnyRef] = contents.groupBy(x => x.getOrDefault(JsonKey.LAST_ACCESS_TIME_KEY, null).asInstanceOf[Date]).maxBy(_._1)._2.get(0)
+    val updateMap = new java.util.HashMap[String, AnyRef] () {{
+      put("lastreadcontentid", lastAccessContent.get(JsonKey.CONTENT_ID_KEY))
+      put("lastreadcontentstatus", lastAccessContent.get("status"))
+      put("lrc_progressdetails", lastAccessContent.get("progressdetails"))
+      put(JsonKey.LAST_CONTENT_ACCESS_TIME, lastAccessContent.get(JsonKey.LAST_ACCESS_TIME_KEY))
+
+
+    }}
+    val selectMap = new util.HashMap[String, AnyRef]() {{
+      put("batchId", batchId)
+      put("userId", userId)
+      put("eventId", lastAccessContent.get(JsonKey.EVENT_ID))
+    }}
+    (selectMap, updateMap)
+  }
+
+  def pushKaramPointsKafkaTopic(userId: String, eventId: String, batchId: String) = {
+    val now = System.currentTimeMillis()
+    val event = s"""
+       |{
+       |  "user_id": $userId,
+       |  "ets": $now,
+       |  "batch_id":$batchId ,
+       |  "event_id": $eventId"
+       |}
+       |""".replaceAll("\n","")
+    if(pushTokafkaEnabled){
+      val topic = ProjectUtil.getConfigValue("user_claim_event_karma_point")
+      KafkaClient.send(userId, event, topic)
+    }
+  }
+
+
 }
