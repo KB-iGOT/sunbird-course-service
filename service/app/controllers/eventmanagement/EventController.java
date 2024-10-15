@@ -41,21 +41,12 @@ public class EventController extends BaseController {
                 httpRequest);
     }
 
-    public CompletionStage<Result> getEnrolledCourses(String uid, Http.Request httpRequest) {
+    public CompletionStage<Result> getEnrolledEventsList(String uid, Http.Request httpRequest) {
         return handleRequest(actorRef, "listEnrol",
                 httpRequest.body().asJson(),
                 (req) -> {
                     Request request = (Request) req;
                     Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
-                    if(queryParams.containsKey("fields")) {
-                        Set<String> fields = new HashSet<>(Arrays.asList(queryParams.get("fields")[0].split(",")));
-                        fields.addAll(Arrays.asList(JsonKey.NAME, JsonKey.DESCRIPTION, JsonKey.LEAF_NODE_COUNT, JsonKey.APP_ICON));
-                        queryParams.put("fields", fields.toArray(new String[0]));
-                    }
-                    if(queryParams.containsKey("courseIds")) {
-                        List<String> courseIds = new ArrayList<>(Arrays.asList(queryParams.get("courseIds")[0].split(",")));
-                        request.put("courseIds",courseIds );
-                    }
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
                     request.getContext().put(JsonKey.USER_ID, userId);
@@ -90,9 +81,9 @@ public class EventController extends BaseController {
                         request.put("eventId", eventId);
                     }
                     // Extract 'batchId' as a single value, not a list
-                    if (queryParams.containsKey("batchId")) {
-                        String batchId = queryParams.get("batchId")[0]; // Single batchId
-                        request.put("batchId", batchId);
+                    if (queryParams.containsKey(JsonKey.BATCH_ID)) {
+                        String batchId = queryParams.get(JsonKey.BATCH_ID)[0]; // Single batchId
+                        request.put(JsonKey.BATCH_ID, batchId);
                     }
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
