@@ -465,6 +465,7 @@ public interface ResponseMessage {
     String NOT_OPEN_BATCH ="Not an open batch";
     String EVENT_ID_MISSING_ERROR = "Please provide event id.";
     String EVENT_ID_MISSING = "Event id is mandatory.";
+    String USER_DOES_NOT_HAVE_ACCESS_TO_EVENT = "User doesn't have access to this Event Id";
   }
 
   interface Key {
@@ -859,5 +860,6 @@ public interface ResponseMessage {
     String EVENT_ID_MISSING_ERROR = "EVENT_ID_REQUIRED_ERROR";
     String EVENT_ID_MISSING = "EVENT_ID_REQUIRED_ERROR";
     String INVALID_EVENT_ID = "INVALID_EVENT_ID";
+    String INVALID_EVENT_BATCH_ID = "INVALID_EVENT_BATCH_ID";
   }
 }

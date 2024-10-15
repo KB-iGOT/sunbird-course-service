@@ -396,4 +396,21 @@ public final class ContentUtil {
     return flag;
   }
 
+  public static boolean updateEventCollection(RequestContext requestContext, String collectionId, Map<String, Object> data) {
+    String response = "";
+    try {
+      String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
+      Request request = new Request();
+      request.put("content", data);
+      response =
+              HttpUtil.sendPatchRequest(
+                      contentUpdateBaseUrl
+                              + PropertiesCache.getInstance().getProperty(JsonKey.EVENT_UPDATE_URL)
+                              + collectionId, JsonUtil.serialize(request),
+                      headerMap);
+    } catch (Exception e) {
+      logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
+    }
+    return JsonKey.SUCCESS.equalsIgnoreCase(response);
+  }
 }
