@@ -29,19 +29,20 @@ public class UserEventsDaoImpl implements UserEventsDao {
     private static final String USER_EVENTS_ENROLLMENTS = Util.dbInfoMap.get(JsonKey.USER_EVENT_DB).getTableName();
 
     @Override
-    public UserEvents read(RequestContext requestContext, String userId, String courseId, String batchId) {
+    public UserEvents read(RequestContext requestContext, String userId, String eventId, String batchId) {
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.USER_ID, userId);
-        primaryKey.put(JsonKey.EVENT_ID, courseId);
+        primaryKey.put(JsonKey.CONTENT_ID,eventId);
+        primaryKey.put(JsonKey.CONTEXT_ID,eventId);
         primaryKey.put(JsonKey.BATCH_ID, batchId);
         Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, TABLE_NAME, primaryKey, null);
-        List<Map<String, Object>> userCoursesList =
+        List<Map<String, Object>> userEventList =
                 (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-        if (CollectionUtils.isEmpty(userCoursesList)) {
+        if (CollectionUtils.isEmpty(userEventList)) {
             return null;
         }
         try {
-            return mapper.convertValue((Map<String, Object>) userCoursesList.get(0), UserEvents.class);
+            return mapper.convertValue((Map<String, Object>) userEventList.get(0), UserEvents.class);
         } catch (Exception e) {
             logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
         }
@@ -49,20 +50,22 @@ public class UserEventsDaoImpl implements UserEventsDao {
     }
 
     @Override
-    public Response insertV2(RequestContext requestContext, Map<String, Object> userCoursesDetails) {
-        return cassandraOperation.insertRecord(requestContext, KEYSPACE_NAME, USER_EVENTS_ENROLLMENTS, userCoursesDetails);
+    public Response insertV2(RequestContext requestContext, Map<String, Object> userEventDetails) {
+        return cassandraOperation.insertRecord(requestContext, KEYSPACE_NAME, USER_EVENTS_ENROLLMENTS, userEventDetails);
     }
 
     @Override
     public Response updateV2(RequestContext requestContext, String userId, String eventId, String batchId, Map<String, Object> updateAttributes) {
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.USER_ID, userId);
-        primaryKey.put(JsonKey.EVENT_ID, eventId);
+        primaryKey.put(JsonKey.CONTENT_ID, eventId);
+        primaryKey.put(JsonKey.CONTEXT_ID, eventId);
         primaryKey.put(JsonKey.BATCH_ID, batchId);
         Map<String, Object> updateList = new HashMap<>();
         updateList.putAll(updateAttributes);
         updateList.remove(JsonKey.BATCH_ID_KEY);
-        updateList.remove(JsonKey.EVENT_ID_KEY);
+        updateList.remove(JsonKey.CONTENT_ID_KEY);
+        updateList.remove(JsonKey.CONTEXT_ID_KEY);
         updateList.remove(JsonKey.USER_ID_KEY);
         return cassandraOperation.updateRecord(requestContext, KEYSPACE_NAME, USER_EVENTS_ENROLLMENTS, updateList, primaryKey);
     }

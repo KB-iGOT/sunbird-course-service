@@ -13,7 +13,8 @@ public class UserEvents {
     private boolean active;
     private String addedBy;
     private String batchId;
-    private String eventId;
+    private String contentId;
+    private String contextId;
     private String delta;
     private Date enrolledDate;
     private String grade;
@@ -47,14 +48,6 @@ public class UserEvents {
 
     public void setBatchId(String batchId) {
         this.batchId = batchId;
-    }
-
-    public String getCourseId() {
-        return eventId;
-    }
-
-    public void setCourseId(String eventId) {
-        this.eventId = eventId;
     }
 
     public String getDelta() {
@@ -137,4 +130,11 @@ public class UserEvents {
         this.userId = userId;
     }
 
+    public String getContentId() {return contentId;}
+
+    public void setContentId(String contentId) {this.contentId = contentId;}
+
+    public String getContextId() { return contextId; }
+
+    public void setContextId(String contextId) { this.contextId = contextId; }
 }
