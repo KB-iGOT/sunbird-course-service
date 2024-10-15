@@ -1146,9 +1146,9 @@ public final class JsonKey {
   public static final String EVENT_ID = "eventId";
   public static final String EVENT_BATCH_DB = "eventBatchDB";
   public static final String KEYSPACE_SUNBIRD_COURSES = "sunbird_courses";
-  public static final String TABLE_USER_EVENT_ENROLMENTS = "user_event_enrolments";
+  public static final String TABLE_USER_EVENT_ENROLMENTS = "user_entity_enrolments";
   public static final String TABLE_USER_EVENT_BATCHES = "event_batch";
-  public static final String TABLE_USER_EVENT_CONSUMPTION = "user_event_consumption";
+  public static final String TABLE_USER_EVENT_CONSUMPTION = "user_entity_consumption";
   public static final String EVENTID = "eventid";
   public static final String EVENT_REDIS_TTL = "eventRedisTTL";
   public static final String LEARNER_EVENT_DB = "learnerEvent_db";
@@ -1156,7 +1156,7 @@ public final class JsonKey {
   public static final String USER_EVENT_DB = "userEventDb";
   public static final String EVENT_ID_KEY = "eventid";
   public static final String EVENT_BATCH = "eventBatch";
-  public static final String CONTEXT_ID = "contextId";
+    public static final String CONTEXT_ID = "contextId";
   public static final String EVENT_UPDATE_URL = "event.update.url";
   public static final String CONTEXT_ID_KEY = "contextid";
   private JsonKey() {}
