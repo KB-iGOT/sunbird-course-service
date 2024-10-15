@@ -280,7 +280,7 @@ public class EventsActor extends BaseActor {
         data.put("enrollmentEndDate", getEnrollmentEndDate((String) eventBatch.getOrDefault(JsonKey.ENROLLMENT_END_DATE, null), (String) eventBatch.getOrDefault(JsonKey.END_DATE, null)));
         batches.removeIf(map -> StringUtils.equalsIgnoreCase((String) eventBatch.getOrDefault(JsonKey.BATCH_ID, ""), (String) map.get("batchId")));
         batches.add(data);
-        ContentUtil.updateCollection(requestContext, (String) eventBatch.getOrDefault(JsonKey.EVENT_ID, ""), new HashMap<String, Object>() {{ put("batches", batches);}});
+        ContentUtil.updateEventCollection(requestContext, (String) eventBatch.getOrDefault(JsonKey.EVENT_ID, ""), new HashMap<String, Object>() {{ put("batches", batches);}});
     }
 
     private Object getEnrollmentEndDate(String enrollmentEndDate, String endDate) {
@@ -374,7 +374,7 @@ public class EventsActor extends BaseActor {
             InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap);
 
         } else {
-            throw new ProjectCommonException("","",ResponseCode.CLIENT_ERROR.getResponseCode());
+            throw new ProjectCommonException(ResponseCode.accessDeniedToEnrolEvent.getErrorCode(), ResponseCode.accessDeniedToEnrolEvent.getErrorMessage(),ResponseCode.CLIENT_ERROR.getResponseCode());
         }
     }
 
@@ -446,7 +446,8 @@ public class EventsActor extends BaseActor {
         Map<String, Object> enrolmentMap = new HashMap<>();
 
         enrolmentMap.put(JsonKey.USER_ID, userId);
-        enrolmentMap.put(JsonKey.EVENT_ID, eventId);
+        enrolmentMap.put(JsonKey.CONTENT_ID, eventId);
+        enrolmentMap.put(JsonKey.CONTEXT_ID, eventId);
         enrolmentMap.put(JsonKey.BATCH_ID, batchId);
         enrolmentMap.put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.ACTIVE.getValue());
 
@@ -457,7 +458,7 @@ public class EventsActor extends BaseActor {
             enrolmentMap.put(JsonKey.DATE_TIME, new Timestamp(new Date().getTime()));
             enrolmentMap.put(JsonKey.COURSE_PROGRESS, 0);
         } else {
-            //logger.info(String.format( (requestContext "user-enrollment-null-tag, userId: %s, courseId: %s, batchId: %s, %s", userId, eventId, batchId));
+            logger.info(requestContext, "user-enrollment-null-tag, userId: "+ userId + "courseId: " + eventId+ "batchId: " + batchId);
         }
 
         return enrolmentMap;
@@ -481,7 +482,7 @@ public class EventsActor extends BaseActor {
             Object activeStatus = dataMap.get(JsonKey.ACTIVE);
             Object enrolledDate = dataMap.get(JsonKey.ENROLLED_DATE);
 
-            //logger.info("upsertEnrollment :: IsNew DataBatchMap :: " );
+            logger.info(requestContext,"upsertEnrollment :: IsNew DataBatchMap" );
 
             if (activeStatus == null) {
                 throw new Exception("Active Value is null in upsertEnrollment");
@@ -490,7 +491,7 @@ public class EventsActor extends BaseActor {
                 throw new Exception("Enrolled date Value is null in upsertEnrollment");
             }
         } catch (Exception e) {
-           // logger.severe(String.format( "Exception in upsertEnrollment: user :: %s | Exception: %s", userId, e.getMessage()));
+           logger.info(requestContext, "Exception in upsertEnrollment: user :: " +userId+ ". | Exception: " + e.getMessage());
             throw new Exception("Exception in upsertEnrollment: " + e);
         }
 

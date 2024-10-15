@@ -850,6 +850,9 @@ public enum ResponseCode {
   invalidEventId(ResponseMessage.Key.INVALID_EVENT_ID, ResponseMessage.Message.INVALID_COURSE_ID),
 
   accessDeniedToEnrolOrUnenrolCourse(ResponseMessage.Key.USER_DOES_NOT_HAVE_ACCESS,ResponseMessage.Message.USER_DOES_NOT_HAVE_ACCESS),
+  accessDeniedToEnrolEvent(ResponseMessage.Key.USER_DOES_NOT_HAVE_ACCESS,ResponseMessage.Message.USER_DOES_NOT_HAVE_ACCESS_TO_EVENT),
+  invalidEventBatchId(
+          ResponseMessage.Key.INVALID_EVENT_BATCH_ID, ResponseMessage.Message.INVALID_COURSE_BATCH_ID),
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),
