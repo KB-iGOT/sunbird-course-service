@@ -41,7 +41,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
             for (Map<String, Object> enrollment : userEnrollmentList) {
                 String contentId= (String) enrollment.get(JsonKey.CONTENT_ID);
-                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID);
+                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
                 String userid = (String) enrollment.get(JsonKey.USER_ID);
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get(JsonKey.CONTENT_ID));
