@@ -386,7 +386,8 @@ public class ProjectUtil {
     metrics("metrics"),
     cbatchstats("cbatchstats"),
     cbatchassessment("cbatch-assessment"),
-    userfeed("userfeed");
+    userfeed("userfeed"),
+    eventBatch("event-batch");
 
     private String typeName;
 

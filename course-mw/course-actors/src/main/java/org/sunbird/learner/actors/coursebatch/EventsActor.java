@@ -13,7 +13,6 @@ import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.util.JsonUtil;
-import org.sunbird.kafka.client.InstructionEventGenerator;
 import org.sunbird.learner.actors.coursebatch.dao.BatchUserDao;
 import org.sunbird.learner.actors.coursebatch.dao.UserEventsDao;
 import org.sunbird.learner.actors.coursebatch.dao.impl.BatchUserDaoImpl;
@@ -22,7 +21,7 @@ import org.sunbird.learner.actors.eventbatch.EventBatchDao;
 import org.sunbird.learner.actors.eventbatch.impl.EventBatchDaoImpl;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.util.ContentUtil;
-import org.sunbird.learner.util.CourseBatchUtil;
+import org.sunbird.learner.util.EventBatchUtil;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.event.batch.EventBatch;
@@ -119,8 +118,8 @@ public class EventsActor extends BaseActor {
         Response result = eventBatchDao.create(actorMessage.getRequestContext(), eventBatch);
         result.put(JsonKey.BATCH_ID, eventBatchId);
 
-        Map<String, Object> esCourseMap = CourseBatchUtil.esEventMapping(eventBatch, dateFormat);
-        CourseBatchUtil.syncCourseBatchForeground(actorMessage.getRequestContext(),
+        Map<String, Object> esCourseMap = EventBatchUtil.esEventMapping(eventBatch, dateFormat);
+        EventBatchUtil.syncEventBatchForeground(actorMessage.getRequestContext(),
                 eventBatchId, esCourseMap);
         sender().tell(result, self());
 
@@ -138,9 +137,9 @@ public class EventsActor extends BaseActor {
         //  updateBatchCount(eventBatch);
         esCourseMap.put(JsonKey.VERSION_KEY,contentDetails.get(JsonKey.VERSION_KEY));
         updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
-        if (courseNotificationActive()) {
-            batchOperationNotifier(actorMessage, eventBatch, null);
-        }
+        // if (courseNotificationActive()) {
+        //    batchOperationNotifier(actorMessage, eventBatch, null);
+        // }
     }
 
     private int setEventBatchStatus(RequestContext requestContext, String startDate) {

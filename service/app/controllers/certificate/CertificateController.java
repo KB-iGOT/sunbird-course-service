@@ -9,6 +9,7 @@ import javax.inject.Named;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.Request;
 import org.sunbird.learner.actor.operations.CourseActorOperations;
+import org.sunbird.learner.actor.operations.EventActorOperations;
 import play.mvc.Http;
 import play.mvc.Result;
 
@@ -19,6 +20,10 @@ public class CertificateController extends BaseController {
   @Inject
   @Named("course-batch-certificate-actor")
   private ActorRef courseBatchCertificateActorRef;
+
+  @Inject
+  @Named("event-batch-certificate-actor")
+  private ActorRef eventBatchCertificateActorRef;
 
   @Inject
   @Named("certificate-actor")
@@ -48,7 +53,7 @@ public class CertificateController extends BaseController {
         httpRequest.body().asJson(),
         (request) -> {
           Request req = (Request) request;
-          new CertificateRequestValidator().validateAddCertificateRequest(req);
+          new CertificateRequestValidator().validateAddCertificateRequest(req, JsonKey.COURSE_ID);
           return null;
         },
         getAllRequestHeaders(httpRequest),
@@ -76,7 +81,21 @@ public class CertificateController extends BaseController {
         httpRequest.body().asJson(),
         (request) -> {
           Request req = (Request) request;
-          new CertificateRequestValidator().validateAddCertificateRequest(req);
+          new CertificateRequestValidator().validateAddCertificateRequest(req, JsonKey.COURSE_ID);
+          return null;
+        },
+        getAllRequestHeaders(httpRequest),
+        httpRequest);
+  }
+
+  public CompletionStage<Result> privateAddEventCertificate(Http.Request httpRequest) {
+    return handleRequest(
+        courseBatchCertificateActorRef,
+        EventActorOperations.ADD_EVENT_BATCH_CERTIFICATE.getValue(),
+        httpRequest.body().asJson(),
+        (request) -> {
+          Request req = (Request) request;
+          new CertificateRequestValidator().validateAddCertificateRequest(req, JsonKey.EVENT_ID);
           return null;
         },
         getAllRequestHeaders(httpRequest),

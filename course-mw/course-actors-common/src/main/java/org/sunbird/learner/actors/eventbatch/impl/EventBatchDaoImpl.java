@@ -13,9 +13,9 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.eventbatch.EventBatchDao;
-import org.sunbird.learner.util.CourseBatchUtil;
+import org.sunbird.learner.constants.CourseJsonKey;
+import org.sunbird.learner.util.EventBatchUtil;
 import org.sunbird.learner.util.Util;
-import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.models.event.batch.EventBatch;
 
 import java.text.ParseException;
@@ -41,8 +41,8 @@ public class EventBatchDaoImpl implements EventBatchDao {
                 (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
         if (eventList.isEmpty()) {
             throw new ProjectCommonException(
-                    ResponseCode.invalidCourseBatchId.getErrorCode(),
-                    ResponseCode.invalidCourseBatchId.getErrorMessage(),
+                    ResponseCode.invalidEventBatchId.getErrorCode(),
+                    ResponseCode.invalidEventBatchId.getErrorMessage(),
                     ResponseCode.CLIENT_ERROR.getResponseCode());
         } else {
             eventList.get(0).remove(JsonKey.PARTICIPANT);
@@ -52,7 +52,7 @@ public class EventBatchDaoImpl implements EventBatchDao {
 
     @Override
     public Response create(RequestContext requestContext, EventBatch eventBatch) {
-        Map<String, Object> map = CourseBatchUtil.cassandraEventMapping(eventBatch, dateFormat);
+        Map<String, Object> map = EventBatchUtil.cassandraEventMapping(eventBatch, dateFormat);
         map = CassandraUtil.changeCassandraColumnMapping(map);
         CassandraUtil.convertMaptoJsonString(map, JsonKey.BATCH_ATTRIBUTES_KEY);
         if(map.get(JsonKey.START_TIME) != null) {
@@ -110,4 +110,46 @@ public class EventBatchDaoImpl implements EventBatchDao {
         map.put(dateType, calendar.getTime());
         log.info("Updated date in map with key {}: {}", dateType, calendar.getTime());
     }
+
+    @Override
+  public void addCertificateTemplateToEventBatch(
+          RequestContext requestContext, String eventId, String batchId, String templateId, Map<String, Object> templateDetails) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.EVENT_ID, eventId);
+    primaryKey.put(JsonKey.BATCH_ID, batchId);
+    cassandraOperation.updateAddMapRecord(
+            requestContext, eventBatchDb.getKeySpace(),
+        eventBatchDb.getTableName(),
+        primaryKey,
+        CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
+        templateId,
+        templateDetails);
+  }
+
+  @Override
+  public void removeCertificateTemplateFromEventBatch(
+          RequestContext requestContext, String eventId, String batchId, String templateId) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.EVENT_ID, eventId);
+    primaryKey.put(JsonKey.BATCH_ID, batchId);
+    cassandraOperation.updateRemoveMapRecord(
+            requestContext, eventBatchDb.getKeySpace(),
+        eventBatchDb.getTableName(),
+        primaryKey,
+        CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
+        templateId);
+  }
+
+  @Override
+  public Map<String, Object> getEventBatch(RequestContext requestContext, String eventId, String batchId) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.COURSE_ID, eventId);
+    primaryKey.put(JsonKey.BATCH_ID, batchId);
+    Response eventBatchResult =
+        cassandraOperation.getRecordByIdentifier(
+                requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), primaryKey, null);
+    List<Map<String, Object>> eventList =
+        (List<Map<String, Object>>) eventBatchResult.get(JsonKey.RESPONSE);
+    return eventList.get(0);
+  }
 }
