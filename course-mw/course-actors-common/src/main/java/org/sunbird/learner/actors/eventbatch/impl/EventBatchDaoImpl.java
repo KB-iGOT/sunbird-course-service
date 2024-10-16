@@ -34,11 +34,11 @@ public class EventBatchDaoImpl implements EventBatchDao {
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.EVENT_ID, eventId);
         primaryKey.put(JsonKey.BATCH_ID, batchId);
-        Response courseBatchResult =
+        Response eventBatchResult =
                 cassandraOperation.getRecordByIdentifier(
                         requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), primaryKey,null);
         List<Map<String, Object>> eventList =
-                (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
+                (List<Map<String, Object>>) eventBatchResult.get(JsonKey.RESPONSE);
         if (eventList.isEmpty()) {
             throw new ProjectCommonException(
                     ResponseCode.invalidEventBatchId.getErrorCode(),
@@ -143,7 +143,7 @@ public class EventBatchDaoImpl implements EventBatchDao {
   @Override
   public Map<String, Object> getEventBatch(RequestContext requestContext, String eventId, String batchId) {
     Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.COURSE_ID, eventId);
+    primaryKey.put(JsonKey.EVENT_ID, eventId);
     primaryKey.put(JsonKey.BATCH_ID, batchId);
     Response eventBatchResult =
         cassandraOperation.getRecordByIdentifier(
