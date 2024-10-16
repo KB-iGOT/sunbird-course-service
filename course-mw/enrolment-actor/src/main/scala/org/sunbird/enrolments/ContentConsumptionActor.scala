@@ -806,7 +806,6 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         "type": "IssueCertificate"
       }
     }""".replaceAll("\n","")
-    System.out.print(event)
     if(pushTokafkaEnabled){
       val topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event")
       KafkaClient.send(userId, event, topic)
