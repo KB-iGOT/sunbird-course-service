@@ -33,11 +33,7 @@ import org.sunbird.userorg.UserOrgServiceImpl;
 import org.sunbird.common.models.util.ProjectUtil;
 
 import java.sql.Timestamp;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.Month;
-import java.time.ZoneId;
+import java.time.*;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -162,7 +158,7 @@ public class EventsActor extends BaseActor {
     }
 
     private Map<String, Object> getContentDetails(RequestContext requestContext, String eventId, Map<String, String> headers) {
-        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory","versionKey"));
+        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory","versionKey","endDate","endTime"));
         logger.info(requestContext, "EventsActor:getEkStepContent: eventId: " + eventId, null,
                 ekStepContent);
         String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
@@ -342,11 +338,15 @@ public class EventsActor extends BaseActor {
         String userId = (String) request.get(JsonKey.USER_ID);
         String batchId = (String) request.get(JsonKey.BATCH_ID);
 
+        Map<String, String> headers =
+                (Map<String, String>) request.getContext().get(JsonKey.HEADER);
+        Map<String, Object> contentDetails = getContentDetails(request.getRequestContext(),eventId, headers);
+
         EventBatch batchData = eventBatchDao.readById(eventId, batchId, request.getRequestContext());
         UserEvents enrolmentData = userEventsDao.read(request.getRequestContext(), userId, eventId, batchId);
         BatchUser batchUserData = batchUserDao.read(request.getRequestContext(), batchId, userId);
 
-        validateEnrolment(batchData, enrolmentData, true);
+        validateEnrolment(batchData, enrolmentData, true,contentDetails);
 
         Map<String, Object> dataBatch = createBatchUserMapping(batchId, userId, batchUserData);
         Map<String, Object> data = createUserEnrolmentMap(
@@ -374,10 +374,26 @@ public class EventsActor extends BaseActor {
         }
     }
 
-    private void validateEnrolment(EventBatch batchData, UserEvents enrolmentData, Boolean isEnrol){
+    private void validateEnrolment(EventBatch batchData, UserEvents enrolmentData, Boolean isEnrol,Map<String, Object> contentDetails){
+        String endDateStr = (String) contentDetails.get("endDate");
+        String endTimeStr = (String) contentDetails.get("endTime");
+
+        LocalDate eventEndDate = LocalDate.parse(endDateStr);
+
+        OffsetTime endTime = OffsetTime.parse(endTimeStr);
+
+        LocalDateTime eventEndLocalDateTime = LocalDateTime.of(eventEndDate, endTime.toLocalTime());
+
+        ZonedDateTime eventEndDateTime = eventEndLocalDateTime.atZone(ZoneId.of("Asia/Kolkata")).withZoneSameInstant(endTime.getOffset());
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
+
+        if (isEnrol && now.isAfter(eventEndDateTime)) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
+                    ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
+        }
         if (batchData == null) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.invalidCourseBatchId,
-                    ResponseCode.invalidCourseBatchId.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.invalidEventBatchId,
+                    ResponseCode.invalidEventBatchId.getErrorMessage());
         }
         if (!(ProjectUtil.EnrolmentType.inviteOnly.getVal().equalsIgnoreCase(batchData.getEnrollmentType()) ||
                 ProjectUtil.EnrolmentType.open.getVal().equalsIgnoreCase(batchData.getEnrollmentType()))) {
@@ -391,29 +407,23 @@ public class EventsActor extends BaseActor {
         if (batchData.getStatus() == 2 ||
                 (batchData.getEndDate() != null &&
                         LocalDateTime.now().isAfter(endDate.atStartOfDay()))) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted,
-                    ResponseCode.courseBatchAlreadyCompleted.getErrorMessage());
-        }
-
-        if (isEnrol && batchData.getEnrollmentEndDate() != null &&
-                LocalDateTime.now().isAfter(enrollmentEndDate.atTime(LocalTime.MAX))) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchEnrollmentDateEnded,
-                    ResponseCode.courseBatchEnrollmentDateEnded.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
+                    ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
         }
 
         if (isEnrol && enrolmentData != null && enrolmentData.isActive()) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse,
-                    ResponseCode.userAlreadyEnrolledCourse.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledEvent,
+                    ResponseCode.userAlreadyEnrolledEvent.getErrorMessage());
         }
 
         if (!isEnrol && (enrolmentData == null || !enrolmentData.isActive())) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.userNotEnrolledCourse,
-                    ResponseCode.userNotEnrolledCourse.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.userNotEnrolledEvent,
+                    ResponseCode.userNotEnrolledEvent.getErrorMessage());
         }
 
         if (!isEnrol && ProjectUtil.ProgressStatus.COMPLETED.getValue() == enrolmentData.getStatus()) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted,
-                    ResponseCode.courseBatchAlreadyCompleted.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
+                    ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
         }
     }
 
