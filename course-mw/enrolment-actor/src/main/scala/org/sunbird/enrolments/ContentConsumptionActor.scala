@@ -591,12 +591,17 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       val batchId = inputContent.get(JsonKey.BATCH_ID).asInstanceOf[String]
       val contentId = inputContent.get(JsonKey.EVENT_ID).asInstanceOf[String]
       val contextId = inputContent.get(JsonKey.EVENT_ID).asInstanceOf[String]
+      val completionPercentage = inputContent.get("completionPercentage").toString.toDouble
       // Retrieve batch details
       val batchDetailsList: List[java.util.Map[String, AnyRef]] = getBatches(requestContext, batchId, contentId, null).toList
       if (batchDetailsList.nonEmpty) {
+
         val batchDetails: java.util.Map[String, AnyRef] = batchDetailsList.get(0)
         // Check batch status
         if (null != batchDetails.get(JsonKey.STATUS) && 2 != batchDetails.get(JsonKey.STATUS)) {
+          val batchAttributes : String = batchDetails.get("batchAttributes").asInstanceOf[String]
+          val batchAttributesMap = JsonUtil.deserialize(batchAttributes,new util.HashMap[String,AnyRef]().getClass)
+          val minPercetageToComplete= batchAttributesMap.get("minPercetageToComplete").toString.toDouble
           val validUserIds = List(requestedBy, requestedFor).filter(p => StringUtils.isNotBlank(p))
           val primaryUserId = if (StringUtils.isNotBlank(requestedFor)) requestedFor else requestedBy
           if (StringUtils.isBlank(inputContent.get(JsonKey.USER_ID).asInstanceOf[String]))
@@ -606,23 +611,19 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           if (validUserIds.contains(userId)) {
             val existingContents = getEventsConsumption(userId, contentId,contextId, batchId, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
-            var updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId))
+            var updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId,minPercetageToComplete))
             updatedContent.remove("eventId")
             updatedContent.put("contentid", contentId)
             updatedContent.put("contextid",contextId)
             val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
-            val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-            /*val contentInfoMap = ContentUtil.getContentReadV3(eventId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
-            val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]*/
-            // TO DO : Kafka Topic need to be created and checked as per the requirement.
-            /*pushInstructionEvent(requestContext, userId, batchId, eventId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)*/
             // Insert updated content into the database
             cassandraOperation.batchInsertLogged(requestContext, eventConsumptionDBInfo.getKeySpace, eventConsumptionDBInfo.getTableName, updatedContentList)
             val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, contentId,contextId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
-            if(updatedContent.get("status").asInstanceOf[Int] == 2) {
+            if(updatedContent.get("status").asInstanceOf[Int] == 2 && inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
               pushKaramPointsKafkaTopic(userId, contentId, batchId);
+              pushCertficateGenerateKafkaTopic(userId, contentId, batchId,completionPercentage);
             }
           }
         }
@@ -714,14 +715,12 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
   def pushKaramPointsKafkaTopic(userId: String, eventId: String, batchId: String) = {
     val now = System.currentTimeMillis()
-    val event = s"""
-       |{
-       |  "user_id": $userId,
-       |  "ets": $now,
-       |  "batch_id":$batchId ,
-       |  "event_id": $eventId"
-       |}
-       |""".replaceAll("\n","")
+    val event = s"""{
+    "user_id": "$userId",
+    "ets": $now,
+    "batch_id": "$batchId",
+    "event_id": "$eventId"
+    }""".replaceAll("\n","")
     if(pushTokafkaEnabled){
       val topic = ProjectUtil.getConfigValue("user_claim_event_karma_point")
       KafkaClient.send(userId, event, topic)
@@ -729,9 +728,9 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
   }
 
 
-  def processEventConsumption(inputContent: java.util.Map[String, AnyRef], existingContent: java.util.Map[String, AnyRef], userId: String) = {
+  def processEventConsumption(inputContent: java.util.Map[String, AnyRef], existingContent: java.util.Map[String, AnyRef], userId: String, minPercetageToComplete: Double) = {
     var inputStatus = inputContent.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number].intValue()
-    if (inputContent.get("completionPercentage").toString.toDouble >= 50.0.asInstanceOf[Double]) {
+    if (inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
        inputStatus = 2;
        inputContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
     }
@@ -764,7 +763,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
       }
     } else {
-      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
+      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= minPercetageToComplete) {
         updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
         updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
         updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
@@ -776,5 +775,40 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     updatedContent.put(JsonKey.LAST_UPDATED_TIME, ProjectUtil.getTimeStamp)
     updatedContent.put(JsonKey.USER_ID, userId)
     updatedContent
+  }
+
+
+  private def pushCertficateGenerateKafkaTopic(userId: String, eventId: String, batchId: String,completionPercentage:Double) = {
+    val now = System.currentTimeMillis()
+    val event = s"""{
+    "actor":{
+      "id": "Issue Certificate Generator",
+      "type": "System"
+      },
+      "context":{
+        "pdata":{
+          "version": "1.0",
+          "id": "org.sunbird.learning.platform"
+          }
+      },
+      "edata": {
+        "action": "issue-event-certificate",
+        "batchId": "$batchId",
+        "eventId": "$eventId",
+        "userId": "$userId",
+        "eventCompletionPercentage": $completionPercentage
+      },
+      "eid": "BE_JOB_REQUEST",
+      "ets" : $now,
+      "mid" : "EVENT.${UUID.randomUUID()}",
+      "object": {
+        "id": "$userId",
+        "type": "IssueCertificate"
+      }
+    }""".replaceAll("\n","")
+    if(pushTokafkaEnabled){
+      val topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event")
+      KafkaClient.send(userId, event, topic)
+    }
   }
 }
