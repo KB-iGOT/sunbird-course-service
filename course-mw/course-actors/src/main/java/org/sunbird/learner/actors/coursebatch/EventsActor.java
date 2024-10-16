@@ -333,7 +333,7 @@ public class EventsActor extends BaseActor {
         courseBatchNotificationActorRef.tell(batchNotification, getSelf());
     }
 
-    public void eventEnroll(Request request) throws Throwable {
+    private void eventEnroll(Request request) throws Throwable {
         String eventId = (String) request.get(JsonKey.EVENT_ID);
         String userId = (String) request.get(JsonKey.USER_ID);
         String batchId = (String) request.get(JsonKey.BATCH_ID);
