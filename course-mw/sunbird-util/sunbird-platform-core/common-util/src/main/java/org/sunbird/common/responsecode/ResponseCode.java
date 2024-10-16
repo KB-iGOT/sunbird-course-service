@@ -851,8 +851,22 @@ public enum ResponseCode {
 
   accessDeniedToEnrolOrUnenrolCourse(ResponseMessage.Key.USER_DOES_NOT_HAVE_ACCESS,ResponseMessage.Message.USER_DOES_NOT_HAVE_ACCESS),
   accessDeniedToEnrolEvent(ResponseMessage.Key.USER_DOES_NOT_HAVE_ACCESS,ResponseMessage.Message.USER_DOES_NOT_HAVE_ACCESS_TO_EVENT),
-  invalidEventBatchId(
-          ResponseMessage.Key.INVALID_EVENT_BATCH_ID, ResponseMessage.Message.INVALID_COURSE_BATCH_ID),
+  invalidEventBatchId(ResponseMessage.Key.INVALID_EVENT_BATCH_ID, ResponseMessage.Message.INVALID_COURSE_BATCH_ID),
+  eventBatchAlreadyCompleted(
+          ResponseMessage.Key.EVENT_BATCH_ALREADY_COMPLETED,
+          ResponseMessage.Message.EVENT_BATCH_ALREADY_COMPLETED),
+  EventBatchEnrollmentDateEnded(
+          ResponseMessage.Key.EVENT_BATCH_ENROLLMENT_DATE_ENDED,
+          ResponseMessage.Message.EVENT_BATCH_ENROLLMENT_DATE_ENDED),
+  userAlreadyEnrolledEvent(
+          ResponseMessage.Key.USER_ALREADY_ENROLLED_EVENT,
+          ResponseMessage.Message.USER_ALREADY_ENROLLED_EVENT),
+  userNotEnrolledEvent(
+          ResponseMessage.Key.USER_NOT_ENROLLED_EVENT,
+          ResponseMessage.Message.USER_NOT_ENROLLED_EVENT),
+  eventEnded(
+          ResponseMessage.Key.EVENT_ENDED,
+          ResponseMessage.Message.EVENT_ENDED),
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),
