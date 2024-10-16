@@ -176,7 +176,7 @@ public final class ContentUtil {
     Map<String, Object> resMap = new HashMap<>();
     Map<String, String> headers = new HashMap<>();
     try {
-      String baseContentreadUrl = JsonKey.EKSTEP_BASE_URL + "/content/v4/read/" + eventId;
+      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v4/read/" + eventId;
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
       logger.info(null, "making call for content read ==" + baseContentreadUrl);
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
