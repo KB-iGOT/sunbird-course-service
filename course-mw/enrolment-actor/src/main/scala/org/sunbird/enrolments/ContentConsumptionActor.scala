@@ -700,6 +700,9 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       put("lastreadcontentid", lastAccessContent.get(JsonKey.CONTENT_ID_KEY))
       put("lastreadcontentstatus", lastAccessContent.get("status"))
       put("lrc_progressdetails", lastAccessContent.get("progressdetails"))
+      put("completionPercentage", lastAccessContent.get("completionPercentage"))
+      put("progress", lastAccessContent.get("progress"))
+      put("status", lastAccessContent.get("status"))
       put(JsonKey.LAST_CONTENT_ACCESS_TIME, lastAccessContent.get(JsonKey.LAST_ACCESS_TIME_KEY))
 
 
