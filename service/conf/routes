@@ -106,3 +106,6 @@ PATCH    /v1/event/state/update     	@controllers.LearnerController.updateEventS
 POST    /v2/event/enroll                    @controllers.eventmanagement.EventsController.enrollEvent(request: play.mvc.Http.Request)
 GET      /v1/user/event/:uid	    @controllers.eventmanagement.EventController.getEnrolledEvent(uid:String, request: play.mvc.Http.Request)
 POST    /v2/user/event/state/read           @controllers.eventmanagement.EventController.getUserEventState(request: play.mvc.Http.Request)
+
+POST    /private/v2/event/batch/create			    @controllers.eventmanagement.EventsController.createEventBatch(request: play.mvc.Http.Request)
+PATCH /private/v1/event/batch/cert/template/add       @controllers.certificate.CertificateController.privateAddEventCertificate(request: play.mvc.Http.Request)
