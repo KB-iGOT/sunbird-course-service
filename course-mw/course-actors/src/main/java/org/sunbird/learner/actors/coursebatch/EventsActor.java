@@ -384,13 +384,12 @@ public class EventsActor extends BaseActor {
 
         LocalDateTime eventEndLocalDateTime = LocalDateTime.of(eventEndDate, endTime.toLocalTime());
 
-        ZonedDateTime eventEndDateTime = eventEndLocalDateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(endTime.getOffset());
-
-        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+        ZonedDateTime eventEndDateTime = eventEndLocalDateTime.atZone(ZoneId.of("Asia/Kolkata")).withZoneSameInstant(endTime.getOffset());
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 
         if (now.isAfter(eventEndDateTime)) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.eventEnded,
-                    ResponseCode.eventEnded.getErrorMessage());
+            ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
+                    ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
         }
         if (batchData == null) {
             ProjectCommonException.throwClientErrorException(ResponseCode.invalidEventBatchId,

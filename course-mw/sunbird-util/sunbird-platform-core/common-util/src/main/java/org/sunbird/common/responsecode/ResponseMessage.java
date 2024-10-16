@@ -466,11 +466,10 @@ public interface ResponseMessage {
     String EVENT_ID_MISSING_ERROR = "Please provide event id.";
     String EVENT_ID_MISSING = "Event id is mandatory.";
     String USER_DOES_NOT_HAVE_ACCESS_TO_EVENT = "User doesn't have access to this Event Id";
-    String EVENT_BATCH_ALREADY_COMPLETED = "Course batch is already completed.";
+    String EVENT_BATCH_ALREADY_COMPLETED = "Event batch is already completed.";
     String EVENT_BATCH_ENROLLMENT_DATE_ENDED = "Event batch enrollment date has ended.";
     String USER_ALREADY_ENROLLED_EVENT = "User has already Enrolled this event .";
     String USER_NOT_ENROLLED_EVENT = "User is not enrolled to given event batch.";
-    String EVENT_ENDED = "Event date has ended.";
   }
 
   interface Key {
@@ -870,6 +869,5 @@ public interface ResponseMessage {
     String EVENT_BATCH_ENROLLMENT_DATE_ENDED = "EVENT_BATCH_ENROLLMENT_DATE_ENDED";
     String USER_ALREADY_ENROLLED_EVENT = "USER_ALREADY_ENROLLED_EVENT";
     String USER_NOT_ENROLLED_EVENT = "USER_NOT_ENROLLED_EVENT";
-    String EVENT_ENDED = "EVENT_ENDED";
   }
 }
