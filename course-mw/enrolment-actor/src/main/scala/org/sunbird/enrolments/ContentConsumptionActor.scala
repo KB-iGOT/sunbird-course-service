@@ -731,9 +731,9 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
   def processEventConsumption(inputContent: java.util.Map[String, AnyRef], existingContent: java.util.Map[String, AnyRef], userId: String) = {
     var inputStatus = inputContent.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]).asInstanceOf[Number].intValue()
-    if (inputContent.get("completionPercentage").asInstanceOf[Double] >= 50.0.asInstanceOf[Double]) {
-      inputStatus = 2;
-      inputContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
+    if (inputContent.get("completionPercentage").toString.toDouble >= 50.0.asInstanceOf[Double]) {
+       inputStatus = 2;
+       inputContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
     }
     val updatedContent = new java.util.HashMap[String, AnyRef]()
     updatedContent.putAll(inputContent)
