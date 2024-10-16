@@ -90,7 +90,7 @@ public class CertificateController extends BaseController {
 
   public CompletionStage<Result> privateAddEventCertificate(Http.Request httpRequest) {
     return handleRequest(
-        courseBatchCertificateActorRef,
+        eventBatchCertificateActorRef,
         EventActorOperations.ADD_EVENT_BATCH_CERTIFICATE.getValue(),
         httpRequest.body().asJson(),
         (request) -> {
