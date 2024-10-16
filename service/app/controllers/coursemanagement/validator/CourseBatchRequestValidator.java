@@ -35,7 +35,7 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
     String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
     String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
     String enrollmentEndDate = (String) request.getRequest().get(JsonKey.ENROLLMENT_END_DATE);
-    validateStartDate(startDate);
+    validateStartDate(startDate,false);
     validateEndDate(startDate, endDate);
     validateEnrollmentEndDate(enrollmentEndDate, startDate, endDate);
     validateCreatedForAndMentors(request);
@@ -129,7 +129,7 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
     }
   }
 
-  private void validateStartDate(String startDate) {
+  private void validateStartDate(String startDate, boolean isEvent) {
     SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
     format.setLenient(false);
     validateParam(startDate, ResponseCode.mandatoryParamsMissing, JsonKey.START_DATE);
@@ -140,7 +140,7 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
       Calendar cal2 = Calendar.getInstance();
       cal1.setTime(batchStartDate);
       cal2.setTime(todayDate);
-      if (batchStartDate.before(todayDate)) {
+      if (batchStartDate.before(todayDate) && !isEvent) {
         throw new ProjectCommonException(
             ResponseCode.courseBatchStartDateError.getErrorCode(),
             ResponseCode.courseBatchStartDateError.getErrorMessage(),
@@ -360,10 +360,10 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
     validateEnrolmentType(request);
     String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
     String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
-    String enrollmentEndDate = (String) request.getRequest().get(JsonKey.ENROLLMENT_END_DATE);
-    validateStartDate(startDate);
+    //String enrollmentEndDate = (String) request.getRequest().get(JsonKey.ENROLLMENT_END_DATE);
+    validateStartDate(startDate, true);
     validateEndDate(startDate, endDate);
-    validateEnrollmentEndDate(enrollmentEndDate, startDate, endDate);
+    //validateEnrollmentEndDate(enrollmentEndDate, startDate, endDate);
     validateCreatedForAndMentors(request);
   }
   
