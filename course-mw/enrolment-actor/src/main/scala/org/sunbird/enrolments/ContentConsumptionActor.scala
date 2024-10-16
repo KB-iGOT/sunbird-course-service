@@ -714,14 +714,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
   def pushKaramPointsKafkaTopic(userId: String, eventId: String, batchId: String) = {
     val now = System.currentTimeMillis()
-    val event = s"""
-       |{
-       |  "user_id": $userId,
-       |  "ets": $now,
-       |  "batch_id":$batchId ,
-       |  "event_id": $eventId"
-       |}
-       |""".replaceAll("\n","")
+    val event = s"""{"user_id": $userId,"ets": $now,"batch_id":$batchId ,"event_id": $eventId"}""".replaceAll("\n","")
     if(pushTokafkaEnabled){
       val topic = ProjectUtil.getConfigValue("user_claim_event_karma_point")
       KafkaClient.send(userId, event, topic)
