@@ -387,7 +387,7 @@ public class EventsActor extends BaseActor {
         ZonedDateTime eventEndDateTime = eventEndLocalDateTime.atZone(ZoneId.of("Asia/Kolkata")).withZoneSameInstant(endTime.getOffset());
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Kolkata"));
 
-        if (now.isAfter(eventEndDateTime)) {
+        if (isEnrol && now.isAfter(eventEndDateTime)) {
             ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
                     ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
         }
@@ -409,12 +409,6 @@ public class EventsActor extends BaseActor {
                         LocalDateTime.now().isAfter(endDate.atStartOfDay()))) {
             ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
                     ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
-        }
-
-        if (isEnrol && batchData.getEnrollmentEndDate() != null &&
-                LocalDateTime.now().isAfter(enrollmentEndDate.atTime(LocalTime.MAX))) {
-            ProjectCommonException.throwClientErrorException(ResponseCode.EventBatchEnrollmentDateEnded,
-                    ResponseCode.EventBatchEnrollmentDateEnded.getErrorMessage());
         }
 
         if (isEnrol && enrolmentData != null && enrolmentData.isActive()) {
