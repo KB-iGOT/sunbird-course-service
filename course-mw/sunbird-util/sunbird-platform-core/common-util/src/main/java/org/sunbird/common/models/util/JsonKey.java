@@ -1156,8 +1156,23 @@ public final class JsonKey {
   public static final String USER_EVENT_DB = "userEventDb";
   public static final String EVENT_ID_KEY = "eventid";
   public static final String EVENT_BATCH = "eventBatch";
-    public static final String CONTEXT_ID = "contextId";
+  public static final String CONTEXT_ID = "contextId";
   public static final String EVENT_UPDATE_URL = "event.update.url";
   public static final String CONTEXT_ID_KEY = "contextid";
+  public static final String TYPE_ID = "typeId";
+  public static final String EVENT = "Event";
+  public static final String EVENT_ENROLMENT_ALERT = "event-enrolment-alert";
+  public static final String SUNBIRD_LEARNING_PLATFORM = "org.sunbird.learning.platform";
+  public static final String EVENT_ENROLMENT_ALERT_OBJ = "EventEnrolmentAlert";
+  public static final String E_DATA = "edata";
+  public static final String DASHBOARD_USER_STATE_COMPLETION = "dashboard_user_state_completion";
+  public static final String ACTOR = "actor";
+  public static final String OBJECT = "object";
+  public static final String EID = "eid";
+  public static final String MID = "mid";
+  public static final String LMS_SYSTEMS = "LMS.Systems";
+  public static final String EVENT_ENROLMENT_ALERT_ID = "Event-enrolment-alert";
+  public static final String SYSTEM_KEY = "System";
+
   private JsonKey() {}
 }
