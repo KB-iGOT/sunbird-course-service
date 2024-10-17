@@ -784,6 +784,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
   private def pushCertficateGenerateKafkaTopic(userId: String, eventId: String, batchId: String,completionPercentage:Double) = {
     val now = System.currentTimeMillis()
+    val userIds = List(userId)
     val event = s"""{
     "actor":{
       "id": "Issue Certificate Generator",
@@ -799,7 +800,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         "action": "issue-event-certificate",
         "batchId": "$batchId",
         "eventId": "$eventId",
-        "userId": "$userId",
+        "userIds": "$userIds",
         "eventCompletionPercentage": $completionPercentage
       },
       "eid": "BE_JOB_REQUEST",
