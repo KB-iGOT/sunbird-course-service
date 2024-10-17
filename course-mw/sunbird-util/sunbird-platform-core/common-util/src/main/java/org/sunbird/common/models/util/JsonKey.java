@@ -1165,7 +1165,7 @@ public final class JsonKey {
   public static final String SUNBIRD_LEARNING_PLATFORM = "org.sunbird.learning.platform";
   public static final String EVENT_ENROLMENT_ALERT_OBJ = "EventEnrolmentAlert";
   public static final String E_DATA = "edata";
-  public static final String DASHBOARD_USER_ENROLLMENT = "dashboard_user_enrollment";
+  public static final String DASHBOARD_USER_ENROLLMENT = "dashboard_user_event_state";
   public static final String ACTOR = "actor";
   public static final String OBJECT = "object";
   public static final String EID = "eid";
@@ -1173,6 +1173,7 @@ public final class JsonKey {
   public static final String LMS_SYSTEMS = "LMS.Systems";
   public static final String EVENT_ENROLMENT_ALERT_ID = "Event-enrolment-alert";
   public static final String SYSTEM_KEY = "System";
+  public static final String ENROLLED = "enrolled";
 
   private JsonKey() {}
 }

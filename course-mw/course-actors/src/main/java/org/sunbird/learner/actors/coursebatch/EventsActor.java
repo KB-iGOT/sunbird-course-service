@@ -574,6 +574,7 @@ public class EventsActor extends BaseActor {
         edata.put(JsonKey.BATCH_ID, batchId);
         edata.put(JsonKey.TYPE,JsonKey.EVENT);
         edata.put(JsonKey.ACTION,JsonKey.EVENT_ENROLMENT_ALERT);
+        edata.put(JsonKey.STATUS,JsonKey.ENROLLED);
 
         actor.put(ID,JsonKey.EVENT_ENROLMENT_ALERT_ID);
         actor.put(JsonKey.TYPE,JsonKey.SYSTEM_KEY);
