@@ -582,7 +582,7 @@ public class EventsActor extends BaseActor {
         context.put(JsonKey.PDATA,pdata);
         object.put(JsonKey.ID,userId);
         object.put(JsonKey.TYPE,JsonKey.EVENT_ENROLMENT_ALERT_OBJ);
-        String topic = ProjectUtil.getConfigValue(JsonKey.DASHBOARD_USER_STATE_COMPLETION);
+        String topic = ProjectUtil.getConfigValue(JsonKey.DASHBOARD_USER_ENROLLMENT);
         Map<String, Object> data = new HashMap<>();
         data.put(JsonKey.ACTOR, actor);
         data.put(JsonKey.CONTEXT, context);

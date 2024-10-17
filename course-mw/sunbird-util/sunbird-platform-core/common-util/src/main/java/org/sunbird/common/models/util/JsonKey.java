@@ -1165,7 +1165,7 @@ public final class JsonKey {
   public static final String SUNBIRD_LEARNING_PLATFORM = "org.sunbird.learning.platform";
   public static final String EVENT_ENROLMENT_ALERT_OBJ = "EventEnrolmentAlert";
   public static final String E_DATA = "edata";
-  public static final String DASHBOARD_USER_STATE_COMPLETION = "dashboard_user_state_completion";
+  public static final String DASHBOARD_USER_ENROLLMENT = "dashboard_user_enrollment";
   public static final String ACTOR = "actor";
   public static final String OBJECT = "object";
   public static final String EID = "eid";
