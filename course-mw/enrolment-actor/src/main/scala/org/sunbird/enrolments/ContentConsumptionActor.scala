@@ -624,6 +624,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             if(updatedContent.get("status").asInstanceOf[Int] == 2 && inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
               pushKaramPointsKafkaTopic(userId, contentId, batchId);
               pushCertficateGenerateKafkaTopic(userId, contentId, batchId,completionPercentage);
+              pushEventCompletionKafkaTopic(userId, contentId, batchId,completionPercentage);
             }
           }
         }
@@ -700,7 +701,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       put("lastreadcontentid", lastAccessContent.get(JsonKey.CONTENT_ID_KEY))
       put("lastreadcontentstatus", lastAccessContent.get("status"))
       put("lrc_progressdetails", lastAccessContent.get("progressdetails"))
-      put("completionPercentage", lastAccessContent.get("completionPercentage"))
+      put("completionpercentage", lastAccessContent.get("completionpercentage"))
       put("progress", lastAccessContent.get("progress"))
       put("status", lastAccessContent.get("status"))
       put(JsonKey.LAST_CONTENT_ACCESS_TIME, lastAccessContent.get(JsonKey.LAST_ACCESS_TIME_KEY))
@@ -811,6 +812,41 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     }""".replaceAll("\n","")
     if(pushTokafkaEnabled){
       val topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event")
+      KafkaClient.send(userId, event, topic)
+    }
+  }
+
+  private def pushEventCompletionKafkaTopic(userId: String, eventId: String, batchId: String,completionPercentage:Double) = {
+    val now = System.currentTimeMillis()
+    val event = s"""{
+    "actor":{
+      "id": "Event Consumption Alert",
+      "type": "System"
+      },
+      "context":{
+        "pdata":{
+          "ver": "1.0",
+          "id": "org.sunbird.learning.platform"
+          }
+      },
+      "edata": {
+        "action": "event-consumption-alert",
+        "batchId": "$batchId",
+        "type": "Event",
+        "typeId": "$eventId",
+        "userId": "$userId",
+        "completionPercentage": $completionPercentage
+      },
+      "eid": "BE_JOB_REQUEST",
+      "ets" : $now,
+      "mid" : "LMS.System",
+      "object": {
+        "id": "$userId",
+        "type": "EventConsumptionAlert"
+      }
+    }""".replaceAll("\n","")
+    if(pushTokafkaEnabled){
+      val topic = ProjectUtil.getConfigValue("event_consumption_alert_for_event")
       KafkaClient.send(userId, event, topic)
     }
   }
