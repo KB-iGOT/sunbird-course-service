@@ -1,10 +1,6 @@
 package org.sunbird.enrolments
 
-import java.util
-import java.util.{Date, TimeZone, UUID}
 import com.fasterxml.jackson.databind.ObjectMapper
-
-import javax.inject.Inject
 import org.apache.commons.collections4.{CollectionUtils, MapUtils}
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.cassandra.CassandraOperation
@@ -20,6 +16,10 @@ import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.constants.{CourseJsonKey, InstructionEvent}
 import org.sunbird.learner.util.{ContentUtil, Util}
 
+import java.time.{ZoneId, ZonedDateTime}
+import java.util
+import java.util.{Date, TimeZone, UUID}
+import javax.inject.Inject
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.language.postfixOps
@@ -705,8 +705,9 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       put("progress", lastAccessContent.get("progress"))
       put("status", lastAccessContent.get("status"))
       put(JsonKey.LAST_CONTENT_ACCESS_TIME, lastAccessContent.get(JsonKey.LAST_ACCESS_TIME_KEY))
-
-
+      val now = ZonedDateTime.now(ZoneId.of("Asia/Calcutta"))
+      val epochMillis = now.toInstant.toEpochMilli
+      put("completedon", java.lang.Long.valueOf(epochMillis))
     }}
     val selectMap = new util.HashMap[String, AnyRef]() {{
       put("batchid", batchId)
