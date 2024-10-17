@@ -140,4 +140,24 @@ public class InstructionEventGenerator {
     }
     return jsonMessage;
   }
+
+  public static void EventEnrolmentTopic (String key, String topic,
+                                          Map<String, Object> data) throws Exception {
+    String message = mapper.writeValueAsString(data);
+    if (StringUtils.isBlank(message)) {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Event is not generated properly.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    if (StringUtils.isNotBlank(topic)) {
+      if (StringUtils.isNotBlank(key)) KafkaClient.send(key, message, topic);
+      else KafkaClient.send(message, topic);
+    } else {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Invalid topic id.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+  }
 }

@@ -13,6 +13,7 @@ import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.util.JsonUtil;
+import org.sunbird.kafka.client.InstructionEventGenerator;
 import org.sunbird.learner.actors.coursebatch.dao.BatchUserDao;
 import org.sunbird.learner.actors.coursebatch.dao.UserEventsDao;
 import org.sunbird.learner.actors.coursebatch.dao.impl.BatchUserDaoImpl;
@@ -367,6 +368,7 @@ public class EventsActor extends BaseActor {
             );
 
             sender().tell(successResponse(), self());
+            sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());
             generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
             notifyUser(userId, batchData, JsonKey.ADD);
         } else {
@@ -559,5 +561,44 @@ public class EventsActor extends BaseActor {
 
         // Call the telemetry processing method
         TelemetryUtil.telemetryProcessingCall(request, targetedObject, correlationObject, contextMap, "enrol");
+    }
+
+    private void sendEventEnrolmentAlert(String userId, String eventId, String batchId, RequestContext requestContext) {
+        Map<String, Object> edata = new HashMap<>();
+        Map<String,Object> actor = new HashMap<>();
+        Map<String,Object> context = new HashMap<>();
+        Map<String,Object> pdata = new HashMap<>();
+        Map<String,Object> object = new HashMap<>();
+        edata.put(JsonKey.TYPE_ID, eventId);
+        edata.put(JsonKey.USER_ID, userId);
+        edata.put(JsonKey.BATCH_ID, batchId);
+        edata.put(JsonKey.TYPE,JsonKey.EVENT);
+        edata.put(JsonKey.ACTION,JsonKey.EVENT_ENROLMENT_ALERT);
+
+        actor.put(ID,JsonKey.EVENT_ENROLMENT_ALERT_ID);
+        actor.put(JsonKey.TYPE,JsonKey.SYSTEM_KEY);
+        pdata.put(JsonKey.ID,JsonKey.SUNBIRD_LEARNING_PLATFORM);
+        pdata.put(JsonKey.VER,JsonKey.P_VERSION);
+        context.put(JsonKey.PDATA,pdata);
+        object.put(JsonKey.ID,userId);
+        object.put(JsonKey.TYPE,JsonKey.EVENT_ENROLMENT_ALERT_OBJ);
+        String topic = ProjectUtil.getConfigValue(JsonKey.DASHBOARD_USER_ENROLLMENT);
+        Map<String, Object> data = new HashMap<>();
+        data.put(JsonKey.ACTOR, actor);
+        data.put(JsonKey.CONTEXT, context);
+        data.put(JsonKey.OBJECT, object);
+        data.put(JsonKey.E_DATA, edata);
+        data.put(JsonKey.EID,JsonKey.BE_JOB_REQUEST);
+        long unixTime = System.currentTimeMillis();
+        data.put(JsonKey.ETS,unixTime);
+        data.put(JsonKey.MID,JsonKey.LMS_SYSTEMS);
+        try {
+            InstructionEventGenerator.EventEnrolmentTopic("",topic, data);
+        }catch (Exception e) {
+            logger.error(requestContext, "Error while sending event enrolment alert", e);
+            throw new ProjectCommonException("BE_JOB_REQUEST_EXCEPTION",
+                    "Event is not generated properly.",
+                    ResponseCode.CLIENT_ERROR.getResponseCode());
+        }
     }
 }

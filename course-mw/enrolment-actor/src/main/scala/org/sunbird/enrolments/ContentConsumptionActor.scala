@@ -847,7 +847,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       }
     }""".replaceAll("\n","")
     if(pushTokafkaEnabled){
-      val topic = ProjectUtil.getConfigValue("event_consumption_alert_for_event")
+      val topic = ProjectUtil.getConfigValue("dashboard_user_state_completion")
       KafkaClient.send(userId, event, topic)
     }
   }
