@@ -72,6 +72,7 @@ public final class ContentUtil {
               params,
               headers);
       logger.info(null, "Content search response", null, new HashMap<>(){{put("response", response);}});
+      logger.info(null,  "Content search response got from search query: " + mapper.writeValueAsString(response));
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
         String resmsgId = (String) ((Map<String, Object>) data.get("params")).get("resmsgid");
@@ -208,6 +209,7 @@ public final class ContentUtil {
     if (!StringUtils.isBlank(courseId)) {
       try {
         String query = EKSTEP_COURSE_SEARCH_QUERY.replaceAll("COURSE_ID_PLACEHOLDER", courseId);
+        logger.info(null, "the query after replace is: " + query);
         Map<String, Object> result = ContentUtil.searchContent(query, headers);
         if (null != result && !result.isEmpty() && result.get(JsonKey.CONTENTS) != null) {
           return ((List<Map<String, Object>>) result.get(JsonKey.CONTENTS)).get(0);

@@ -83,8 +83,10 @@ public class HttpUtil {
   public static String sendPostRequest(
       String requestURL, String params, Map<String, String> headers) throws Exception {
     long startTime = System.currentTimeMillis();
+    logger.info(null,"The request url is :" + requestURL + ": headers : " + headers + " : params : " + params);
     HttpResponse<String> httpResponse = Unirest.post(requestURL).headers(headers).body(params).asString();
     String str = httpResponse.getBody();
+    logger.info(null,"The response of the request :" + str + " for params is: " + params);
     long stopTime = System.currentTimeMillis();
     long elapsedTime = stopTime - startTime;
     logger.info( null,
