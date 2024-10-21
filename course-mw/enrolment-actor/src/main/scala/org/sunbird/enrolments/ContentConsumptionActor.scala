@@ -836,7 +836,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         "type": "Event",
         "typeId": "$eventId",
         "userId": "$userId",
-        "completionPercentage": $completionPercentage
+        "status":"complete"
       },
       "eid": "BE_JOB_REQUEST",
       "ets" : $now,
