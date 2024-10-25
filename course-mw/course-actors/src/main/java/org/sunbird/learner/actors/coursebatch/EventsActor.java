@@ -377,19 +377,12 @@ public class EventsActor extends BaseActor {
     }
 
     private void validateEnrolment(EventBatch batchData, UserEvents enrolmentData, Boolean isEnrol,Map<String, Object> contentDetails){
-        String endDateStr = (String) contentDetails.get("endDate");
-        String endTimeStr = (String) contentDetails.get("endTime");
-
-        LocalDate eventEndDate = LocalDate.parse(endDateStr);
-
-        OffsetTime endTime = OffsetTime.parse(endTimeStr);
-
-        LocalDateTime eventEndLocalDateTime = LocalDateTime.of(eventEndDate, endTime.toLocalTime());
-
-        ZonedDateTime eventEndDateTime = eventEndLocalDateTime.atZone(ZoneId.of("Asia/Calcutta")).withZoneSameInstant(endTime.getOffset());
+        String endDate = ProjectUtil.getConfigValue(JsonKey.KARMAYOGI_SAPTAH_END_DATE);
+        LocalDate eventEndDateLocal = LocalDate.parse(endDate);
+        ZonedDateTime eventEndDate = eventEndDateLocal.atTime(23, 59, 59).atZone(ZoneId.of("Asia/Calcutta"));
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Calcutta"));
 
-        if (isEnrol && now.isAfter(eventEndDateTime)) {
+        if (isEnrol && now.isAfter(eventEndDate)) {
             ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
                     ResponseCode.eventBatchAlreadyCompleted.getErrorMessage());
         }
@@ -402,9 +395,6 @@ public class EventsActor extends BaseActor {
             ProjectCommonException.throwClientErrorException(ResponseCode.enrollmentTypeValidation,
                     ResponseCode.enrollmentTypeValidation.getErrorMessage());
         }
-
-        LocalDate endDate = batchData.getEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        LocalDate enrollmentEndDate = batchData.getEnrollmentEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
         if (batchData.getStatus() == 2) {
             ProjectCommonException.throwClientErrorException(ResponseCode.eventBatchAlreadyCompleted,
