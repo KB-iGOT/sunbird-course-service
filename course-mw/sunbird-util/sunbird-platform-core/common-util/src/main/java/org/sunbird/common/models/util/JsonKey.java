@@ -1176,5 +1176,6 @@ public final class JsonKey {
   public static final String ENROLLED = "enrolled";
   public static final String MEETING_LINK_URL = "meeting_link_url";
   public static final String MEETING_LINK = "meetingLink";
+  public static final String KARMAYOGI_SAPTAH_END_DATE = "karmayogi_saptah_end_date";
   private JsonKey() {}
 }
