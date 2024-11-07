@@ -989,8 +989,8 @@ public enum ResponseCode {
   public static ResponseCode getResponse(String errorCode) {
     if (StringUtils.isBlank(errorCode)) {
       return null;
-//    } else if (JsonKey.UNAUTHORIZED.equals(errorCode)) {
-//      return ResponseCode.unAuthorized;
+    } else if (JsonKey.UNAUTHORIZED.equals(errorCode)) {
+      return ResponseCode.unAuthorized;
     } else {
       ResponseCode value = null;
       ResponseCode responseCodes[] = ResponseCode.values();
