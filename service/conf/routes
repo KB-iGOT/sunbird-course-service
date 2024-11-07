@@ -21,6 +21,7 @@ POST     /v2/user/courses/list	    @controllers.courseenrollment.CourseEnrollmen
 POST     /v2/user/courses/admin/list	    @controllers.courseenrollment.CourseEnrollmentController.adminGetUserEnrolledCourses(request: play.mvc.Http.Request)
 POST     /private/v2/user/courses/list	    @controllers.courseenrollment.CourseEnrollmentController.privateGetUserEnrolledCourses(request: play.mvc.Http.Request)
 POST     /v1/course/enroll	    		@controllers.courseenrollment.CourseEnrollmentController.enrollCourse(request: play.mvc.Http.Request)
+POST     /v1/blended/program/admin/enroll	    		@controllers.courseenrollment.CourseEnrollmentController.blendedProgramEnrollCourse(request: play.mvc.Http.Request)
 POST     /v1/course/unenroll             @controllers.courseenrollment.CourseEnrollmentController.unenrollCourse(request: play.mvc.Http.Request)
 POST     /v1/course/admin/enroll	    		@controllers.courseenrollment.CourseEnrollmentController.adminEnrollCourse(request: play.mvc.Http.Request)
 POST     /v1/course/admin/unenroll             @controllers.courseenrollment.CourseEnrollmentController.adminUnenrollCourse(request: play.mvc.Http.Request)

@@ -337,6 +337,26 @@ public class CourseEnrollmentController extends BaseController {
         return enrollProgram(httpRequest, true);
     }
 
+    public CompletionStage<Result> blendedProgramEnrollCourse(Http.Request httpRequest) {
+        return handleRequest(courseEnrolmentActor, "enrolBlendedProgram",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String courseId = req.getRequest().containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                    String batchId = (String)req.getRequest().get(JsonKey.BATCH_ID);
+                    req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
+                    String userId = (String) req.getContext().getOrDefault(JsonKey.REQUESTED_FOR, req.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved, UserId : "+  userId +", courseId : "+courseId + ", batchId:"+batchId);
+                    req.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollCourse(req);
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
+
     public CompletionStage<Result> enrollProgram(Http.Request httpRequest) {
         return enrollProgram(httpRequest, false);
     }

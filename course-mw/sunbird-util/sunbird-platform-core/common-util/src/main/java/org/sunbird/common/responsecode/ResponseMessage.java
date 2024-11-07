@@ -141,6 +141,7 @@ public interface ResponseMessage {
     String USER_NOT_ENROLLED_COURSE = "User is not enrolled to given course batch.";
     String USER_ALREADY_COMPLETED_COURSE = "User already completed given course batch.";
     String COURSE_BATCH_ALREADY_COMPLETED = "Course batch is already completed.";
+    String COURSE_BATCH_ALREADY_STARTED= "Course batch is already started.";
     String COURSE_BATCH_ENROLLMENT_DATE_ENDED = "Course batch enrollment date has ended.";
     String EXISTING_ORG_MEMBER = "You already have a membership of this organization.";
     String CONTENT_TYPE_ERROR = "Please add Content-Type header with value application/json";
@@ -589,6 +590,7 @@ public interface ResponseMessage {
     String USER_NOT_ENROLLED_COURSE = "USER_NOT_ENROLLED_COURSE";
     String USER_ALREADY_COMPLETED_COURSE = "USER_ALREADY_COMPLETED_COURSE";
     String COURSE_BATCH_ALREADY_COMPLETED = "COURSE_BATCH_ALREADY_COMPLETED";
+    String COURSE_BATCH_ALREADY_STARTED = "COURSE_BATCH_ALREADY_STARTED";
     String COURSE_BATCH_ENROLLMENT_DATE_ENDED = "COURSE_BATCH_ENROLLMENT_DATE_ENDED";
     String CONTENT_TYPE_ERROR = "CONTENT_TYPE_ERROR";
     String INVALID_PROPERTY_ERROR = "INVALID_PROPERTY_ERROR";
