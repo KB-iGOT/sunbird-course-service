@@ -170,8 +170,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         validateEnrolment(batchData, enrolmentData, true, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
-        dataBatch.put(JsonKey.COURSE_ENROLL_DATE, request.get(JsonKey.ENROLLED_DATE))
-        data.put(JsonKey.COURSE_ENROLL_DATE, request.get(JsonKey.ENROLLED_DATE))
+        dataBatch.put(JsonKey.COURSE_ENROLL_DATE, Timestamp.valueOf(LocalDateTime.parse(request.get(JsonKey.ENROLLED_DATE).asInstanceOf[String], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))))
+        data.put(JsonKey.COURSE_ENROLL_DATE, Timestamp.valueOf(LocalDateTime.parse(request.get(JsonKey.ENROLLED_DATE).asInstanceOf[String], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))))
         val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
         if (hasAccess) {
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
