@@ -344,7 +344,10 @@ public class CourseEnrollmentController extends BaseController {
                     Request req = (Request) request;
                     Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
                     String courseId = req.getRequest().containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                    String userId = (String) req.getRequest().get(JsonKey.USER_ID);
+                    String batchId = (String) req.getRequest().get(JsonKey.BATCH_ID);
                     req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
+                    logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved via Blended Program admin enroll, UserId : "+  userId +", courseId : "+courseId+ ", batchId:"+batchId);
                     validator.validateEnrollCourse(req);
                     return null;
                 },
