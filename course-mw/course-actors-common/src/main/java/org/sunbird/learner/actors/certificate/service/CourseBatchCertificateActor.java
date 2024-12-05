@@ -81,7 +81,7 @@ public class CourseBatchCertificateActor extends BaseActor {
         (Map<String, Object>) request.getRequest().get(JsonKey.BATCH);
     final String batchId = (String) batchRequest.get(JsonKey.BATCH_ID);
     final String courseId = (String) batchRequest.get(JsonKey.COURSE_ID);
-    CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId);
+    CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId, null);
     Map<String, Object> template = (Map<String, Object>) batchRequest.get(CourseJsonKey.TEMPLATE);
     String templateId = (String) template.get(JsonKey.IDENTIFIER);
     CourseBatchUtil.validateTemplate(request.getRequestContext(), templateId);

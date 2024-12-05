@@ -131,7 +131,7 @@ public class CourseBatchUtilTest {
     Map<String, Object> courseBatchOut =
         CourseBatchUtil.validateCourseBatch(
                 null, (String) courseBatchIn.get().get(JsonKey.COURSE_ID),
-            (String) courseBatchIn.get().get(JsonKey.BATCH_ID));
+            (String) courseBatchIn.get().get(JsonKey.BATCH_ID),null);
     Assert.assertNotNull(courseBatchOut);
     Assert.assertEquals(courseBatchIn.get(), courseBatchOut);
   }
@@ -144,7 +144,7 @@ public class CourseBatchUtilTest {
         .thenReturn(CustomObjectBuilder.getEmptyMap().asESIdentifierResult());
     try {
       Map<String, Object> courseBatchOut =
-          CourseBatchUtil.validateCourseBatch(Mockito.any(), "courseId", "batchId");
+          CourseBatchUtil.validateCourseBatch(Mockito.any(), "courseId", "batchId",null);
     } catch (ProjectCommonException ex) {
       Assert.assertNotNull(ex);
       Assert.assertEquals(ResponseCode.CLIENT_ERROR.getErrorCode(), ex.getCode());
@@ -162,7 +162,7 @@ public class CourseBatchUtilTest {
     try {
       Map<String, Object> courseBatchOut =
           CourseBatchUtil.validateCourseBatch(
-                  null, "anotherCourseId", (String) courseBatchIn.get().get(JsonKey.BATCH_ID));
+                  null, "anotherCourseId", (String) courseBatchIn.get().get(JsonKey.BATCH_ID),null);
     } catch (ProjectCommonException ex) {
       Assert.assertNotNull(ex);
       Assert.assertEquals(ResponseCode.CLIENT_ERROR.getErrorCode(), ex.getCode());

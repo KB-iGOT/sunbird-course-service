@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
@@ -59,9 +60,10 @@ public class CertificateActor extends BaseActor {
     final String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
     final String courseId = (String) request.getRequest().get(JsonKey.COURSE_ID);
     List<String> userIds = (List<String>) request.getRequest().get(JsonKey.USER_IDs);
+    final String eventId = (String) request.getRequest().get(JsonKey.EVENT_ID);
     final boolean reIssue = isReissue(request.getContext().get(CourseJsonKey.REISSUE));
     Map<String, Object> courseBatchResponse =
-        CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId);
+        CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId, eventId);
     if (null == courseBatchResponse.get("cert_templates")) {
       ProjectCommonException.throwClientErrorException(
           ResponseCode.CLIENT_ERROR, "No certificate templates associated with " + batchId);
@@ -75,7 +77,7 @@ public class CertificateActor extends BaseActor {
     resultData.put(JsonKey.COLLECTION_ID, courseId);
     response.put(JsonKey.RESULT, resultData);
     try {
-      pushInstructionEvent(batchId, courseId, userIds, reIssue);
+      pushInstructionEvent(batchId, courseId, userIds, reIssue, eventId);
     } catch (Exception e) {
       logger.error(request.getRequestContext(), "issueCertificate pushInstructionEvent error for courseId="
                       + courseId + ", batchId=" + batchId, e);
@@ -105,7 +107,7 @@ public class CertificateActor extends BaseActor {
    * @throws Exception
    */
   private void pushInstructionEvent(
-      String batchId, String courseId, List<String> userIds, boolean reIssue) throws Exception {
+      String batchId, String courseId, List<String> userIds, boolean reIssue, String eventId) throws Exception {
     Map<String, Object> data = new HashMap<>();
 
     data.put(
@@ -137,7 +139,12 @@ public class CertificateActor extends BaseActor {
               put(JsonKey.USER_IDs, userIds);
             }
             put(JsonKey.BATCH_ID, batchId);
-            put(JsonKey.COURSE_ID, courseId);
+            if (StringUtils.isNotBlank(eventId)) {
+              put(JsonKey.EVENT_ID, eventId);
+              put(JsonKey.EVENT_COMPLETION_PERCENTAGE, 100.0);
+            } else {
+              put(JsonKey.COURSE_ID, courseId);
+            }
             put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
             put(CourseJsonKey.ITERATION, 1);
             if (reIssue) {

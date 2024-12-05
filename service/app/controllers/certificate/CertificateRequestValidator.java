@@ -18,10 +18,12 @@ import org.sunbird.learner.constants.CourseJsonKey;
 public class CertificateRequestValidator extends BaseRequestValidator {
 
   public void validateIssueCertificateRequest(Request certRequestDto) {
-    validateParam(
-        (String) certRequestDto.getRequest().get(JsonKey.COURSE_ID),
-        ResponseCode.mandatoryParamsMissing,
-        JsonKey.COURSE_ID+"/"+JsonKey.COLLECTION_ID);
+    if (!certRequestDto.getRequest().containsKey(JsonKey.EVENT_ID)) {
+      validateParam(
+              (String) certRequestDto.getRequest().get(JsonKey.COURSE_ID),
+              ResponseCode.mandatoryParamsMissing,
+              JsonKey.COURSE_ID+"/"+JsonKey.COLLECTION_ID);
+    }
     validateParam(
         (String) certRequestDto.getRequest().get(JsonKey.BATCH_ID),
         ResponseCode.mandatoryParamsMissing,

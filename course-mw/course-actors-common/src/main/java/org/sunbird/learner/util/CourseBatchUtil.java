@@ -63,7 +63,7 @@ public class CourseBatchUtil {
             + esResponse);
   }
 
-  public static Map<String, Object> validateCourseBatch(RequestContext requestContext, String courseId, String batchId) {
+  public static Map<String, Object> validateCourseBatch(RequestContext requestContext, String courseId, String batchId, String eventId) {
     Future<Map<String, Object>> resultF =
         esUtil.getDataByIdentifier(requestContext, EsType.courseBatch.getTypeName(), batchId);
     Map<String, Object> result =
@@ -76,6 +76,13 @@ public class CourseBatchUtil {
         && !StringUtils.equals(courseId, (String) result.get(JsonKey.COURSE_ID))) {
       ProjectCommonException.throwClientErrorException(
           ResponseCode.CLIENT_ERROR, "batchId is not linked with courseId");
+    }
+
+    if (StringUtils.isNotBlank(eventId)) {
+      if (!StringUtils.equals(eventId, (String) result.get(JsonKey.EVENT_ID))) {
+        ProjectCommonException.throwClientErrorException(
+                ResponseCode.CLIENT_ERROR, "batchId is not linked with eventId");
+      }
     }
     return result;
   }
