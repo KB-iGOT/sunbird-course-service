@@ -1180,5 +1180,6 @@ public final class JsonKey {
   public static final String ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED ="use_cache_for_enrollment_list_batch_fetch";
   public static final String TRUE="true";
   public static final String EVENT_COMPLETION_PERCENTAGE="eventCompletionPercentage";
+  public static final String ISSUE_EVENT_CERTIFICATE = "issue-event-certificate";
   private JsonKey() {}
 }

@@ -218,7 +218,7 @@ public class CertificateActor extends BaseActor {
                 put(JsonKey.BATCH_ID, batchId);
                 put(JsonKey.EVENT_ID, eventId);
                 put(JsonKey.EVENT_COMPLETION_PERCENTAGE, 100.0);
-                put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
+                put(CourseJsonKey.ACTION, JsonKey.ISSUE_EVENT_CERTIFICATE);
                 put(CourseJsonKey.ITERATION, 1);
                 if (reIssue) {
                   put(CourseJsonKey.REISSUE, true);
