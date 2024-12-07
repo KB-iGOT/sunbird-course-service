@@ -1,10 +1,9 @@
 package org.sunbird.learner.actors.certificate.service;
 
 import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.exception.ProjectCommonException;
@@ -17,6 +16,7 @@ import org.sunbird.common.models.util.datasecurity.OneWayHashing;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.kafka.client.InstructionEventGenerator;
+import org.sunbird.kafka.client.KafkaClient;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.constants.InstructionEvent;
 import org.sunbird.learner.util.CourseBatchUtil;
@@ -173,7 +173,7 @@ public class CertificateActor extends BaseActor {
     resultData.put(JsonKey.COLLECTION_ID, eventId);
     response.put(JsonKey.RESULT, resultData);
     try {
-      pushInstructionEventForEvent(batchId, eventId, userIds, reIssue);
+      pushCertificateGenerateKafkaTopic(userIds,eventId,batchId,100.0,reIssue);
     } catch (Exception e) {
       logger.error(request.getRequestContext(), "issueCertificate pushInstructionEvent error for eventId="
               + eventId + ", batchId=" + batchId, e);
@@ -183,50 +183,62 @@ public class CertificateActor extends BaseActor {
     sender().tell(response, self());
   }
 
-  private void pushInstructionEventForEvent(
-          String batchId, String eventId, List<String> userIds, boolean reIssue) throws Exception {
-    Map<String, Object> data = new HashMap<>();
+  public void pushCertificateGenerateKafkaTopic(List<String> userIds, String eventId, String batchId, double completionPercentage, boolean reIssue) {
+    long now = System.currentTimeMillis();
 
-    data.put(
-            CourseJsonKey.ACTOR,
-            new HashMap<String, Object>() {
-              {
-                put(JsonKey.ID, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorId());
-                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorType());
-              }
-            });
+    String userIdsJson = userIds.stream()
+            .map(id -> "\"" + id + "\"")
+            .collect(Collectors.joining(", ", "[", "]"));
 
-    String id = OneWayHashing.encryptVal(batchId + CourseJsonKey.UNDERSCORE + eventId);
-    data.put(
-            CourseJsonKey.OBJECT,
-            new HashMap<String, Object>() {
-              {
-                put(JsonKey.ID, id);
-                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getType());
-              }
-            });
+    String event = String.format(
+            "{"
+                    + "\"actor\":{"
+                    + "  \"id\": \"Issue Certificate Generator\","
+                    + "  \"type\": \"System\""
+                    + "},"
+                    + "\"context\":{"
+                    + "  \"pdata\":{"
+                    + "    \"version\": \"1.0\","
+                    + "    \"id\": \"org.sunbird.learning.platform\""
+                    + "  }"
+                    + "},"
+                    + "\"edata\": {"
+                    + "  \"action\": \"issue-event-certificate\","
+                    + "  \"batchId\": \"%s\","
+                    + "  \"eventId\": \"%s\","
+                    + "  \"userIds\": %s,"
+                    + "  \"eventCompletionPercentage\": %.2f%s"
+                    + "},"
+                    + "\"eid\": \"BE_JOB_REQUEST\","
+                    + "\"ets\": %d,"
+                    + "\"mid\": \"EVENT.%s\","
+                    + "\"object\": {"
+                    + "  \"id\": \"batch_%s\","
+                    + "  \"type\": \"IssueCertificate\""
+                    + "}"
+                    + "}",
+            batchId,
+            eventId,
+            userIdsJson,
+            completionPercentage,
+            reIssue ? ",\"reIssue\": true" : "",
+            now,
+            UUID.randomUUID().toString(),
+            batchId
+    );
 
-    data.put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
 
-    data.put(
-            CourseJsonKey.E_DATA,
-            new HashMap<String, Object>() {
-              {
-                if (CollectionUtils.isNotEmpty(userIds)) {
-                  put(JsonKey.USER_IDs, userIds);
-                }
-                put(JsonKey.BATCH_ID, batchId);
-                put(JsonKey.EVENT_ID, eventId);
-                put(JsonKey.EVENT_COMPLETION_PERCENTAGE, 100.0);
-                put(CourseJsonKey.ACTION, JsonKey.ISSUE_EVENT_CERTIFICATE);
-                put(CourseJsonKey.ITERATION, 1);
-                if (reIssue) {
-                  put(CourseJsonKey.REISSUE, true);
-                }
-              }
-            });
-    String topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event");
-    InstructionEventGenerator.pushInstructionEvent(batchId, topic, data);
+      String topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event");
+      try {
+        KafkaClient.send(String.join(",", userIds), event, topic);
+      } catch (Exception e) {
+        throw new ProjectCommonException(
+                "BE_JOB_REQUEST_EXCEPTION",
+                "Invalid topic id.",
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+
   }
 
 }
