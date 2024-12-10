@@ -15,6 +15,9 @@ import org.sunbird.common.models.util.ProjectUtil.Source;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.responsecode.ResponseMessage;
+import org.sunbird.enrolments.CourseEnrolmentActor;
+import org.sunbird.learner.util.ContentCacheHandler;
+import org.sunbird.learner.util.ContentSearchUtil;
 
 import javax.ws.rs.core.MediaType;
 import java.text.MessageFormat;
@@ -74,7 +77,7 @@ public final class RequestValidator {
                   ResponseCode.courseIdRequired.getErrorCode(),
                   ResponseCode.courseIdRequiredError.getErrorMessage(),
                   ERROR_CODE);
-        } else if (isProgram((String) map.get(JsonKey.COURSE_ID))){
+        } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID))){
           throw new ProjectCommonException(
                   ResponseCode.invalidProgramId.getErrorCode(),
                   ResponseCode.invalidProgramId.getErrorMessage(),
@@ -1096,34 +1099,14 @@ public final class RequestValidator {
     }
   }
 
-  public static Boolean isProgram(String contentId) {
+  public static Boolean isProgramConsumptionAccepted(String contentId) {
     Boolean isProgram = false;
     try {
-      String baseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
-      String authorizationToken = getAuthorizationToken();
-
-      Map<String, String> headers = new HashMap<>();
-      headers.put(JsonKey.AUTHORIZATION, JsonKey.BEARER + authorizationToken);
-
-      logger.info(null, "Making call for content read for id: " + contentId);
-      HttpResponse<String> httpResponse = Unirest.get(baseUrl + PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_CONTENT_READ_API) + "/" + contentId)
-              .headers(headers)
-              .asString();
-
-      String responseBody = httpResponse.getBody();
-      Map<String, Object> response = mapper.readValue(responseBody, Map.class);
-      Map<String, Object> data = (Map<String, Object>) response.get(JsonKey.RESULT);
-
-      if (org.apache.commons.collections4.MapUtils.isNotEmpty(data)) {
-        Map<String, Object> content = (Map<String, Object>) data.get(JsonKey.CONTENT);
-        String primaryCategory = (String) content.get(JsonKey.PRIMARYCATEGORY);
-
-        if (isProgramCategory(primaryCategory)) {
-          isProgram = true;
-          logger.info(null, "Content ID: " + contentId + " is a " + primaryCategory);
-        }
-      } else {
-        logger.info(null, "No data found for Content ID: " + contentId);
+      Map<String, Object> courseContent = getCourseContent(contentId);
+      String courseCategory = (String) courseContent.get("courseCategory");
+      Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
+      if (isProgramCategory(courseCategory) && cumulativeTracking != null && !cumulativeTracking) {
+        isProgram = true;
       }
     } catch (Exception e) {
       logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
@@ -1131,13 +1114,20 @@ public final class RequestValidator {
     return isProgram;
   }
 
-  private static String getAuthorizationToken() {
-    String token = System.getenv(JsonKey.EKSTEP_AUTHORIZATION);
-    return StringUtils.isBlank(token) ? PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_AUTHORIZATION) : token;
+
+  public static Map<String, Object> getCourseContent(String courseId) {
+    Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
+    Map<String, Object> courseContent = (Map<String, Object>)coursesMap.get(courseId);
+    if (courseContent == null || courseContent.isEmpty()) {
+      courseContent = ContentCacheHandler.getContent(courseId);
+    }
+    return courseContent;
   }
 
   private static boolean isProgramCategory(String category) {
-    return Set.of("Program", "Blended Program", "Curated Program").contains(category);
+    String categoriesList = ProjectUtil.getConfigValue(JsonKey.PROGRAM_CATEGORIES);
+    Set<String> programCategories = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+    return programCategories.contains(category);
   }
 
 }
