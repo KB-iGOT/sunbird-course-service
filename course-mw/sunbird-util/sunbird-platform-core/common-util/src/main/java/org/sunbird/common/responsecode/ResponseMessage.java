@@ -471,6 +471,8 @@ public interface ResponseMessage {
     String EVENT_BATCH_ENROLLMENT_DATE_ENDED = "Event batch enrollment date has ended.";
     String USER_ALREADY_ENROLLED_EVENT = "User has already Enrolled this event .";
     String USER_NOT_ENROLLED_EVENT = "User is not enrolled to given event batch.";
+    String INVALID_PROGRAM_ID = "Course id is expected instead of program id.";
+
   }
 
   interface Key {
@@ -871,5 +873,7 @@ public interface ResponseMessage {
     String EVENT_BATCH_ENROLLMENT_DATE_ENDED = "EVENT_BATCH_ENROLLMENT_DATE_ENDED";
     String USER_ALREADY_ENROLLED_EVENT = "USER_ALREADY_ENROLLED_EVENT";
     String USER_NOT_ENROLLED_EVENT = "USER_NOT_ENROLLED_EVENT";
+    String INVALID_PROGRAM_ID = "INVALID_PROGRAM_ID";
+
   }
 }

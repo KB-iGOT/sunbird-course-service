@@ -867,6 +867,7 @@ public enum ResponseCode {
   userNotEnrolledEvent(
           ResponseMessage.Key.USER_NOT_ENROLLED_EVENT,
           ResponseMessage.Message.USER_NOT_ENROLLED_EVENT),
+  invalidProgramId(ResponseMessage.Key.INVALID_PROGRAM_ID, ResponseMessage.Message.INVALID_PROGRAM_ID),
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),
