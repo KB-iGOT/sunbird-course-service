@@ -1,10 +1,9 @@
 package org.sunbird.learner.actors.certificate.service;
 
 import java.text.MessageFormat;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.exception.ProjectCommonException;
@@ -17,6 +16,7 @@ import org.sunbird.common.models.util.datasecurity.OneWayHashing;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.kafka.client.InstructionEventGenerator;
+import org.sunbird.kafka.client.KafkaClient;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.constants.InstructionEvent;
 import org.sunbird.learner.util.CourseBatchUtil;
@@ -47,6 +47,9 @@ public class CertificateActor extends BaseActor {
     switch (requestedOperation) {
       case "issueCertificate":
         issueCertificate(request);
+        break;
+      case "issueEventCertificate":
+        issueEventCertificate(request);
         break;
       default:
         onReceiveUnsupportedOperation(request.getOperation());
@@ -148,4 +151,94 @@ public class CertificateActor extends BaseActor {
     String topic = ProjectUtil.getConfigValue("kafka_topics_certificate_instruction");
     InstructionEventGenerator.pushInstructionEvent(batchId, topic, data);
   }
+
+  private void issueEventCertificate(Request request) {
+    logger.info(request.getRequestContext(), "issueEventCertificate request=" + request.getRequest());
+    final String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
+    final String eventId = (String) request.getRequest().get(JsonKey.EVENT_ID);
+    List<String> userIds = (List<String>) request.getRequest().get(JsonKey.USER_IDs);
+    final boolean reIssue = isReissue(request.getContext().get(CourseJsonKey.REISSUE));
+    Map<String, Object> courseBatchResponse =
+            CourseBatchUtil.validateEventBatch(request.getRequestContext(), eventId, batchId);
+    if (null == courseBatchResponse.get("cert_templates")) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.CLIENT_ERROR, "No certificate templates associated with " + batchId);
+    }
+    Response response = new Response();
+    Map<String, Object> resultData = new HashMap<>();
+    resultData.put(
+            JsonKey.STATUS, MessageFormat.format(ResponseMessage.SUBMITTED.getValue(), batchId));
+    resultData.put(JsonKey.BATCH_ID, batchId);
+    resultData.put(JsonKey.EVENT_ID, eventId);
+    resultData.put(JsonKey.COLLECTION_ID, eventId);
+    response.put(JsonKey.RESULT, resultData);
+    try {
+      pushCertificateGenerateKafkaTopic(userIds,eventId,batchId,100.0,reIssue);
+    } catch (Exception e) {
+      logger.error(request.getRequestContext(), "issueCertificate pushInstructionEvent error for eventId="
+              + eventId + ", batchId=" + batchId, e);
+      resultData.put(
+              JsonKey.STATUS, MessageFormat.format(ResponseMessage.FAILED.getValue(), batchId));
+    }
+    sender().tell(response, self());
+  }
+
+  public void pushCertificateGenerateKafkaTopic(List<String> userIds, String eventId, String batchId, double completionPercentage, boolean reIssue) {
+    long now = System.currentTimeMillis();
+
+    String userIdsJson = userIds.stream()
+            .map(id -> "\"" + id + "\"")
+            .collect(Collectors.joining(", ", "[", "]"));
+
+    String event = String.format(
+            "{"
+                    + "\"actor\":{"
+                    + "  \"id\": \"Issue Certificate Generator\","
+                    + "  \"type\": \"System\""
+                    + "},"
+                    + "\"context\":{"
+                    + "  \"pdata\":{"
+                    + "    \"version\": \"1.0\","
+                    + "    \"id\": \"org.sunbird.learning.platform\""
+                    + "  }"
+                    + "},"
+                    + "\"edata\": {"
+                    + "  \"action\": \"issue-event-certificate\","
+                    + "  \"batchId\": \"%s\","
+                    + "  \"eventId\": \"%s\","
+                    + "  \"userIds\": %s,"
+                    + "  \"eventCompletionPercentage\": %.2f%s"
+                    + "},"
+                    + "\"eid\": \"BE_JOB_REQUEST\","
+                    + "\"ets\": %d,"
+                    + "\"mid\": \"EVENT.%s\","
+                    + "\"object\": {"
+                    + "  \"id\": \"batch_%s\","
+                    + "  \"type\": \"IssueCertificate\""
+                    + "}"
+                    + "}",
+            batchId,
+            eventId,
+            userIdsJson,
+            completionPercentage,
+            reIssue ? ",\"reIssue\": true" : "",
+            now,
+            UUID.randomUUID().toString(),
+            batchId
+    );
+
+
+      String topic = ProjectUtil.getConfigValue("user_issue_certificate_for_event");
+      try {
+        KafkaClient.send(String.join(",", userIds), event, topic);
+      } catch (Exception e) {
+        throw new ProjectCommonException(
+                "BE_JOB_REQUEST_EXCEPTION",
+                "Invalid topic id.",
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+
+  }
+
 }

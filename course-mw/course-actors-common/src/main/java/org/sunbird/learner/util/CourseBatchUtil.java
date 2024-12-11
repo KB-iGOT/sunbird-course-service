@@ -287,4 +287,21 @@ public class CourseBatchUtil {
     return esCourseMap;
   }
 
+  public static Map<String, Object> validateEventBatch(RequestContext requestContext, String eventId, String batchId) {
+    Future<Map<String, Object>> resultF =
+            esUtil.getDataByIdentifier(requestContext, EsType.eventBatch.getTypeName(), batchId);
+    Map<String, Object> result =
+            (Map<String, Object>) ElasticSearchHelper.getResponseFromFuture(resultF);
+    if (MapUtils.isEmpty(result)) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.CLIENT_ERROR, "No such batchId exists");
+    }
+    if (StringUtils.isNotBlank(eventId)
+            && !StringUtils.equals(eventId, (String) result.get(JsonKey.EVENT_ID))) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.CLIENT_ERROR, "batchId is not linked with eventId");
+    }
+    return result;
+  }
+
 }

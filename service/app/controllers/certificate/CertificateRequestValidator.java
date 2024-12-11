@@ -28,6 +28,17 @@ public class CertificateRequestValidator extends BaseRequestValidator {
         JsonKey.BATCH_ID);
   }
 
+  public void validateIssueEventCertificateRequest(Request certRequestDto) {
+    validateParam(
+            (String) certRequestDto.getRequest().get(JsonKey.EVENT_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.EVENT_ID+"/"+JsonKey.COLLECTION_ID);
+    validateParam(
+            (String) certRequestDto.getRequest().get(JsonKey.BATCH_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.BATCH_ID);
+  }
+
   public void validateAddCertificateRequest(Request certRequestDto, String contextIdName) {
     Map<String, Object> batch =
         (Map<String, Object>) certRequestDto.getRequest().get(JsonKey.BATCH);

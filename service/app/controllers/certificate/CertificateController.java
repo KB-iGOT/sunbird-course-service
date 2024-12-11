@@ -101,4 +101,21 @@ public class CertificateController extends BaseController {
         getAllRequestHeaders(httpRequest),
         httpRequest);
   }
+
+    public CompletionStage<Result> issueEventCertificate(Http.Request httpRequest) {
+        return handleRequest(
+                certificateActorRef,
+                CourseActorOperations.ISSUE_EVENT_CERTIFICATE.getValue(),
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    String eventId = req.getRequest().containsKey(JsonKey.EVENT_ID) ? JsonKey.EVENT_ID : JsonKey.COLLECTION_ID;
+                    req.getRequest().put(JsonKey.EVENT_ID, req.getRequest().get(eventId));
+                    new CertificateRequestValidator().validateIssueEventCertificateRequest(req);
+                    req.getContext().put(REISSUE, httpRequest.queryString().get(REISSUE));
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
 }
