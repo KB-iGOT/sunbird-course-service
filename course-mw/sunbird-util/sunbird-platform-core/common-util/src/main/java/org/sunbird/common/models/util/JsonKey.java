@@ -1181,5 +1181,7 @@ public final class JsonKey {
   public static final String TRUE="true";
   public static final String EVENT_COMPLETION_PERCENTAGE="eventCompletionPercentage";
   public static final String ISSUE_EVENT_CERTIFICATE = "issue-event-certificate";
+  public static final String PROGRAM_CHILDREN_COURSES_ALLOWED_PRIMARY_CATEGORY = "program_children_courses_allowed_primary_category";
+  public static final String COURSECATEGORY = "courseCategory";
   private JsonKey() {}
 }
