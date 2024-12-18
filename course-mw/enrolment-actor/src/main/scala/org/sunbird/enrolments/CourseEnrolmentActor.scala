@@ -962,10 +962,10 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
                     }
                 }
             } else {
-                logger.info(request.getRequestContext, "The primary category is not valid to fetch the children: " + primaryCategory + " for courseId: " + courseId)
+                logger.info(request.getRequestContext, "The primary category is not valid to fetch the children for primaryCategory : " + primaryCategory + " for courseId: " + courseId)
             }
         } else {
-            logger.info(request.getRequestContext, "More than 1 courseid so request is not from TOC page, no enhancement required.")
+            logger.info(request.getRequestContext, "CourseId Not present in request or more than 1 courseId so request is not from TOC page, no enhancement required.")
         }
     }
 }
