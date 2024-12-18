@@ -220,8 +220,9 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
 
     }
 
-    def getActiveEnrollments(userId: String, courseIdList: java.util.List[String], requestContext: RequestContext): java.util.List[java.util.Map[String, AnyRef]] = {
-        val enrolments: java.util.List[java.util.Map[String, AnyRef]] = userCoursesDao.listEnrolments(requestContext, userId, courseIdList);
+    def getActiveEnrollments(userId: String, courseIdList: java.util.List[String], request: Request): java.util.List[java.util.Map[String, AnyRef]] = {
+        enrichCourseIdFromProgram(request, courseIdList)
+        val enrolments: java.util.List[java.util.Map[String, AnyRef]] = userCoursesDao.listEnrolments(request.getRequestContext, userId, courseIdList);
         if (CollectionUtils.isNotEmpty(enrolments)) {
             if (isRetiredCoursesIncludedInEnrolList) {
                 enrolments.toList.asJava
@@ -508,7 +509,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
     def getEnrolmentList(request: Request, userId: String, courseIdList: java.util.List[String]): Response = {
         logger.info(request.getRequestContext,"CourseEnrolmentActor :: getCachedEnrolmentList :: fetching data from cassandra with userId " + userId)
         //ContentUtil.getAllContent(PropertiesCache.getInstance.getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH).toInt)
-        val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments( userId, courseIdList, request.getRequestContext)
+        val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments( userId, courseIdList, request)
         val enrolments: java.util.List[java.util.Map[String, AnyRef]] = {
             if (CollectionUtils.isNotEmpty(activeEnrolments)) {
               val allCourseIds: java.util.List[String] = activeEnrolments.map(e => e.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]).distinct.filter(id => StringUtils.isNotBlank(id)).toList.asJava
@@ -937,6 +938,35 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         inputCal.setTime(enrollmentEndDate)
         val currentCal = Calendar.getInstance(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)));
         currentCal.after(inputCal)
+    }
+
+    private def enrichCourseIdFromProgram(request: Request, courseIdList:  java.util.List[String]) = {
+        if (CollectionUtils.isNotEmpty(courseIdList) && courseIdList.size() == 1) {
+            val courseId = courseIdList.get(0)
+            val contentData = getContentReadAPIData(courseId, List(JsonKey.COURSECATEGORY), request)
+            val primaryCategory: String = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+            if (util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_CHILDREN_COURSES_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(primaryCategory)) {
+                val redisKey = s"$courseId:$courseId:childrenCourses"
+                val childrenNodes: List[String] = cacheUtil.getList(redisKey, redisCollectionIndex)
+                if (childrenNodes.nonEmpty) {
+                    courseIdList.addAll(childrenNodes.asJava)
+                } else {
+                    val contentDataForProgram: java.util.List[java.util.Map[String, AnyRef]] = contentHierarchyDao.getContentChildren(request.getRequestContext, courseId)
+                    if (CollectionUtils.isNotEmpty(contentDataForProgram)) {
+                        courseIdList.addAll(contentDataForProgram.asScala
+                          .map(childNode => childNode.get(JsonKey.IDENTIFIER).asInstanceOf[String])
+                          .asJava
+                        )
+                    } else {
+                        logger.error(request.getRequestContext, "Not able to get the hierarchy for the content with contentId: " + courseId, null)
+                    }
+                }
+            } else {
+                logger.info(request.getRequestContext, "The primary category is not valid to fetch the children for primaryCategory : " + primaryCategory + " for courseId: " + courseId)
+            }
+        } else {
+            logger.info(request.getRequestContext, "CourseId Not present in request or more than 1 courseId so request is not from TOC page, no enhancement required.")
+        }
     }
 }
 
