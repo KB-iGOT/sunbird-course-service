@@ -1105,15 +1105,27 @@ public final class RequestValidator {
       Map<String, Object> courseContent = getCourseContent(contentId);
       String courseCategory = (String) courseContent.get("courseCategory");
       Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
-      if (isProgramCategory(courseCategory) && cumulativeTracking != null && cumulativeTracking) {
-        isProgram = true;
+      if (StringUtils.isBlank(courseCategory)) {
+        throw new ProjectCommonException(
+                ResponseCode.invalidCourseCategory.getErrorCode(),
+                ResponseCode.invalidCourseCategory.getErrorMessage(),
+                ERROR_CODE);
+      }
+      if (isProgramCategory(courseCategory)) {
+        if (cumulativeTracking == null) {
+          throw new ProjectCommonException(
+                  ResponseCode.invalidTrackingAttribute.getErrorCode(),
+                  ResponseCode.invalidTrackingAttribute.getErrorMessage(),
+                  ERROR_CODE);
+        } else if (cumulativeTracking) {
+          isProgram = true;
+        }
       }
     } catch (Exception e) {
       logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
     }
     return isProgram;
   }
-
 
   public static Map<String, Object> getCourseContent(String courseId) {
     Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
