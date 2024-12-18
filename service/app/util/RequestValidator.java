@@ -1,24 +1,28 @@
 package util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpHeaders;
 import org.sunbird.common.exception.ProjectCommonException;
+import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.*;
 import org.sunbird.common.models.util.ProjectUtil.ProgressStatus;
 import org.sunbird.common.models.util.ProjectUtil.Source;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.responsecode.ResponseMessage;
+import org.sunbird.enrolments.CourseEnrolmentActor;
+import org.sunbird.learner.util.ContentCacheHandler;
+import org.sunbird.learner.util.ContentSearchUtil;
 
+import javax.ws.rs.core.MediaType;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * This call will do validation for all incoming request data.
@@ -28,6 +32,7 @@ import java.util.Map;
 public final class RequestValidator {
   private static final int ERROR_CODE = ResponseCode.CLIENT_ERROR.getResponseCode();
   public static LoggerUtil logger = new LoggerUtil(RequestValidator.class);
+  private static ObjectMapper mapper = new ObjectMapper();
 
   private RequestValidator() {}
 
@@ -71,6 +76,11 @@ public final class RequestValidator {
           throw new ProjectCommonException(
                   ResponseCode.courseIdRequired.getErrorCode(),
                   ResponseCode.courseIdRequiredError.getErrorMessage(),
+                  ERROR_CODE);
+        } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID))){
+          throw new ProjectCommonException(
+                  ResponseCode.invalidProgramId.getErrorCode(),
+                  ResponseCode.invalidProgramId.getErrorMessage(),
                   ERROR_CODE);
         }
         if (map.containsKey(JsonKey.CONTENT_ID)) {
@@ -1088,4 +1098,48 @@ public final class RequestValidator {
       }
     }
   }
+
+  public static Boolean isProgramConsumptionAccepted(String contentId) {
+    Boolean isProgram = false;
+    try {
+      Map<String, Object> courseContent = getCourseContent(contentId);
+      String courseCategory = (String) courseContent.get("courseCategory");
+      Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
+      if (StringUtils.isBlank(courseCategory)) {
+        throw new ProjectCommonException(
+                ResponseCode.invalidCourseCategory.getErrorCode(),
+                ResponseCode.invalidCourseCategory.getErrorMessage(),
+                ERROR_CODE);
+      }
+      if (isProgramCategory(courseCategory)) {
+        if (cumulativeTracking == null) {
+          throw new ProjectCommonException(
+                  ResponseCode.invalidTrackingAttribute.getErrorCode(),
+                  ResponseCode.invalidTrackingAttribute.getErrorMessage(),
+                  ERROR_CODE);
+        } else if (cumulativeTracking) {
+          isProgram = true;
+        }
+      }
+    } catch (Exception e) {
+      logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
+    }
+    return isProgram;
+  }
+
+  public static Map<String, Object> getCourseContent(String courseId) {
+    Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
+    Map<String, Object> courseContent = (Map<String, Object>)coursesMap.get(courseId);
+    if (courseContent == null || courseContent.isEmpty()) {
+      courseContent = ContentCacheHandler.getContent(courseId);
+    }
+    return courseContent;
+  }
+
+  private static boolean isProgramCategory(String category) {
+    String categoriesList = ProjectUtil.getConfigValue(JsonKey.PROGRAM_CATEGORIES);
+    Set<String> programCategories = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+    return programCategories.contains(category);
+  }
+
 }
