@@ -867,6 +867,9 @@ public enum ResponseCode {
   userNotEnrolledEvent(
           ResponseMessage.Key.USER_NOT_ENROLLED_EVENT,
           ResponseMessage.Message.USER_NOT_ENROLLED_EVENT),
+  invalidProgramId(ResponseMessage.Key.INVALID_PROGRAM_ID, ResponseMessage.Message.INVALID_PROGRAM_ID),
+  invalidCourseCategory(ResponseMessage.Key.INVALID_COURSE_CATEGORY, ResponseMessage.Message.INVALID_COURSE_CATEGORY),
+  invalidTrackingAttribute(ResponseMessage.Key.INVALID_TRACKING_ATTRIBUTE, ResponseMessage.Message.INVALID_TRACKING_ATTRIBUTE),
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),

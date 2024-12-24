@@ -1,6 +1,8 @@
 package org.sunbird.learner.actors.certificate.service;
 
 import java.text.MessageFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -14,6 +16,7 @@ import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.models.util.TelemetryEnvKey;
 import org.sunbird.common.models.util.datasecurity.OneWayHashing;
 import org.sunbird.common.request.Request;
+import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.kafka.client.InstructionEventGenerator;
 import org.sunbird.kafka.client.KafkaClient;
@@ -25,6 +28,7 @@ import org.sunbird.learner.util.Util;
 public class CertificateActor extends BaseActor {
   
 
+  private final String timeZone = ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE);
   private static enum ResponseMessage {
     SUBMITTED("Certificates issue action for Course Batch Id {0} submitted Successfully!"),
     FAILED("Certificates issue action for Course Batch Id {0} Failed!");
@@ -58,19 +62,37 @@ public class CertificateActor extends BaseActor {
   }
 
   private void issueCertificate(Request request) {
+    RequestContext requestContext = request.getRequestContext();
     logger.info(request.getRequestContext(), "issueCertificate request=" + request.getRequest());
     final String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
     final String courseId = (String) request.getRequest().get(JsonKey.COURSE_ID);
     List<String> userIds = (List<String>) request.getRequest().get(JsonKey.USER_IDs);
     final boolean reIssue = isReissue(request.getContext().get(CourseJsonKey.REISSUE));
-    Map<String, Object> courseBatchResponse =
-        CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId);
-    if (null == courseBatchResponse.get("cert_templates")) {
-      ProjectCommonException.throwClientErrorException(
-          ResponseCode.CLIENT_ERROR, "No certificate templates associated with " + batchId);
-    }
+    final String reIssueDateTime = (String) request.getRequest().get(JsonKey.REISSUE_DATE);
+    long reIssueDateTimeInMilliSeconds = 0L;
+
     Response response = new Response();
     Map<String, Object> resultData = new HashMap<>();
+    // Check if reissue is required, and if so, convert date-time to milliseconds
+    if (reIssue && reIssueDateTime != null) {
+      try {
+        reIssueDateTimeInMilliSeconds = getDateTimeInMilliseconds(requestContext, reIssueDateTime);
+      } catch (IllegalArgumentException e) {
+        logger.error(request.getRequestContext(), "Invalid date/time format: reissuedDate="
+                + reIssueDateTime, e);
+        resultData.put(JsonKey.ERRORMSG, JsonKey.INVALID_DATE_TIME);
+        response.put(JsonKey.RESULT, resultData);
+        sender().tell(response, self());
+        return;  // Exit early if validation fails
+      }
+    }
+    // Validate the course batch and ensure certificate templates are available
+    Map<String, Object> courseBatchResponse =
+            CourseBatchUtil.validateCourseBatch(request.getRequestContext(), courseId, batchId);
+    if (null == courseBatchResponse.get("cert_templates")) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.CLIENT_ERROR, "No certificate templates associated with " + batchId);
+    }
     resultData.put(
         JsonKey.STATUS, MessageFormat.format(ResponseMessage.SUBMITTED.getValue(), batchId));
     resultData.put(JsonKey.BATCH_ID, batchId);
@@ -78,7 +100,7 @@ public class CertificateActor extends BaseActor {
     resultData.put(JsonKey.COLLECTION_ID, courseId);
     response.put(JsonKey.RESULT, resultData);
     try {
-      pushInstructionEvent(batchId, courseId, userIds, reIssue);
+      pushInstructionEvent(batchId, courseId, userIds, reIssue, reIssueDateTimeInMilliSeconds);
     } catch (Exception e) {
       logger.error(request.getRequestContext(), "issueCertificate pushInstructionEvent error for courseId="
                       + courseId + ", batchId=" + batchId, e);
@@ -108,7 +130,7 @@ public class CertificateActor extends BaseActor {
    * @throws Exception
    */
   private void pushInstructionEvent(
-      String batchId, String courseId, List<String> userIds, boolean reIssue) throws Exception {
+      String batchId, String courseId, List<String> userIds, boolean reIssue, long reissueDateTime) throws Exception {
     Map<String, Object> data = new HashMap<>();
 
     data.put(
@@ -145,6 +167,9 @@ public class CertificateActor extends BaseActor {
             put(CourseJsonKey.ITERATION, 1);
             if (reIssue) {
               put(CourseJsonKey.REISSUE, true);
+              if (reissueDateTime > 0) {
+                put(CourseJsonKey.REISSUE_DATE, reissueDateTime);
+              }
             }
           }
         });
@@ -239,6 +264,23 @@ public class CertificateActor extends BaseActor {
         );
       }
 
+  }
+
+  private long getDateTimeInMilliseconds(RequestContext requestContext, String reissuedDate) {
+    try {
+      // Define date and time formats
+      String dateTimePattern = "yyyy-MM-dd HH:mm:ss";
+      SimpleDateFormat dateTimeFormatter = new SimpleDateFormat(dateTimePattern);
+      dateTimeFormatter.setTimeZone(TimeZone.getTimeZone(timeZone)); // Adjust time zone as needed
+      // Parse the combined date and time
+      Date parsedDate = dateTimeFormatter.parse(reissuedDate);
+      logger.info(requestContext, "Parsed date and time: " + parsedDate);
+      // Return milliseconds
+      return parsedDate.getTime();
+    } catch (ParseException e) {
+      logger.error(requestContext, "Invalid date format: reissuedDate=" + reissuedDate + ". Expected formats: yyyy-MM-dd HH:mm:ss", e);
+      throw new IllegalArgumentException("Invalid date/time format.", e);
+    }
   }
 
 }

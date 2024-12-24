@@ -224,11 +224,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         enrichCourseIdFromProgram(request, courseIdList)
         val enrolments: java.util.List[java.util.Map[String, AnyRef]] = userCoursesDao.listEnrolments(request.getRequestContext, userId, courseIdList);
         if (CollectionUtils.isNotEmpty(enrolments)) {
-            if (isRetiredCoursesIncludedInEnrolList) {
-                enrolments.toList.asJava
-            } else {
-                enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
-            }
+            enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
         } else
             new util.ArrayList[java.util.Map[String, AnyRef]]()
     }
