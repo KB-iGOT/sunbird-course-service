@@ -68,4 +68,6 @@ public interface UserCoursesDao {
 
   Map<String, Object> getBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request);
   List<UserCourses> readAll(RequestContext requestContext, String userId, String courseId);
+
+  List<Map<String, Object>> getEnrolmentByBatchIdAndCourseId(RequestContext requestContext, String userId, String courseId, String batchId);
 }

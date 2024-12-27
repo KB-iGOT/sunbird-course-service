@@ -53,7 +53,9 @@ public enum ACTOR_NAMES {
   GROUP_AGGREGATES_ACTORS(GroupAggregatesActor.class, "group-aggregates-actor"),
   EVENTS_ACTOR(EventsActor.class, "event-batch-management-actor"),
   EVENT_BATCH_CERTIFICATE_ACTOR(
-      EventBatchCertificateActor.class, "event-batch-certificate-actor");
+      EventBatchCertificateActor.class, "event-batch-certificate-actor"),
+  COURSE_ENROLMENT_ACTOR_V3(CourseEnrolmentActorV3.class, "course-enrolment-actor-v3");
+
 
   private ACTOR_NAMES(Class clazz, String name) {
     actorClass = clazz;

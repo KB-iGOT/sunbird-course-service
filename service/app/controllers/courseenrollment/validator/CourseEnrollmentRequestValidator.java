@@ -8,11 +8,15 @@ import org.sunbird.common.request.BaseRequestValidator;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
   public CourseEnrollmentRequestValidator() {}
+
+  List<String> acceptedStatus = new ArrayList<>(Arrays.asList("In-Progress", "Completed", "Not-Started", "All"));
 
   public void validateEnrollCourse(Request courseRequestDto) {
     commonValidations(courseRequestDto);
@@ -105,5 +109,23 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
                 JsonKey.USER_ID);
       }
     }
+  }
+
+  public void validateEnrollListRequest(Request enrollListRequestDto) {
+    validateParam(
+            (String) enrollListRequestDto.getRequest().get(JsonKey.STATUS),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.STATUS);
+    validateParamFromList(acceptedStatus,
+            (String) enrollListRequestDto.getRequest().get(JsonKey.STATUS),
+            ResponseCode.invalidData,
+            JsonKey.STATUS);
+  }
+
+  public void validateEnrollListRequestDetails(Request enrollListRequestDetailsDto) {
+    validateParam(
+            (String) enrollListRequestDetailsDto.getRequest().get(JsonKey.COURSE_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.COURSE_ID);
   }
 }

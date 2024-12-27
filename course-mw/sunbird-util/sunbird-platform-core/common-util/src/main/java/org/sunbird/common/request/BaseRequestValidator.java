@@ -509,4 +509,13 @@ public class BaseRequestValidator {
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
+
+  public void validateParamFromList(List v, String value, ResponseCode error, String errorMsgArgument) {
+    if (!v.contains(value)) {
+      throw new ProjectCommonException(
+              error.getErrorCode(),
+              error.getErrorMessage() + " for " + errorMsgArgument,
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+  }
 }
