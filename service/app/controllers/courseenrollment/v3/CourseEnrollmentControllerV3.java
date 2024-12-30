@@ -62,7 +62,6 @@ public class CourseEnrollmentControllerV3 extends BaseController {
                 (req) -> {
                     Request request = (Request) req;
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
-                    userId = uid;
                     validator.validateRequestedBy(userId);
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
