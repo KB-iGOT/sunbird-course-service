@@ -82,4 +82,5 @@ public interface Constants {
   public static final String KARMAYOGI_BHARAT = "Karmayogi Bharat";
   public static final String  REQUEST_BODY = "requestBody";
   public static final String  SIMPLE_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
+  public static final String  STATUS = "status";
 }
