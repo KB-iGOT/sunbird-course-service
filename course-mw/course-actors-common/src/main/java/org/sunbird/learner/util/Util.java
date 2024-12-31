@@ -82,6 +82,8 @@ public final class Util {
     dbInfoMap.put(JsonKey.EVENT_BATCH_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "event_batch"));
     dbInfoMap.put(
             JsonKey.USER_EVENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_entity_enrolments"));
+    dbInfoMap.put(
+            JsonKey.EXTERNAL_COURSES_ENROLMENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_external_enrolments"));
   }
 
   /**

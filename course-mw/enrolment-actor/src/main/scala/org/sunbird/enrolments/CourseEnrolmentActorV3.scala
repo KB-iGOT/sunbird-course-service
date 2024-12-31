@@ -39,6 +39,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   val redisCollectionIndex = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("redis_collection_index")))
     (ProjectUtil.getConfigValue("redis_collection_index")).toInt else 10
   private val pageDbInfo = Util.dbInfoMap.get(JsonKey.USER_KARMA_POINTS_DB)
+  private val externalCourseEnrolDbInfo = Util.dbInfoMap.get(JsonKey.EXTERNAL_COURSES_ENROLMENT_DB)
   private val cassandraOperation = ServiceFactory.getInstance
   val statusMap: Map[String, Int] = Map("In-Progress" -> 1, "Completed" -> 2, "Not-Started" -> 0)
   val jsonFields = Set[String]("lrcProgressDetails")
@@ -85,16 +86,22 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext,"enrolmentInfoStats :: list :: UserId = " + userId)
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+    val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
-    if (enrolmentList != null) {
+    if (CollectionUtils.isNotEmpty(enrolmentList)) {
       allEnrolledCourses.addAll(enrolmentList)
     }
     val userCourseEnrolmentInfo = getUserEnrolmentCourseInfo(allEnrolledCourses.asScala.toList, request, userId);
-
+    var externalCourseInfo = new util.HashMap[String, AnyRef]()
+    if (CollectionUtils.isNotEmpty(externalEnrolments)) {
+      val externalEnrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addExternalCourseDetails(externalEnrolments, false)
+      externalCourseInfo = getUserEnrolmentExternalCourseInfo(externalEnrolmentList.asScala.toList, request)
+    }
     try {
       val resp: Response = new Response()
       resp.put(JsonKey.USER_COURSE_ENROLMENT_INFO, userCourseEnrolmentInfo)
+      resp.put(JsonKey.USER_COURSE_EXTERNAL_ENROLMENT_INFO, externalCourseInfo)
       sender().tell(resp, self)
     }catch {
       case e: Exception =>
@@ -197,7 +204,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
         }
       }
     }
-    val userKarmaPoints = cassandraOperation.getRecordsByProperty(
+    val userKarmaPoints = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
       actorMessage.getRequestContext,
       pageDbInfo.getKeySpace,
       pageDbInfo.getTableName,
@@ -229,6 +236,34 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     enrolmentCourseDetails
   }
 
+  def getUserEnrolmentExternalCourseInfo(externalEnrolmentFinalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request) = {
+    var certificateIssued: Int = 0
+    var coursesInProgress: Int = 0
+    var hoursSpentOnCompletedCourses: Int = 0
+    externalEnrolmentFinalEnrolment.foreach { courseDetails =>
+      val courseStatus = courseDetails.get(JsonKey.STATUS)
+      if (courseStatus != 2) {
+        coursesInProgress += 1
+      } else {
+        val courseContent: java.util.HashMap[String, AnyRef] = courseDetails.get(JsonKey.CONTENT).asInstanceOf[java.util.HashMap[String, AnyRef]]
+        var hoursSpentOnCourses: Int = 0
+        if (null != courseContent.get(JsonKey.DURATION)) {
+          hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+        }
+        hoursSpentOnCompletedCourses += hoursSpentOnCourses
+        val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
+        if (certificatesIssue.nonEmpty) {
+          certificateIssued += 1
+        }
+      }
+    }
+    val enrolmentCourseDetails = new util.HashMap[String, AnyRef]()
+    enrolmentCourseDetails.put(JsonKey.TIME_SPENT_ON_COMPLETED_COURSES, hoursSpentOnCompletedCourses.asInstanceOf[AnyRef])
+    enrolmentCourseDetails.put(JsonKey.CERITFICATES_ISSUED, certificateIssued.asInstanceOf[AnyRef])
+    enrolmentCourseDetails.put(JsonKey.COURSES_IN_PROGRESS, coursesInProgress.asInstanceOf[AnyRef])
+    enrolmentCourseDetails
+  }
+
   def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
     activeEnrolments.filter(enrolment => isCourseEligible(enrolment)).map(enrolment => {
       val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
@@ -245,9 +280,28 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     }).toList.asJava
   }
 
+  def addExternalCourseDetails(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
+    activeEnrolments.filter(enrolment => isExternalCourseEligible(enrolment)).map(enrolment => {
+      val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
+      enrolment.put(JsonKey.CONTENT, courseContent)
+      enrolment
+    }).toList.asJava
+  }
+
   def isCourseEligible(enrolment: java.util.Map[String, AnyRef]): Boolean = {
     val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
     if (null == courseContent || (!JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])
+      && !isRetiredCoursesIncludedInEnrolList)) {
+      false
+    }
+    else {
+      true
+    }
+  }
+
+  def isExternalCourseEligible(enrolment: java.util.Map[String, AnyRef]): Boolean = {
+    val courseContent = getExternalCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
+    if (null == courseContent || ((!courseContent.get(JsonKey.IS_ACTIVE).asInstanceOf[Boolean])
       && !isRetiredCoursesIncludedInEnrolList)) {
       false
     }
@@ -261,6 +315,14 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     var courseContent = coursesMap.get(courseId)
     if (courseContent == null || courseContent.size() < 1)
       courseContent = ContentCacheHandler.getContent(courseId)
+    courseContent
+  }
+
+  def getExternalCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
+    val coursesMap = ContentCacheHandler.getContentMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
+    var courseContent = coursesMap.get(courseId)
+    if (courseContent == null || courseContent.size() < 1)
+      courseContent = ContentCacheHandler.getExternalContent(courseId)
     courseContent
   }
 
@@ -380,5 +442,23 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     case it if 1 until leafNodesCount contains it => (completedCount * 100) / leafNodesCount
     case `leafNodesCount` => 100
     case _ => 100
+  }
+
+  def getExternalEnrollments(userId: String, request: Request): java.util.List[java.util.Map[String, AnyRef]] = {
+    var externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = new java.util.ArrayList()
+    val externalEnrolmentsFromDB = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+      request.getRequestContext,
+      externalCourseEnrolDbInfo.getKeySpace,
+      externalCourseEnrolDbInfo.getTableName,
+      JsonKey.USER_ID,
+      userId,
+      null
+    )
+    externalEnrolments = externalEnrolmentsFromDB.get(JsonKey.RESPONSE).asInstanceOf[java.util.List[util.Map[String, AnyRef]]]
+    if (CollectionUtils.isNotEmpty(externalEnrolments)) {
+      externalEnrolments
+    } else {
+      new util.ArrayList[java.util.Map[String, AnyRef]]()
+    }
   }
 }

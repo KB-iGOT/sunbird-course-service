@@ -32,7 +32,10 @@ public class ContentCacheHandler implements Runnable {
     try {
      Map contents =  ContentUtil.getAllContent(Integer.parseInt(PropertiesCache.getInstance()
              .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
+     Map externalContents =  ContentUtil.getAllExternalContent(Integer.parseInt(PropertiesCache.getInstance()
+                .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
       contentMap.putAll(contents);
+      contentMap.putAll(externalContents);
           logger.debug(null, "content keyset " + map.keySet());
       logger.info(null,  " cache size: " + map.size());
     } catch (Exception e) {
@@ -55,4 +58,15 @@ public class ContentCacheHandler implements Runnable {
        return (Map<String, Object>)contentMap.get(id);
     }
   }
+
+    public static Map<String, Object> getExternalContent(String id) {
+        Map<String, Object> obj = (Map<String, Object>)contentMap.get(id);
+        if(obj != null)
+            return obj;
+        else{
+            contentMap.putAll(ContentUtil.getAllExternalContent(Arrays.asList(id),Integer.parseInt(PropertiesCache.getInstance()
+                    .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
+            return (Map<String, Object>)contentMap.get(id);
+        }
+    }
 }
