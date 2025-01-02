@@ -4,11 +4,14 @@ package org.sunbird.learner.actors.event.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerUtil;
+import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.models.util.PropertiesCache;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
@@ -16,9 +19,24 @@ import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.event.EventEnrolmentDao;
 import org.sunbird.learner.util.ContentUtil;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
+
+    private final Map<String, Integer> statusMap;
+
+    public EventEnrolmentDaoImpl() {
+        statusMap = buildStatusMap();
+    }
+
+    private Map<String, Integer> buildStatusMap() {
+        Map<String, Integer> map = new HashMap<>();
+        map.put("In-Progress", 1);
+        map.put("Completed", 2);
+        map.put("Not-Started", 0);
+        return map;
+    }
 
     private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
     private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
@@ -28,17 +46,42 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     public List<Map<String, Object>> getEnrolmentList(Request request, String userId) {
         logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
         List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
-        Map<String, Object> propertyMap = new HashMap<>();
-        if (userId != null && !userId.isEmpty()) {
-            propertyMap.put(JsonKey.USER_ID_KEY, userId);
-        }
-        Response res = cassandraOperation.getRecordsByProperties(request.getRequestContext(),
+
+        Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(request.getRequestContext(),
                 JsonKey.KEYSPACE_SUNBIRD_COURSES,
                 JsonKey.TABLE_USER_EVENT_ENROLMENTS,
-                propertyMap
+                JsonKey.USER_ID_KEY,
+                userId,
+                null
         );
+        String status = request.get(JsonKey.STATUS) != null ? (String)request.get(JsonKey.STATUS) : null;
+        int limit = request.get(JsonKey.LIMIT) != null ? (int)request.get(JsonKey.LIMIT) : -1;
         if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
             userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
+            if (CollectionUtils.isNotEmpty(userEnrollmentList)) {
+                if (StringUtils.isNotEmpty(status) && statusMap.get(status) != null) {
+                    if (statusMap.get(status) == 1) {
+                        userEnrollmentList = userEnrollmentList.stream().filter(enrolment -> (int)enrolment.get(JsonKey.STATUS) != 2).collect(Collectors.toList());
+                    } else {
+                        userEnrollmentList = userEnrollmentList.stream().filter(enrolment -> (int)enrolment.get(JsonKey.STATUS) == statusMap.get(status)).collect(Collectors.toList());
+                    }
+                }
+                if (limit > -1 && limit != 0) {
+                    int maximumAllowedLimitForEnrolList = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
+                    if (maximumAllowedLimitForEnrolList < limit) {
+                        limit = maximumAllowedLimitForEnrolList;
+                    }
+                    userEnrollmentList = userEnrollmentList.stream()
+                            .sorted(Comparator.comparing(
+                                            enrolment -> (Date) ((Map<String, Object>)enrolment).get(JsonKey.LAST_CONTENT_ACCESS_TIME),
+                                            Comparator.nullsLast(Comparator.naturalOrder())) // Null values last
+                                    .reversed()).collect(Collectors.toList());
+                    if (CollectionUtils.isNotEmpty(userEnrollmentList) && userEnrollmentList.size() > limit)
+                        userEnrollmentList = userEnrollmentList.subList(0, limit);
+                }
+            }
+
+
             for (Map<String, Object> enrollment : userEnrollmentList) {
                 String contentId= (String) enrollment.get(JsonKey.CONTENT_ID);
                 String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);

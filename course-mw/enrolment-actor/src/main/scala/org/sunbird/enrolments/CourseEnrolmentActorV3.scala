@@ -19,6 +19,7 @@ import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao,
 import org.sunbird.learner.util._
 
 import java.util
+import java.util.Date
 import javax.inject.Inject
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -165,16 +166,35 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     } else {
       enrolments = userCoursesDao.listEnrolments(request.getRequestContext, userId, null);
     }
-    val status: String = if (request.get(Constants.STATUS) != null)  request.get(Constants.STATUS).asInstanceOf[String] else null
+    val status: String = if (request.get(JsonKey.STATUS) != null)  request.get(JsonKey.STATUS).asInstanceOf[String] else null
     if (CollectionUtils.isNotEmpty(enrolments)) {
       enrolments = enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
       if (StringUtils.isNotBlank(status)) {
         val statusValue: Integer = statusMap.getOrElse(status, -1).asInstanceOf[Integer]
         if (statusValue.intValue() != -1) {
-          enrolments = enrolments
-            .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] == statusValue)
-            .toList
-            .asJava
+          if (statusValue.intValue() == 1) {
+            enrolments = enrolments
+              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] != 2)
+              .toList
+              .asJava
+          } else {
+            enrolments = enrolments
+              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] == statusValue)
+              .toList
+              .asJava
+          }
+        }
+      }
+      var limit: Integer = if (request.get(JsonKey.LIMIT) != null)  request.get(JsonKey.LIMIT).asInstanceOf[Integer] else -1
+      if (limit > -1 && limit !=0) {
+        val maximumAllowedLimit = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
+        if (maximumAllowedLimit < limit) {
+          limit = maximumAllowedLimit
+        }
+        val sortedEnrolment = enrolments.filter(ae => ae.get("lastContentAccessTime")!=null).toList.sortBy(_.get("lastContentAccessTime").asInstanceOf[Date])(Ordering[Date].reverse).toList
+        val finalEnrolments = sortedEnrolment ++ enrolments.asScala.filter(e => e.get("lastContentAccessTime")==null).toList
+        if (finalEnrolments.size > limit) {
+          enrolments = finalEnrolments.subList(0, limit)
         }
       }
       enrolments
