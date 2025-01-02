@@ -1195,6 +1195,7 @@ public final class JsonKey {
   public static final String PAGE_NUMBER = "pageNumber";
   public static final String PAGE_SIZE = "pageSize";
   public static final String FILTER_CRITERIA_MAP = "filterCriteriaMap";
+  public static final String MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST ="maximum_allowed_limit_enrol_list";
 
     private JsonKey() {}
 }

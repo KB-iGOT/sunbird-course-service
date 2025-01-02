@@ -70,6 +70,22 @@ public class EventController extends BaseController {
                 false,
                 httpRequest);
     }
+    public CompletionStage<Result> getUserEnrolledEventsList(String uid, Http.Request httpRequest) {
+        return handleRequest(actorRef, "userEnrolList",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollListRequest(request);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
+
     public CompletionStage<Result> getEnrolledEvent(String uid, Http.Request httpRequest) {
         return handleRequest(actorRef, "getEnrol",
                 httpRequest.body().asJson(),
