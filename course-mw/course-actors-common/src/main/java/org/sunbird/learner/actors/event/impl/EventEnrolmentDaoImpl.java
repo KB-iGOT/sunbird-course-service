@@ -60,7 +60,11 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
             if (CollectionUtils.isNotEmpty(userEnrollmentList)) {
                 if (StringUtils.isNotEmpty(status) && statusMap.get(status) != null) {
-                    userEnrollmentList = userEnrollmentList.stream().filter(enrolment -> (int)enrolment.get(JsonKey.STATUS) == statusMap.get(status)).collect(Collectors.toList());
+                    if (statusMap.get(status) == 1) {
+                        userEnrollmentList = userEnrollmentList.stream().filter(enrolment -> (int)enrolment.get(JsonKey.STATUS) != 2).collect(Collectors.toList());
+                    } else {
+                        userEnrollmentList = userEnrollmentList.stream().filter(enrolment -> (int)enrolment.get(JsonKey.STATUS) == statusMap.get(status)).collect(Collectors.toList());
+                    }
                 }
                 if (limit > -1 && limit != 0) {
                     int maximumAllowedLimitForEnrolList = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));

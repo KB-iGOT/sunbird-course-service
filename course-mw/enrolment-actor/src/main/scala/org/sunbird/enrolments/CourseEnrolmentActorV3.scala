@@ -172,10 +172,17 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
       if (StringUtils.isNotBlank(status)) {
         val statusValue: Integer = statusMap.getOrElse(status, -1).asInstanceOf[Integer]
         if (statusValue.intValue() != -1) {
-          enrolments = enrolments
-            .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] == statusValue)
-            .toList
-            .asJava
+          if (statusValue.intValue() == 1) {
+            enrolments = enrolments
+              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] != 2)
+              .toList
+              .asJava
+          } else {
+            enrolments = enrolments
+              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] == statusValue)
+              .toList
+              .asJava
+          }
         }
       }
       var limit: Integer = if (request.get(JsonKey.LIMIT) != null)  request.get(JsonKey.LIMIT).asInstanceOf[Integer] else -1
