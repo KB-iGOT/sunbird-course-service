@@ -123,8 +123,8 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
   }
 
   public void validateEnrollListRequestDetails(Request enrollListRequestDetailsDto) {
-    validateParam(
-            (String) enrollListRequestDetailsDto.getRequest().get(JsonKey.COURSE_ID),
+    validateParamCollection(
+            (List<String>) enrollListRequestDetailsDto.getRequest().get(JsonKey.COURSE_ID),
             ResponseCode.mandatoryParamsMissing,
             JsonKey.COURSE_ID);
   }
