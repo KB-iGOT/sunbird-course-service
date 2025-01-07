@@ -888,4 +888,40 @@ public abstract class CassandraOperationImpl implements CassandraOperation {
     return response;
   }
 
+  @Override
+  public Response getRecordsByPropertiesWithoutFiltering(RequestContext requestContext, String keyspaceName,
+                                                         String tableName,
+                                                         String propertyName,
+                                                         Object propertyValue,
+                                                         List<String> fields) {
+    Response response = new Response();
+    Session session = connectionManager.getSession(keyspaceName);
+    try {
+      Builder selectBuilder;
+      if (CollectionUtils.isNotEmpty(fields)) {
+        selectBuilder = QueryBuilder.select(fields.toArray(new String[fields.size()]));
+      } else {
+        selectBuilder = QueryBuilder.select().all();
+      }
+      Where selectStatement =
+              selectBuilder.from(keyspaceName, tableName).where();
+      if(propertyValue instanceof List) {
+        selectStatement.and(QueryBuilder.in(propertyName, propertyValue));
+      } else {
+        selectStatement.and(QueryBuilder.eq(propertyName, propertyValue));
+      }
+      ResultSet results = null;
+      if (null != selectStatement) logger.debug(requestContext, selectStatement.getQueryString());
+      results = session.execute(selectStatement);
+      response = CassandraUtil.createResponse(results);
+    } catch (Exception e) {
+      logger.error(requestContext, Constants.EXCEPTION_MSG_FETCH + tableName + " : " + e.getMessage(), e);
+      throw new ProjectCommonException(
+              ResponseCode.SERVER_ERROR.getErrorCode(),
+              ResponseCode.SERVER_ERROR.getErrorMessage(),
+              ResponseCode.SERVER_ERROR.getResponseCode());
+    }
+    return response;
+  }
+
 }

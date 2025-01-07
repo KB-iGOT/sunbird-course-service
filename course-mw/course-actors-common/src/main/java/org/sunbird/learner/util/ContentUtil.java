@@ -461,4 +461,103 @@ public final class ContentUtil {
         }
         return JsonKey.SUCCESS.equalsIgnoreCase(response);
     }
+
+  public static Map<String, Object> getAllExternalContent(int pageSize) {
+    return getAllExternalContent(null, pageSize);
+  }
+
+  public static Map<String,Object> getAllExternalContent(List<String> identifierList, int pageSize) {
+    int remainingRecords;
+    Map<String, Object> allRecords = new HashMap<>();
+    do {
+      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = getExternalContents(identifierList,allRecords.size(), pageSize);
+      int count = contentsResult.getKey();
+      Map<String, Map<String, Object>> contentMap = contentsResult.getValue();
+      allRecords.putAll(contentMap);
+      // Update remaining records and move to the next page if needed
+      remainingRecords = count - allRecords.size();
+    } while (remainingRecords > 0);
+
+    return allRecords;
+  }
+
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> getExternalContents(List identifierList,int offset, int limit) {
+    Map<String, Object> searchObject = new HashMap<>();
+    searchObject.put(JsonKey.PAGE_NUMBER, offset);
+    searchObject.put(JsonKey.PAGE_SIZE, limit);
+
+    Map<String, Object> filters = new HashMap<>();
+    if(identifierList != null && identifierList.size() > 0) {
+      filters.put(JsonKey.CONTENT_ID,identifierList);
+      searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
+    }
+
+    String response = "";
+    int count = 0;
+    Map<String, Map<String, Object>> coursesMap = new HashMap<>();
+    try {
+      String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_SERVICE_BASE_URL);
+      response =
+              HttpUtil.sendPostRequest(
+                      contentUpdateBaseUrl
+                              + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+                              , JsonUtil.serialize(searchObject),
+                      headerMap);
+
+      Map<String, Object> data = mapper.readValue(response, Map.class);
+      if (MapUtils.isNotEmpty(data)) {
+        count = (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+        List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+        filters.put(JsonKey.IS_ACTIVE, false);
+        searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
+        response =
+                HttpUtil.sendPostRequest(
+                        contentUpdateBaseUrl
+                                + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+                        , JsonUtil.serialize(searchObject),
+                        headerMap);
+
+        data = mapper.readValue(response, Map.class);
+        if (MapUtils.isNotEmpty(data)) {
+          count = count + (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+          List<Map<String, Object>> retireCoursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+          coursesList.addAll(retireCoursesList);
+        }
+        if (CollectionUtils.isNotEmpty(coursesList)) {
+          for (Map<String, Object> enrolment : coursesList) {
+            String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
+            coursesMap.put(courseId, enrolment);
+          }
+      }
+    } else {
+        if(identifierList != null && identifierList.size() > 0) {
+          filters.put(JsonKey.IS_ACTIVE, false);
+          searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
+          response =
+                  HttpUtil.sendPostRequest(
+                          contentUpdateBaseUrl
+                                  + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+                          , JsonUtil.serialize(searchObject),
+                          headerMap);
+
+          data = mapper.readValue(response, Map.class);
+          if (MapUtils.isNotEmpty(data)) {
+            count = (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+            List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+            if (CollectionUtils.isNotEmpty(coursesList)) {
+              for (Map<String, Object> enrolment : coursesList) {
+                String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
+                coursesMap.put(courseId, enrolment);
+              }
+            }
+          } else {
+            logger.error(null, "Issue while fetching the data for externalCourses", null);
+          }
+        }
+      }
+  } catch (Exception e) {
+      logger.error(null, "Issue while fetching the data " + e.getMessage(), e);
+    }
+    return new AbstractMap.SimpleEntry<>(count, coursesMap);
+  }
 }
