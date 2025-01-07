@@ -128,10 +128,17 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: getCachedEnrolmentList :: fetching data from cassandra with userId " + userId)
 
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+    var isMoreThanOneCourse: Boolean = false
+    if (request.get(Constants.COURSE_ID) != null) {
+      val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
+      if (courseIdListFromRequest.size() > 1) {
+        isMoreThanOneCourse = true
+      }
+    }
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     if (CollectionUtils.isNotEmpty(activeEnrolments)) {
       val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
-      if (isDetailsRequired) {
+      if (isDetailsRequired && !isMoreThanOneCourse) {
         val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
         addBatchDetails(updatedEnrolmentList, request,"v3")
         allEnrolledCourses.addAll(updatedEnrolmentList)
@@ -151,9 +158,11 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     var enrolments: java.util.List[java.util.Map[String, AnyRef]] = new java.util.ArrayList()
     var batchId: String = null
     if (request.get(Constants.COURSE_ID) != null) {
-      val courseId: String = request.get(Constants.COURSE_ID).asInstanceOf[String]
-      courseIdList.add(courseId)
-      enrichCourseIdFromProgram(request, courseIdList)
+      val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
+      courseIdList.addAll(courseIdListFromRequest)
+      if (courseIdListFromRequest.size() == 1) {
+        enrichCourseIdFromProgram(request, courseIdList)
+      }
     }
     if (request.get(Constants.BATCH_ID) != null) {
       batchId = request.get(Constants.BATCH_ID).asInstanceOf[String]
