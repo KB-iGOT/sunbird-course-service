@@ -2,7 +2,7 @@ package org.sunbird.enrolments
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.apache.commons.collections4.CollectionUtils
+import org.apache.commons.collections4.{CollectionUtils, MapUtils}
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.cache.util.RedisCacheUtil
 import org.sunbird.common.Constants
@@ -89,6 +89,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
+    isRetiredCoursesIncludedInEnrolList = true
     val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
     if (CollectionUtils.isNotEmpty(enrolmentList)) {
       allEnrolledCourses.addAll(enrolmentList)
@@ -125,7 +126,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean): Response = {
-    logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: getCachedEnrolmentList :: fetching data from cassandra with userId " + userId)
+    logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
     var isMoreThanOneCourse: Boolean = false
@@ -138,13 +139,11 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     if (CollectionUtils.isNotEmpty(activeEnrolments)) {
       val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
+      val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
       if (isDetailsRequired && !isMoreThanOneCourse) {
-        val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
         addBatchDetails(updatedEnrolmentList, request,"v3")
-        allEnrolledCourses.addAll(updatedEnrolmentList)
-      } else {
-        allEnrolledCourses.addAll(enrolmentList)
       }
+      allEnrolledCourses.addAll(updatedEnrolmentList)
     }
     val resp: Response = new Response()
     resp.put(JsonKey.COURSES, allEnrolledCourses)
@@ -218,10 +217,12 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     var addInfo: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
     finalEnrolment.foreach { courseDetails =>
       val courseStatus = courseDetails.get(JsonKey.STATUS)
+      val courseContent: java.util.HashMap[String, AnyRef] = courseDetails.get(JsonKey.CONTENT).asInstanceOf[java.util.HashMap[String, AnyRef]]
       if (courseStatus != 2) {
-        coursesInProgress += 1
+        if (JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])) {
+          coursesInProgress += 1
+        }
       } else {
-        val courseContent: java.util.HashMap[String, AnyRef] = courseDetails.get(JsonKey.CONTENT).asInstanceOf[java.util.HashMap[String, AnyRef]]
         var hoursSpentOnCourses: Int = 0
         if (null != courseContent.get(JsonKey.DURATION)) {
           hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
@@ -276,8 +277,17 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
       } else {
         val courseContent: java.util.HashMap[String, AnyRef] = courseDetails.get(JsonKey.CONTENT).asInstanceOf[java.util.HashMap[String, AnyRef]]
         var hoursSpentOnCourses: Int = 0
-        if (null != courseContent.get(JsonKey.DURATION)) {
-          hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+        if (MapUtils.isNotEmpty(courseContent)) {
+          if (null != courseContent.get(JsonKey.DURATION)) {
+            val durationValue = courseContent.get(JsonKey.DURATION).asInstanceOf[String]
+            hoursSpentOnCourses = try {
+              durationValue.toInt
+            } catch {
+              case _: NumberFormatException =>
+                println(s"Invalid duration value: $durationValue") // Log the invalid value
+                0
+            }
+          }
         }
         hoursSpentOnCompletedCourses += hoursSpentOnCourses
         val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
@@ -296,10 +306,10 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
     activeEnrolments.filter(enrolment => isCourseEligible(enrolment)).map(enrolment => {
       val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
+      enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
       if (isDetailsRequired) {
         enrolment.put(JsonKey.COURSE_NAME, courseContent.get(JsonKey.NAME))
         enrolment.put(JsonKey.DESCRIPTION, courseContent.get(JsonKey.DESCRIPTION))
-        enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
         enrolment.put(JsonKey.COURSE_LOGO_URL, courseContent.get(JsonKey.APP_ICON))
         enrolment.put(JsonKey.CONTENT_ID, enrolment.get(JsonKey.COURSE_ID))
         enrolment.put(JsonKey.COLLECTION_ID, enrolment.get(JsonKey.COURSE_ID))
