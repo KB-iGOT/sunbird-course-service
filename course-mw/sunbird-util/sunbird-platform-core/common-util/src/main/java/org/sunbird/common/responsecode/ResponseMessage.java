@@ -474,6 +474,7 @@ public interface ResponseMessage {
     String INVALID_PROGRAM_ID = "Course id is expected instead of program id.";
     String INVALID_COURSE_CATEGORY = "Course category not available for this content.";
     String INVALID_TRACKING_ATTRIBUTE = "Failed to determine tracking capability of this program.";
+    String USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH = "User has already enrolled this course with different batch.";
 
   }
 
@@ -878,6 +879,7 @@ public interface ResponseMessage {
     String INVALID_PROGRAM_ID = "INVALID_PROGRAM_ID";
     String INVALID_COURSE_CATEGORY = "INVALID_COURSE_CATEGORY";
     String INVALID_TRACKING_ATTRIBUTE = "INVALID_TRACKING_ATTRIBUTE";
+    String USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH = "USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH";
 
   }
 }
