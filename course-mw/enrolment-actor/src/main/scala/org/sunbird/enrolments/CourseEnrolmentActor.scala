@@ -104,14 +104,15 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         if (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
         val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
-        val enrolmentData: UserCourses = userCoursesDao.read(request.getRequestContext, userId, courseId, batchId)
+        val enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
-        validateEnrolment(batchData, enrolmentData, true)
+        validateEnrolmentV3(batchData, enrolmentData, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
-        val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
+        val existingEnrolmentForTheBatch: UserCourses = enrolmentData.find(_.getBatchId == batchId).orNull
+        val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
         val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
         if (hasAccess) {
-            upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
+            upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
             sender().tell(successResponse(), self)
@@ -960,6 +961,47 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             logger.info(request.getRequestContext, "CourseId Not present in request or more than 1 courseId so request is not from TOC page, no enhancement required.")
         }
     }
+
+    def validateEnrolmentV3(batchData: CourseBatch, enrolmentData: util.List[UserCourses], isEnrol: Boolean, isBlendedProgram: Boolean = false): Unit = {
+        if (batchData == null)
+            ProjectCommonException.throwClientErrorException(ResponseCode.invalidCourseBatchId, ResponseCode.invalidCourseBatchId.getErrorMessage)
+
+        if (!(EnrolmentType.inviteOnly.getVal.equalsIgnoreCase(batchData.getEnrollmentType) ||
+          EnrolmentType.open.getVal.equalsIgnoreCase(batchData.getEnrollmentType)))
+            ProjectCommonException.throwClientErrorException(ResponseCode.enrollmentTypeValidation, ResponseCode.enrollmentTypeValidation.getErrorMessage)
+
+        if ((batchData.getStatus == 2) || (batchData.getEndDate != null && LocalDateTime.now().isAfter(LocalDate.parse(DATE_FORMAT.format(batchData.getEndDate), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atTime(LocalTime.MAX))))
+            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted, ResponseCode.courseBatchAlreadyCompleted.getErrorMessage)
+
+        if (isBlendedProgram) {
+            if (isEnrol && batchData.getStartDate != null && LocalDateTime.now().isAfter(LocalDate.parse(DATE_FORMAT.format(batchData.getStartDate), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atTime(LocalTime.MAX)))
+                ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyStarted, ResponseCode.courseBatchAlreadyStarted.getErrorMessage)
+        } else {
+            if (isEnrol && batchData.getEnrollmentEndDate != null && LocalDateTime.now().isAfter(LocalDate.parse(DATE_FORMAT.format(batchData.getEnrollmentEndDate), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atTime(LocalTime.MAX)))
+                ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchEnrollmentDateEnded, ResponseCode.courseBatchEnrollmentDateEnded.getErrorMessage)
+        }
+
+        // If enrolling, check if any active enrollment already exists
+        if (isEnrol) {
+            enrolmentData.find(_.isActive) match {
+                case Some(enrolment) if enrolment.getBatchId == batchData.getBatchId =>
+                    // User is already enrolled in the same batch
+                    ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse, ResponseCode.userAlreadyEnrolledCourse.getErrorMessage)
+                case Some(_) =>
+                    // User is already enrolled in a different batch
+                    ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch, ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch.getErrorMessage)
+            }
+        }
+
+        // If unenrolling, check if the user is NOT enrolled in any active batch
+        if (!isEnrol && enrolmentData.forall(e => e == null || !e.isActive))
+            ProjectCommonException.throwClientErrorException(ResponseCode.userNotEnrolledCourse, ResponseCode.userNotEnrolledCourse.getErrorMessage)
+
+        // If unenrolling, check if the user has already completed the course
+        if (!isEnrol && enrolmentData.exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+            ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted, ResponseCode.courseBatchAlreadyCompleted.getErrorMessage)
+    }
+
 }
 
 

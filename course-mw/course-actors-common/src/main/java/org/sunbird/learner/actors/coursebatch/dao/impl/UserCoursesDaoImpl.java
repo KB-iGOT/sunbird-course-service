@@ -1,5 +1,6 @@
 package org.sunbird.learner.actors.coursebatch.dao.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import net.logstash.logback.encoder.org.apache.commons.lang3.StringUtils;
@@ -291,4 +292,25 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     }
     return userCoursesList;
   }
+
+  @Override
+  public List<UserCourses> readV2(RequestContext requestContext, String userId, String courseId) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.USER_ID, userId);
+    primaryKey.put(JsonKey.COURSE_ID, courseId);
+
+    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+    List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+    if (CollectionUtils.isEmpty(userCoursesList)) {
+      return null;
+    }
+    try {
+      return mapper.convertValue(userCoursesList, new TypeReference<List<UserCourses>>() {
+      });
+    } catch (Exception e) {
+      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
+    }
+    return null;
+  }
+
 }

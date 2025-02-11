@@ -870,6 +870,9 @@ public enum ResponseCode {
   invalidProgramId(ResponseMessage.Key.INVALID_PROGRAM_ID, ResponseMessage.Message.INVALID_PROGRAM_ID),
   invalidCourseCategory(ResponseMessage.Key.INVALID_COURSE_CATEGORY, ResponseMessage.Message.INVALID_COURSE_CATEGORY),
   invalidTrackingAttribute(ResponseMessage.Key.INVALID_TRACKING_ATTRIBUTE, ResponseMessage.Message.INVALID_TRACKING_ATTRIBUTE),
+  userAlreadyEnrolledCourseWithDifferentBatch(
+          ResponseMessage.Key.USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH,
+          ResponseMessage.Message.USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH),
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),
