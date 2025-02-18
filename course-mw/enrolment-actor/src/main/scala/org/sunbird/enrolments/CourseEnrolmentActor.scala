@@ -105,9 +105,9 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
         val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
         val enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
-        val safeEnrolmentData = Option(enrolmentData).map(_.asScala).getOrElse(List.empty)
+        val safeEnrolmentData = Option(enrolmentData).map(_.asScala.toList).getOrElse(List.empty)
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
-        validateEnrolmentV3(batchData, safeEnrolmentData.asJava, true)
+        validateEnrolmentV3(batchData, safeEnrolmentData, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
         val existingEnrolmentForTheBatch: UserCourses = safeEnrolmentData.find(_.getBatchId == batchId).orNull
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
@@ -963,7 +963,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         }
     }
 
-    def validateEnrolmentV3(batchData: CourseBatch, enrolmentData: util.List[UserCourses], isEnrol: Boolean, isBlendedProgram: Boolean = false): Unit = {
+    def validateEnrolmentV3(batchData: CourseBatch, enrolmentData: List[UserCourses], isEnrol: Boolean, isBlendedProgram: Boolean = false): Unit = {
         if (batchData == null)
             ProjectCommonException.throwClientErrorException(ResponseCode.invalidCourseBatchId, ResponseCode.invalidCourseBatchId.getErrorMessage)
 
@@ -982,12 +982,9 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
                 ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchEnrollmentDateEnded, ResponseCode.courseBatchEnrollmentDateEnded.getErrorMessage)
         }
 
-        // Convert enrolmentData to Scala List safely
-        val safeEnrolmentData = Option(enrolmentData).map(_.asScala).getOrElse(List.empty)
-
         // If enrolling, check if any active enrollment already exists
-        if (isEnrol && safeEnrolmentData.nonEmpty) {
-            safeEnrolmentData.find(_.isActive) match {
+        if (isEnrol && enrolmentData.nonEmpty) {
+            enrolmentData.find(_.isActive) match {
                 case Some(enrolment) if enrolment.getBatchId == batchData.getBatchId =>
                     // User is already enrolled in the same batch
                     ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse, ResponseCode.userAlreadyEnrolledCourse.getErrorMessage)
@@ -999,11 +996,11 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         }
 
         // If unenrolling, check if the user is NOT enrolled in any active batch
-        if (!isEnrol && safeEnrolmentData.forall(e => e == null || !e.isActive))
+        if (!isEnrol && enrolmentData.forall(e => e == null || !e.isActive))
             ProjectCommonException.throwClientErrorException(ResponseCode.userNotEnrolledCourse, ResponseCode.userNotEnrolledCourse.getErrorMessage)
 
         // If unenrolling, check if the user has already completed the course
-        if (!isEnrol && safeEnrolmentData.exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+        if (!isEnrol && enrolmentData.exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
             ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted, ResponseCode.courseBatchAlreadyCompleted.getErrorMessage)
     }
 
