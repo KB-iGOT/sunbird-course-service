@@ -105,8 +105,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
         val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
         var enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
-        if(CollectionUtils.isEmpty(enrolmentData)){
-            enrolmentData= new util.ArrayList[UserCourses]();
+        if (CollectionUtils.isEmpty(enrolmentData)) {
+            enrolmentData = new util.ArrayList[UserCourses]();
         }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
         validateEnrolmentV3(batchData, enrolmentData, true)
