@@ -104,12 +104,14 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         if (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
         val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
-        val enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
-        val safeEnrolmentData = Option(enrolmentData).map(_.asScala.toList).getOrElse(List.empty)
+        var enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
+        if(CollectionUtils.isEmpty(enrolmentData)){
+            enrolmentData= new util.ArrayList[UserCourses]();
+        }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
-        validateEnrolmentV3(batchData, safeEnrolmentData, true)
+        validateEnrolmentV3(batchData, enrolmentData, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
-        val existingEnrolmentForTheBatch: UserCourses = safeEnrolmentData.find(_.getBatchId == batchId).orNull
+        val existingEnrolmentForTheBatch: UserCourses = enrolmentData.find(_.getBatchId == batchId).orNull
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
         val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
         if (hasAccess) {
@@ -963,7 +965,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         }
     }
 
-    def validateEnrolmentV3(batchData: CourseBatch, enrolmentData: List[UserCourses], isEnrol: Boolean, isBlendedProgram: Boolean = false): Unit = {
+    def validateEnrolmentV3(batchData: CourseBatch, enrolmentData: util.List[UserCourses], isEnrol: Boolean, isBlendedProgram: Boolean = false): Unit = {
         if (batchData == null)
             ProjectCommonException.throwClientErrorException(ResponseCode.invalidCourseBatchId, ResponseCode.invalidCourseBatchId.getErrorMessage)
 
