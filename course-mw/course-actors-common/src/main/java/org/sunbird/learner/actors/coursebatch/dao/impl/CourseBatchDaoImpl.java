@@ -155,7 +155,7 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
                     requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), primaryKey, null);
     List<Map<String, Object>> batchList =
             (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
-    if (batchList.isEmpty()) {
+    if (CollectionUtils.isEmpty(batchList)) {
       throw new ProjectCommonException(
               ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
               ResponseCode.courseDoesNotHaveBatch.getErrorMessage(),
