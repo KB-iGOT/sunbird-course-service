@@ -1,6 +1,11 @@
 package org.sunbird.learner.actors.coursebatch.dao.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.CassandraUtil;
 import org.sunbird.common.exception.ProjectCommonException;
@@ -19,6 +24,8 @@ import org.sunbird.models.course.batch.CourseBatch;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
+
 import org.sunbird.common.models.util.ProjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,27 +151,57 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
     Map<String, Object> primaryKey = new HashMap<>();
     primaryKey.put(JsonKey.COURSE_ID, courseId);
     Response courseBatchResult =
-        cassandraOperation.getRecordByIdentifier(
-                requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), primaryKey,null);
-    List<Map<String, Object>> courseList =
-        (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
-    if (courseList.isEmpty()) {
+            cassandraOperation.getRecordByIdentifier(
+                    requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), primaryKey, null);
+    List<Map<String, Object>> batchList =
+            (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
+    if (CollectionUtils.isEmpty(batchList)) {
       throw new ProjectCommonException(
-          ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
-          ResponseCode.courseDoesNotHaveBatch.getErrorMessage(),
-          ResponseCode.CLIENT_ERROR.getResponseCode());
+              ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
+              ResponseCode.courseDoesNotHaveBatch.getErrorMessage(),
+              ResponseCode.CLIENT_ERROR.getResponseCode());
     } else {
-      for (Map<String, Object> course : courseList) {
-        int status = (int) course.get(JsonKey.STATUS);
-        if (status != 2) {
-          course.remove(JsonKey.PARTICIPANT);
-          return mapper.convertValue(course, CourseBatch.class);
+      List<Map<String, Object>> activeBatchList = batchList.stream()
+              .filter(batch -> ((Integer) batch.get(JsonKey.STATUS)) != 2) // Filter batches where STATUS != 2
+              .collect(Collectors.toList());
+      if (CollectionUtils.isNotEmpty(activeBatchList)) {
+        if (activeBatchList.size() > 1) {
+          for (Map<String, Object> batch : activeBatchList) {
+            String batchAttributesStr = (String) batch.get(CourseJsonKey.BATCH_ATTRIBUTES);
+            Map<String, Object> batchAttributes = new HashMap<>();
+            if (StringUtils.isNotBlank(batchAttributesStr)) {
+              try {
+                batchAttributes = mapper.readValue(batchAttributesStr, new TypeReference<Map<String, Object>>() {});
+              } catch (JsonProcessingException e) {
+                log.error("Error parsing batch attributes JSON: " + batchAttributesStr, e);
+              }
+            }
+            if (MapUtils.isNotEmpty(batchAttributes)) {
+              Boolean isActiveBatch = (Boolean) batchAttributes.get(CourseJsonKey.IS_ACTIVE_BATCH);
+              if (isActiveBatch != null && isActiveBatch) {
+                log.info("Selected active batch for enrolment is: {} for courseId: {}", batch.get(JsonKey.BATCH_ID), courseId);
+                batch.remove(JsonKey.PARTICIPANT);
+                return mapper.convertValue(batch, CourseBatch.class);
+              }
+            }
+          }
+          log.error("Multiple batches available for enrollment. No batch is marked as active (isActiveBatch=true) for courseId: {}", courseId);
+          throw new ProjectCommonException(
+                  ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
+                  ResponseCode.invalidCourseBatchId.getErrorMessage(),
+                  ResponseCode.CLIENT_ERROR.getResponseCode());
+
+        } else {
+          Map<String, Object> batch = activeBatchList.get(0);
+          batch.remove(JsonKey.PARTICIPANT);
+          return mapper.convertValue(batch, CourseBatch.class);
         }
+      } else {
+        throw new ProjectCommonException(
+                ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
+                ResponseCode.invalidCourseBatchId.getErrorMessage(),
+                ResponseCode.CLIENT_ERROR.getResponseCode());
       }
-      throw new ProjectCommonException(
-          ResponseCode.courseDoesNotHaveBatch.getErrorCode(),
-          ResponseCode.invalidCourseBatchId.getErrorMessage(),
-          ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
 

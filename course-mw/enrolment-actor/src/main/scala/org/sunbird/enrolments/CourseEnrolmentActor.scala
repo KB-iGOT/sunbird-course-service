@@ -741,12 +741,16 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         try {
             val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
             val batchId: String = batchData.getBatchId.asInstanceOf[String]
-            val enrolmentData: UserCourses = userCoursesDao.read(request.getRequestContext, userId, courseId, batchId)
+            var enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
+            if (CollectionUtils.isEmpty(enrolmentData)) {
+                enrolmentData = new util.ArrayList[UserCourses]();
+            }
             val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
-            validateEnrolment(batchData, enrolmentData, true)
+            validateEnrolmentV3(batchData, enrolmentData, true)
             val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId, batchUserData)
-            val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
-            upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
+            val existingEnrolmentForTheBatch: UserCourses = enrolmentData.find(_.getBatchId == batchId).orNull
+            val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
+            upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
@@ -754,6 +758,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         } catch {
             case e: ProjectCommonException =>
                 if (ResponseCode.userAlreadyEnrolledCourse.getErrorMessage.equals(e.getMessage))
+                    return true
+                if (ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch.getErrorMessage.equals(e.getMessage))
                     return true
                 if (ResponseCode.userAlreadyCompletedCourse.getErrorMessage.equals(e.getMessage))
                     return true
