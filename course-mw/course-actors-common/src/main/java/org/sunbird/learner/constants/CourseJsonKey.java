@@ -36,4 +36,5 @@ public abstract class CourseJsonKey {
   public static final String ADDITIONAL_PROPS = "additionalProps";
   public static final String BATCH_ATTRIBUTES = "batchAttributes";
   public static final String REISSUE_DATE = "reIssueDate";
+  public static final String IS_ACTIVE_BATCH ="isActiveBatch";
 }
