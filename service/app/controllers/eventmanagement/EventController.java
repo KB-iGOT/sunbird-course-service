@@ -14,7 +14,8 @@ import play.mvc.Result;
 
 import javax.inject.Inject;
 import javax.inject.Named;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 public class EventController extends BaseController {
@@ -156,6 +157,39 @@ public class EventController extends BaseController {
                         request.getContext().put("cache", Boolean.parseBoolean(queryParams.get("cache")[0]));
                     } else
                         request.getContext().put("cache", true);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getTrendingEvent(Http.Request httpRequest) {
+        return handleRequest(actorRef, "getTrendingEvent",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getFeatureEvent(Http.Request httpRequest) {
+        return handleRequest(actorRef, "getFeatureEvent",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
                     return null;
                 },
                 null,

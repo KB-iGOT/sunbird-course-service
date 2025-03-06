@@ -2,6 +2,7 @@ package org.sunbird.learner.actors.event;
 
 
 import org.sunbird.common.request.Request;
+import org.sunbird.common.request.RequestContext;
 
 
 import java.util.List;
@@ -13,4 +14,6 @@ public interface EventEnrolmentDao {
     List<Map<String, Object>> getUserEventEnrollment(Request request, String userId,String eventId ,String batchId);
 
     List<Map<String, Object>> getUserEventState(Request request);
+
+    Map<String, Object> getUserDetails(String userId, RequestContext requestContext);
 }

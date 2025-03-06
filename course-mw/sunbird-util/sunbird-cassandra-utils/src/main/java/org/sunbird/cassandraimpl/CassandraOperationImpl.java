@@ -924,4 +924,8 @@ public abstract class CassandraOperationImpl implements CassandraOperation {
     return response;
   }
 
+  public Response getUserRecordFromDB(String keyspaceName, String tableName, String userId, RequestContext requestContext) {
+    return getRecordsByPropertiesWithoutFiltering(requestContext,keyspaceName, tableName, JsonKey.USER_ID_KEY, userId, null);
+  }
+
 }

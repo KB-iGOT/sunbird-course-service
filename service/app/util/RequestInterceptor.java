@@ -50,6 +50,7 @@ public class RequestInterceptor {
     apiHeaderIgnoreMap.put("/private/v2/event/batch/create", var);
     apiHeaderIgnoreMap.put("/v1/blended/program/admin/enroll", var);
     apiHeaderIgnoreMap.put("/v1/event/batch/cert/issue", var);
+    apiHeaderIgnoreMap.put("/v2/featured/events", var);
   }
 
   /**

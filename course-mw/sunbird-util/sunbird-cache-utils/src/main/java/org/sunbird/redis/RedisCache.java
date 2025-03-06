@@ -1,5 +1,6 @@
 package org.sunbird.redis;
 
+import org.redisson.api.RBucket;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.sunbird.cache.interfaces.Cache;
@@ -101,5 +102,28 @@ public class RedisCache implements Cache {
           "RedisCache:get: Error occurred mapName = " + mapName + ", key = " + key, e);
     }
     return null;
+  }
+
+  public String hget(String mapName, String key, int dbIndex) {
+    try {
+      RedissonClient clientWithDb = RedisConnectionManager.getClientV2(dbIndex);
+      RMap<String, String> map = clientWithDb.getMap(mapName);
+      return map.get(key);
+    } catch (Exception e) {
+      logger.error(null, "RedisCache:get: Error occurred mapName = " + mapName + ", key = " + key + ", dbIndex = " + dbIndex, e);
+    }
+    return null;
+  }
+
+  public String getCache(String key, Integer dbIndex) {
+    try {
+      RedissonClient clientWithDb = RedisConnectionManager.getClientV2(dbIndex);
+      RBucket<String> bucket = clientWithDb.getBucket(key);
+      String value = bucket.get();
+      return value;
+    } catch (Exception e) {
+      logger.error(null, "RedisCache:get: Error occurred key =" + key + ", dbIndex = " + dbIndex, e);
+      return null;
+    }
   }
 }
