@@ -11,6 +11,9 @@ import org.sunbird.common.models.util.LoggerEnum;
 import org.sunbird.common.models.util.LoggerUtil;
 import org.sunbird.common.models.util.ProjectUtil;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class RedisConnectionManager {
   private static String host = ProjectUtil.getConfigValue("sunbird_redis_host");
   private static String port = ProjectUtil.getConfigValue("sunbird_redis_port");
@@ -20,6 +23,7 @@ public class RedisConnectionManager {
       Integer.valueOf(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_REDIS_CONN_POOL_SIZE));
   private static RedissonClient client = null;
   private static LoggerUtil logger = new LoggerUtil(RedisConnectionManager.class);
+  private static Map<Integer, RedissonClient> clientMap = new ConcurrentHashMap<>();
 
   public static RedissonClient getClient() {
     if (client == null) {
@@ -90,5 +94,20 @@ public class RedisConnectionManager {
       logger.error(null, 
           "RedisConnectionManager:initialisingClusterServer: Error occurred = " + e.getMessage(), e);
     }
+  }
+
+  public static RedissonClient getClientV2(int dbIndex) {
+    return clientMap.computeIfAbsent(dbIndex, RedisConnectionManager::createClientForDbV2);
+  }
+
+  private static RedissonClient createClientForDbV2(int dbIndex) {
+    logger.info(null, "Creating new Redis client for dbIndex = " + dbIndex);
+    Config config = new Config();
+    SingleServerConfig singleServerConfig = config.useSingleServer();
+    singleServerConfig.setAddress(host + ":" + port);
+    singleServerConfig.setDatabase(dbIndex);
+    singleServerConfig.setConnectionPoolSize(poolsize);
+    config.setCodec(new StringCodec());
+    return Redisson.create(config);
   }
 }

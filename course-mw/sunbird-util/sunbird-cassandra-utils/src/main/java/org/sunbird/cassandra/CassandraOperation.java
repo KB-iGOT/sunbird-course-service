@@ -306,4 +306,6 @@ public interface CassandraOperation {
   Response getCountOfRecordByIdentifier(RequestContext requestContext, String keyspaceName, String tableName, Object key, String field);
 
   Response getRecordsByPropertiesWithoutFiltering(RequestContext requestContext, String keyspaceName, String tableName, String propertyName, Object propertyValue, List<String> fields);
+
+  Response getUserRecordFromDB( String keyspaceName, String tableName,String userId, RequestContext requestContext);
 }

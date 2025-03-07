@@ -165,6 +165,39 @@ public class EventController extends BaseController {
                 httpRequest);
     }
 
+    public CompletionStage<Result> getTrendingEvent(Http.Request httpRequest) {
+        return handleRequest(actorRef, "getTrendingEvent",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getFeatureEvent(Http.Request httpRequest) {
+        return handleRequest(actorRef, "getFeatureEvent",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
     public CompletionStage<Result> getEnrolledEventsSummary(Http.Request httpRequest) {
         return handleRequest(actorRef, "getEnrolEventSummary",
                 httpRequest.body().asJson(),
@@ -196,4 +229,4 @@ public class EventController extends BaseController {
     }
 
 
-} 
+}

@@ -1196,7 +1196,11 @@ public final class JsonKey {
   public static final String PAGE_SIZE = "pageSize";
   public static final String FILTER_CRITERIA_MAP = "filterCriteriaMap";
   public static final String MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST ="maximum_allowed_limit_enrol_list";
-    public static final String USER_EVENT_ENROLMENT_INFO = "userEventEnrolmentInfo";
+  public static final String KEYSPACE_SUNBIRD = "sunbird";
+  public static final String TABLE_USER = "user";
+  public static final String FEATURE_EVENTS_REDIS_KEY = "feature_events_redis_key";
+  public static final String TRENDING_EVENTS_REDIS_KEY = "trending_events_redis_key";
+  public static final String USER_EVENT_ENROLMENT_INFO = "userEventEnrolmentInfo";
 
     private JsonKey() {}
 }
