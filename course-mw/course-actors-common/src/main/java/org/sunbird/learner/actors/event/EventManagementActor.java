@@ -30,6 +30,7 @@ public class EventManagementActor extends BaseActor {
 
     private EventEnrolmentDao eventBatchDao = new EventEnrolmentDaoImpl();
     private RedisCache redisCache = new RedisCache();
+    private ObjectMapper mapper = new ObjectMapper();
 
 
     @Override
@@ -267,7 +268,7 @@ public class EventManagementActor extends BaseActor {
                     String progressDetails = (String)consumption.get(JsonKey.PROGRESS_DETAILS);
                     JsonNode progressDetailsJson = null;
                     try {
-                        progressDetailsJson = new ObjectMapper().readTree(progressDetails);
+                        progressDetailsJson = mapper.readTree(progressDetails);
                         if (progressDetailsJson != null&&progressDetailsJson.get(JsonKey.DURATION) != null) {
                         hoursSpentOnCourses += (progressDetailsJson.get(JsonKey.DURATION)).intValue();
                         }
