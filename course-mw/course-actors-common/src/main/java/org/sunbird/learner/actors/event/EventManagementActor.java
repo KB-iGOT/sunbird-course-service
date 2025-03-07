@@ -234,7 +234,7 @@ public class EventManagementActor extends BaseActor {
         logger.info(request.getRequestContext(), "EventManagementActor: getUserEnrolEventSummary : UserId = " + userId);
         try {
             List<Map<String, Object>> allEnrolledEvents = eventBatchDao.getEventEnrolmentList(request, userId);
-            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentCourseInfo(request,allEnrolledEvents);
+            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentEventInfo(request,allEnrolledEvents);
             Response response = new Response();
             response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, userCourseEnrolmentInfo);
             sender().tell(response, self());
@@ -244,7 +244,7 @@ public class EventManagementActor extends BaseActor {
         }
     }
 
-    private Map<String, Object> getUserEnrolmentCourseInfo(Request request,
+    private Map<String, Object> getUserEnrolmentEventInfo(Request request,
             List<Map<String, Object>> finalEnrolment) {
         int eventsCompleted = 0;
         int eventsEnrolled = 0;
@@ -252,10 +252,10 @@ public class EventManagementActor extends BaseActor {
         Map<String, Object> addInfo = new HashMap<>();
 
         for (Map<String, Object> eventDetails : finalEnrolment) {
-            Integer courseStatus = (Integer) eventDetails.get(JsonKey.STATUS);
-            List<Map<String, Object>> userEventConsumption = (List<Map<String, Object>>) eventDetails.get("userEventConsumption");
+            Integer eventStatus = (Integer) eventDetails.get(JsonKey.STATUS);
+            List<Map<String, Object>> userEventConsumption = (List<Map<String, Object>>) eventDetails.get(JsonKey.USER_EVENT_CONSUMPTION);
 
-            if (courseStatus == null || courseStatus == 2) {
+            if (eventStatus != null && eventStatus == 2) {
                 eventsCompleted++;
                 eventsEnrolled++;
             } else {
@@ -264,12 +264,12 @@ public class EventManagementActor extends BaseActor {
             int hoursSpentOnCourses = 0;
             if (userEventConsumption != null && !userEventConsumption.isEmpty()) {
                 for (Map<String, Object> consumption : userEventConsumption) {
-                    String progressDetails = (String)consumption.get("progressdetails");
+                    String progressDetails = (String)consumption.get(JsonKey.PROGRESS_DETAILS);
                     JsonNode progressDetailsJson = null;
                     try {
                         progressDetailsJson = new ObjectMapper().readTree(progressDetails);
-                        if (progressDetailsJson != null&&progressDetailsJson.get("duration") != null) {
-                        hoursSpentOnCourses += (progressDetailsJson.get("duration")).intValue();
+                        if (progressDetailsJson != null&&progressDetailsJson.get(JsonKey.DURATION) != null) {
+                        hoursSpentOnCourses += (progressDetailsJson.get(JsonKey.DURATION)).intValue();
                         }
                     } catch (Exception e) {
                         logger.error(request.getRequestContext(),"Error parsing progressDetails JSON", e);

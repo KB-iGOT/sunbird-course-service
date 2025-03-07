@@ -1201,6 +1201,8 @@ public final class JsonKey {
   public static final String FEATURE_EVENTS_REDIS_KEY = "feature_events_redis_key";
   public static final String TRENDING_EVENTS_REDIS_KEY = "trending_events_redis_key";
   public static final String USER_EVENT_ENROLMENT_INFO = "userEventEnrolmentInfo";
+  public static final String USER_EVENT_CONSUMPTION = "userEventConsumption";
+  public static final String PROGRESS_DETAILS = "progressdetails";
 
-    private JsonKey() {}
+  private JsonKey() {}
 }
