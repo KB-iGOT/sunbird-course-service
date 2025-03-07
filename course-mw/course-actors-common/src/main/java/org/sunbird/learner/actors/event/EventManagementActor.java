@@ -230,12 +230,13 @@ public class EventManagementActor extends BaseActor {
             throw e;
         }
     }
-    private void getUserEnrolEventSummary(Request request){
+
+    private void getUserEnrolEventSummary(Request request) {
         String userId = (String) request.get(JsonKey.USER_ID);
         logger.info(request.getRequestContext(), "EventManagementActor: getUserEnrolEventSummary : UserId = " + userId);
         try {
             List<Map<String, Object>> allEnrolledEvents = eventBatchDao.getEventEnrolmentList(request, userId);
-            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentEventInfo(request,allEnrolledEvents);
+            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentEventInfo(request, allEnrolledEvents);
             Response response = new Response();
             response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, userCourseEnrolmentInfo);
             sender().tell(response, self());
@@ -246,7 +247,7 @@ public class EventManagementActor extends BaseActor {
     }
 
     private Map<String, Object> getUserEnrolmentEventInfo(Request request,
-            List<Map<String, Object>> finalEnrolment) {
+                                                          List<Map<String, Object>> finalEnrolment) {
         int eventsCompleted = 0;
         int eventsEnrolled = 0;
         int hoursSpentOnEvents = 0;
@@ -265,15 +266,14 @@ public class EventManagementActor extends BaseActor {
             int hoursSpentOnCourses = 0;
             if (userEventConsumption != null && !userEventConsumption.isEmpty()) {
                 for (Map<String, Object> consumption : userEventConsumption) {
-                    String progressDetails = (String)consumption.get(JsonKey.PROGRESS_DETAILS);
-                    JsonNode progressDetailsJson = null;
+                    String progressDetails = (String) consumption.get(JsonKey.PROGRESS_DETAILS);
                     try {
-                        progressDetailsJson = mapper.readTree(progressDetails);
-                        if (progressDetailsJson != null&&progressDetailsJson.get(JsonKey.DURATION) != null) {
-                        hoursSpentOnCourses += (progressDetailsJson.get(JsonKey.DURATION)).intValue();
+                        JsonNode progressDetailsJson = mapper.readTree(progressDetails);
+                        if (progressDetailsJson != null && progressDetailsJson.hasNonNull(JsonKey.DURATION)) {
+                            hoursSpentOnCourses += progressDetailsJson.get(JsonKey.DURATION).intValue();
                         }
                     } catch (Exception e) {
-                        logger.error(request.getRequestContext(),"Error parsing progressDetails JSON", e);
+                        logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
                     }
                 }
             }
