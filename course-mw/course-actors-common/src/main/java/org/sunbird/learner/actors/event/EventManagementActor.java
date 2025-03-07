@@ -1,5 +1,7 @@
 package org.sunbird.learner.actors.event;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
@@ -41,6 +43,9 @@ public class EventManagementActor extends BaseActor {
                 break;
             case "userEnrolList":
                 eventEnrollmentListForUser(request);
+                break;
+            case "getEnrolEventSummary":
+                getUserEnrolEventSummary(request);
                 break;
             default:
                 onReceiveUnsupportedOperation(requestedOperation);
@@ -157,5 +162,61 @@ public class EventManagementActor extends BaseActor {
             logger.error(request.getRequestContext(), "Exception in enrolment list for user: " + userId, e);
             throw e;
         }
+    }
+    private void getUserEnrolEventSummary(Request request){
+        String userId = (String) request.get(JsonKey.USER_ID);
+        logger.info(request.getRequestContext(), "EventManagementActor: getUserEnrolEventSummary : UserId = " + userId);
+        try {
+            List<Map<String, Object>> allEnrolledEvents = eventBatchDao.getEventEnrolmentList(request, userId);
+            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentCourseInfo(request,allEnrolledEvents);
+            Response response = new Response();
+            response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, userCourseEnrolmentInfo);
+            sender().tell(response, self());
+        } catch (Exception e) {
+            logger.error(request.getRequestContext(), "Exception in enrolment list for user: " + userId, e);
+            throw e;
+        }
+    }
+
+    private Map<String, Object> getUserEnrolmentCourseInfo(Request request,
+            List<Map<String, Object>> finalEnrolment) {
+        int eventsCompleted = 0;
+        int eventsEnrolled = 0;
+        int hoursSpentOnEvents = 0;
+        Map<String, Object> addInfo = new HashMap<>();
+
+        for (Map<String, Object> eventDetails : finalEnrolment) {
+            Integer courseStatus = (Integer) eventDetails.get(JsonKey.STATUS);
+            List<Map<String, Object>> userEventConsumption = (List<Map<String, Object>>) eventDetails.get("userEventConsumption");
+
+            if (courseStatus == null || courseStatus == 2) {
+                eventsCompleted++;
+                eventsEnrolled++;
+            } else {
+                eventsEnrolled++;
+            }
+            int hoursSpentOnCourses = 0;
+            if (userEventConsumption != null && !userEventConsumption.isEmpty()) {
+                for (Map<String, Object> consumption : userEventConsumption) {
+                    String progressDetails = (String)consumption.get("progressdetails");
+                    JsonNode progressDetailsJson = null;
+                    try {
+                        progressDetailsJson = new ObjectMapper().readTree(progressDetails);
+                        if (progressDetailsJson != null&&progressDetailsJson.get("duration") != null) {
+                        hoursSpentOnCourses += (progressDetailsJson.get("duration")).intValue();
+                        }
+                    } catch (Exception e) {
+                        logger.error(request.getRequestContext(),"Error parsing progressDetails JSON", e);
+                    }
+                }
+            }
+            hoursSpentOnEvents += hoursSpentOnCourses;
+        }
+
+        addInfo.put("eventsEnrolled", eventsEnrolled);
+        addInfo.put("eventsAttended", eventsCompleted);
+        addInfo.put("hoursSpentOnEvents", hoursSpentOnEvents);
+
+        return addInfo;
     }
 }
