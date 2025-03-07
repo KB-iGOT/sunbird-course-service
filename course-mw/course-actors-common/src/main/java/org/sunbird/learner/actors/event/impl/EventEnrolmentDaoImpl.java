@@ -5,7 +5,10 @@ package org.sunbird.learner.actors.event.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.models.response.Response;
@@ -24,6 +27,7 @@ import java.util.stream.Collectors;
 
 public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
+    private static final Logger log = LoggerFactory.getLogger(EventEnrolmentDaoImpl.class);
     private final Map<String, Integer> statusMap;
 
     public EventEnrolmentDaoImpl() {
@@ -211,6 +215,26 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
     private String getCacheKey(String eventId) {
         return eventId + ":user-event-enrolments";
+    }
+
+    public Map<String, Object> getUserDetails(String userId, RequestContext requestContext) {
+        try {
+            Response response = cassandraOperation.getUserRecordFromDB(JsonKey.KEYSPACE_SUNBIRD, JsonKey.TABLE_USER, userId, requestContext);
+
+            if (MapUtils.isEmpty(response.getResult())) {
+                log.warn("No user details found for userId: {}", userId);
+                return Collections.emptyMap();
+            }
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> userRecords = mapper.convertValue(response.getResult().get(JsonKey.RESPONSE),
+                    new TypeReference<List<Map<String, Object>>>() {});
+
+            return CollectionUtils.isEmpty(userRecords) ? Collections.emptyMap() : userRecords.get(0);
+
+        } catch (Exception e) {
+            log.error("Exception while fetching user details for userId: {}", userId, e);
+            throw new RuntimeException("Error fetching user details", e);
+        }
     }
 
 }
