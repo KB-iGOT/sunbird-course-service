@@ -179,20 +179,22 @@ public class EventManagementActor extends BaseActor {
             Map<String, Object> userData = eventBatchDao.getUserDetails(userId, request.getRequestContext());
             if (MapUtils.isEmpty(userData)) {
                 log.error("EventManagementActor:getTrendingEvent: UserData not found with userId: {}", userId);
-                ProjectCommonException.throwServerErrorException(ResponseCode.SERVER_ERROR, "UserData not found");
+                ProjectCommonException.throwServerErrorException(ResponseCode.RESOURCE_NOT_FOUND, "UserData not found");
             }
             String orgId = (String) userData.get(JsonKey.ROOT_ORG_ID);
             if (StringUtils.isBlank(orgId)) {
                 log.error("EventManagementActor:getTrendingEvent: Root orgId not found with userId: {}", userId);
                 ProjectCommonException.throwServerErrorException(ResponseCode.invalidOrgId, "Root orgId not found");
             }
-
             String mapName = ProjectUtil.getConfigValue(JsonKey.TRENDING_EVENTS_REDIS_KEY);
             int dbIndex = 12;
             String eventData = redisCache.hget(mapName, orgId, dbIndex);
             if (StringUtils.isBlank(eventData)) {
                 log.error("EventManagementActor:getTrendingEvent: No trending events found for orgId: {}", orgId);
-                ProjectCommonException.throwServerErrorException(ResponseCode.RESOURCE_NOT_FOUND, "No trending events found");
+                Response response = new Response();
+                response.put(JsonKey.MESSAGE, "No Trending events found");
+                sender().tell(response, self());
+                return;
             }
             List<String> eventIds = Arrays.asList(eventData.split(","));
             Response response = new Response();
@@ -200,7 +202,7 @@ public class EventManagementActor extends BaseActor {
             sender().tell(response, self());
         } catch (Exception e) {
             logger.error(request.getRequestContext(), "Exception in eventGetFeature for user: ", e);
-            throw e;
+            ProjectCommonException.throwServerErrorException(ResponseCode.SERVER_ERROR, e.getMessage());
         }
     }
 
@@ -211,17 +213,19 @@ public class EventManagementActor extends BaseActor {
             int dbIndex = 12;
             String eventData = redisCache.getCache(redisKey, dbIndex);
             if (StringUtils.isBlank(eventData)) {
-                log.error("EventManagementActor:getTrendingEvent: No trending events found for redisKey: {}", redisKey);
-                ProjectCommonException.throwServerErrorException(ResponseCode.RESOURCE_NOT_FOUND, "No trending events found");
+                log.error("EventManagementActor:getFeatureEvent: No Feature events found for redisKey: {}", redisKey);
+                Response response = new Response();
+                response.put(JsonKey.MESSAGE, "No Feature events found");
+                sender().tell(response, self());
+                return;
             }
-
             List<String> eventIds = Arrays.asList(eventData.split(","));
             Response response = new Response();
             response.put(JsonKey.EVENTS, eventIds);
             sender().tell(response, self());
         } catch (Exception e) {
             logger.error(request.getRequestContext(), "Exception in eventGetFeature for user: ", e);
-            throw e;
+            ProjectCommonException.throwServerErrorException(ResponseCode.SERVER_ERROR, e.getMessage());
         }
     }
 }
