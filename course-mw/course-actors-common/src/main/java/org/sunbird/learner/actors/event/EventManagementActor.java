@@ -232,7 +232,7 @@ public class EventManagementActor extends BaseActor {
             sender().tell(response, self());
         } catch (Exception e) {
             logger.error(request.getRequestContext(), "Exception in eventGetFeature for user: ", e);
-            throw e;
+            ProjectCommonException.throwServerErrorException(ResponseCode.SERVER_ERROR, e.getMessage());
         }
     }
 
