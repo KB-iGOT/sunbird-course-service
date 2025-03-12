@@ -1203,6 +1203,7 @@ public final class JsonKey {
   public static final String USER_EVENT_ENROLMENT_INFO = "userEventEnrolmentInfo";
   public static final String USER_EVENT_CONSUMPTION = "userEventConsumption";
   public static final String PROGRESS_DETAILS = "progressdetails";
+  public static final String DB_INDEX = "redis_db_index";
 
   private JsonKey() {}
 }

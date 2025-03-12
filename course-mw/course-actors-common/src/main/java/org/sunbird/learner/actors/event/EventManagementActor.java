@@ -217,7 +217,7 @@ public class EventManagementActor extends BaseActor {
         logger.info(request.getRequestContext(), "EventManagementActor: getFeatureEvent ");
         try {
             String redisKey = ProjectUtil.getConfigValue(JsonKey.FEATURE_EVENTS_REDIS_KEY);
-            int dbIndex = 12;
+            int dbIndex = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.DB_INDEX));
             String eventData = redisCache.getCache(redisKey, dbIndex);
             if (StringUtils.isBlank(eventData)) {
                 log.error("EventManagementActor:getFeatureEvent: No Feature events found for redisKey: {}", redisKey);
