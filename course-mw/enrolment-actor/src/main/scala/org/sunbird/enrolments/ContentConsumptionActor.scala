@@ -768,7 +768,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
       }
     } else {
-      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= minPercetageToComplete) {
+      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
         updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
         updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
         updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
