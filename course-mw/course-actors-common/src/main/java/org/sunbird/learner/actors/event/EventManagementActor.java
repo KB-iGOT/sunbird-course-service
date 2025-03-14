@@ -194,7 +194,7 @@ public class EventManagementActor extends BaseActor {
             }
 
             String mapName = ProjectUtil.getConfigValue(JsonKey.TRENDING_EVENTS_REDIS_KEY);
-            int dbIndex = 12;
+            int dbIndex = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.DB_INDEX));
             String eventData = redisCache.hget(mapName, orgId, dbIndex);
             if (StringUtils.isBlank(eventData)) {
                 log.error("EventManagementActor:getTrendingEvent: No trending events found for orgId: {}", orgId);
