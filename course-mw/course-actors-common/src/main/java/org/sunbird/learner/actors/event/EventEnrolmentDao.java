@@ -19,4 +19,6 @@ public interface EventEnrolmentDao {
 
     List<Map<String,Object>> getEventEnrolmentList(Request request, String userId);
 
+    List<Map<String, Object>> getEnrolmentListV2(Request request, String userId);
+
 }

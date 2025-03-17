@@ -119,3 +119,4 @@ PATCH /private/v1/event/batch/cert/template/add       @controllers.certificate.C
 GET  /v2/featured/events                          @controllers.eventmanagement.EventController.getFeatureEvent(request: play.mvc.Http.Request)
 GET  /v2/mdo/trending/events                      @controllers.eventmanagement.EventController.getTrendingEvent(request: play.mvc.Http.Request)
 GET  /v1/user/events/enroll/summary	    @controllers.eventmanagement.EventController.getEnrolledEventsSummary(request: play.mvc.Http.Request)
+POST      /v2/user/events/list/:uid	    @controllers.eventmanagement.EventController.getUserEnrolledEventsListBasedOnEventTypes(uid:String, request: play.mvc.Http.Request)

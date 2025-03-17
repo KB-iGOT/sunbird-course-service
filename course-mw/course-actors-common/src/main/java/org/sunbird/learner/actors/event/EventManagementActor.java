@@ -61,6 +61,9 @@ public class EventManagementActor extends BaseActor {
             case "getEnrolEventSummary":
                 getUserEnrolEventSummary(request);
                 break;
+            case "userEnrolListByEventTypes":
+                eventEnrollmentListForUserBasedOnEventTypes(request);
+                break;
             default:
                 onReceiveUnsupportedOperation(requestedOperation);
                 break;
@@ -290,5 +293,20 @@ public class EventManagementActor extends BaseActor {
         addInfo.put("hoursSpentOnEvents", hoursSpentOnEvents);
 
         return addInfo;
+    }
+
+    private void eventEnrollmentListForUserBasedOnEventTypes(Request request) throws Exception {
+        String userId = (String) request.get(JsonKey.USER_ID);
+        logger.info(request.getRequestContext(), "EventManagementActor: list : UserId = " + userId);
+        try {
+            List<Map<String, Object>> result = eventBatchDao.getEnrolmentListV2(request, userId);
+            Response response = new Response();
+            response.put(JsonKey.EVENTS, result);
+            sender().tell(response, self());
+        } catch (Exception e) {
+            logger.error(
+                    request.getRequestContext(), "Exception in enrolment list for user: " + userId, e);
+            throw e;
+        }
     }
 }
