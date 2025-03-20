@@ -21,6 +21,11 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.event.EventEnrolmentDao;
 import org.sunbird.learner.util.ContentUtil;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -287,6 +292,180 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             }
         }
         return userEnrollmentList;
+    }
+
+    @Override
+    public List<Map<String, Object>> getEnrolmentListV2(Request request, String userId) {
+        logger.info(
+                request.getRequestContext(),
+                "EventEnrolmentDaoImpl:getEnrolmentListV2: UserId = " + userId);
+        List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
+        Response res =
+                cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                        request.getRequestContext(),
+                        JsonKey.KEYSPACE_SUNBIRD_COURSES,
+                        JsonKey.TABLE_USER_EVENT_ENROLMENTS,
+                        JsonKey.USER_ID_KEY,
+                        userId,
+                        null);
+        String status =
+                request.get(JsonKey.STATUS) != null ? (String) request.get(JsonKey.STATUS) : null;
+        int limit = request.get(JsonKey.LIMIT) != null ? (int) request.get(JsonKey.LIMIT) : -1;
+        if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
+            userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
+            if (CollectionUtils.isNotEmpty(userEnrollmentList)) {
+                if (StringUtils.isNotEmpty(status) && statusMap.get(status) != null) {
+                    if (statusMap.get(status) == 1) {
+                        userEnrollmentList =
+                                userEnrollmentList
+                                        .stream()
+                                        .filter(enrolment -> (int) enrolment.get(JsonKey.STATUS) != 2)
+                                        .collect(Collectors.toList());
+                    } else {
+                        userEnrollmentList =
+                                userEnrollmentList
+                                        .stream()
+                                        .filter(
+                                                enrolment -> (int) enrolment.get(JsonKey.STATUS) == statusMap.get(status))
+                                        .collect(Collectors.toList());
+                    }
+                }
+                if (limit > -1 && limit != 0) {
+                    int maximumAllowedLimitForEnrolList =
+                            Integer.parseInt(
+                                    ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
+                    if (maximumAllowedLimitForEnrolList < limit) {
+                        limit = maximumAllowedLimitForEnrolList;
+                    }
+                    userEnrollmentList =
+                            userEnrollmentList
+                                    .stream()
+                                    .sorted(
+                                            Comparator.comparing(
+                                                            enrolment ->
+                                                                    (Date)
+                                                                            ((Map<String, Object>) enrolment)
+                                                                                    .get(JsonKey.LAST_CONTENT_ACCESS_TIME),
+                                                            Comparator.nullsLast(Comparator.naturalOrder())) // Null values last
+                                                    .reversed())
+                                    .collect(Collectors.toList());
+                    if (CollectionUtils.isNotEmpty(userEnrollmentList) && userEnrollmentList.size() > limit)
+                        userEnrollmentList = userEnrollmentList.subList(0, limit);
+                }
+            }
+            String requestedEventType = (String) request.get("eventType");
+            for (Map<String, Object> enrollment : userEnrollmentList) {
+                String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
+                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
+                String userid = (String) enrollment.get(JsonKey.USER_ID);
+                String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
+                Map<String, Object> contentDetails =
+                        getEventDetails(request.getRequestContext(), contentId);
+                String actualEventType = null;
+                String endDateStr = (String) request.get("eventEndDate");
+                boolean calendarEventEnabled = (boolean) request.get("calendarEventEnabled");
+                LocalTime endTime = LocalTime.of(0, 1);
+                if (MapUtils.isNotEmpty(contentDetails)) {
+                    if (calendarEventEnabled) {
+                        processCalendarEvent(
+                                request,
+                                enrollment,
+                                contentId,
+                                contextId,
+                                userid,
+                                batchId,
+                                contentDetails,
+                                actualEventType,
+                                requestedEventType,
+                                endDateStr);
+                    } else {
+                        actualEventType = determineEventType(endDateStr, endTime, contentDetails);
+                        addEventDetailsToEnrollment(
+                                request,
+                                enrollment,
+                                contentId,
+                                contextId,
+                                userid,
+                                batchId,
+                                contentDetails,
+                                actualEventType,
+                                requestedEventType,
+                                false);
+                    }
+                }
+            }
+        }
+        return userEnrollmentList;
+    }
+
+    private void processCalendarEvent(
+            Request request,
+            Map<String, Object> enrollment,
+            String contentId,
+            String contextId,
+            String userid,
+            String batchId,
+            Map<String, Object> contentDetails,
+            String actualEventType,
+            String requestedEventType,
+            String endDateStr) {
+        String startDateStr = (String) request.get("eventStartDate");
+        if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
+            LocalDate startDate = LocalDate.parse(startDateStr);
+            LocalDate endDate = LocalDate.parse(endDateStr);
+            if (startDate.isBefore(LocalDate.parse((String) contentDetails.get("startDate")))
+                    && startDate.isBefore(LocalDate.parse((String) contentDetails.get("endDate")))
+                    && endDate.isAfter(LocalDate.parse((String) contentDetails.get("endDate")))) {
+                addEventDetailsToEnrollment(
+                        request,
+                        enrollment,
+                        contentId,
+                        contextId,
+                        userid,
+                        batchId,
+                        contentDetails,
+                        actualEventType,
+                        requestedEventType,
+                        true);
+            }
+        }
+    }
+
+    private String determineEventType(
+            String endDateStr, LocalTime endTime, Map<String, Object> contentDetails) {
+        LocalDate endDate = LocalDate.parse(endDateStr);
+        LocalDate eventEndDate = LocalDate.parse(contentDetails.get("endDate").toString());
+        OffsetTime eventEndTime = OffsetTime.parse(contentDetails.get("endTime").toString());
+        if (eventEndDate.isBefore(endDate)
+                || (eventEndDate.isEqual(endDate)
+                && eventEndTime.isBefore(OffsetTime.of(endTime, ZoneOffset.ofHoursMinutes(5, 30))))) {
+            return "pastEvent";
+        } else if (eventEndDate.isEqual(endDate)) {
+            return "presentEvent";
+        } else {
+            return "futureEvent";
+        }
+    }
+
+    private void addEventDetailsToEnrollment(
+            Request request,
+            Map<String, Object> enrollment,
+            String contentId,
+            String contextId,
+            String userid,
+            String batchId,
+            Map<String, Object> contentDetails,
+            String actualEventType,
+            String requestedEventType,
+            boolean calendarEventEnabled) {
+        if (calendarEventEnabled || requestedEventType.equalsIgnoreCase(actualEventType)) {
+            List<Map<String, Object>> batchDetails = getBatchList(request, contentId, contextId, batchId);
+            List<Map<String, Object>> userEventConsumption =
+                    getUserEventConsumption(request, userid, contentId, contextId, batchId);
+            enrollment.put("event", contentDetails);
+            enrollment.put("batchDetails", batchDetails);
+            enrollment.put("userEventConsumption", userEventConsumption);
+        }
     }
 
 }
