@@ -435,12 +435,13 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             String endDateStr, LocalTime endTime, Map<String, Object> contentDetails) {
         LocalDate endDate = LocalDate.parse(endDateStr);
         LocalDate eventEndDate = LocalDate.parse(contentDetails.get("endDate").toString());
+        LocalDate eventStartDate = LocalDate.parse(contentDetails.get("startDate").toString());
         OffsetTime eventEndTime = OffsetTime.parse(contentDetails.get("endTime").toString());
         if (eventEndDate.isBefore(endDate)
                 || (eventEndDate.isEqual(endDate)
                 && eventEndTime.isBefore(OffsetTime.of(endTime, ZoneOffset.ofHoursMinutes(5, 30))))) {
             return "pastEvent";
-        } else if (eventEndDate.isEqual(endDate)) {
+        } else if (eventStartDate.isEqual(endDate)) {
             return "presentEvent";
         } else {
             return "futureEvent";
