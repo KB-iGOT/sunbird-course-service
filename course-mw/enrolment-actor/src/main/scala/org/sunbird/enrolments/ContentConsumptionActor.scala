@@ -609,8 +609,8 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           val userId = inputContent.get(JsonKey.USER_ID).asInstanceOf[String]
           // Process event consumption if the user ID is valid
           if (validUserIds.contains(userId)) {
-            val enrolmentRecord = getEventEnrolmentRecord(requestContext, userId, contentId, batchId).get(0)
-            if (MapUtils.isEmpty(enrolmentRecord)) {
+            val enrolmentRecords = getEventEnrolmentRecord(requestContext, userId, contentId, batchId)
+            if (CollectionUtils.isEmpty(enrolmentRecords)) {
               var e = new ProjectCommonException(ResponseCode.invalidRequestData.getErrorCode,
                 s"""No enrolement details found for, userId: $userId, batchId: $batchId, eventId: $contentId""", ResponseCode.CLIENT_ERROR.getResponseCode)
               logger.error(requestContext, "ContentConsumptionActor: processEvents : Failed to retrieve enrolemnt record for userId: " + userId + ", eventId:" + contentId, e)
