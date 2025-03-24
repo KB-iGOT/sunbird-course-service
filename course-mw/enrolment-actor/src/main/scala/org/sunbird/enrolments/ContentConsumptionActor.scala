@@ -611,6 +611,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           if (validUserIds.contains(userId)) {
             val existingContents = getEventsConsumption(userId, contentId,contextId, batchId, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
+            logger.info(requestContext, "Received enrolment record from DB: " + existingContent)
             if(MapUtils.isNotEmpty(existingContent)) {
               var e = new ProjectCommonException(ResponseCode.invalidRequestData.getErrorCode,
                 s"""No enrolement details found for, userId: $userId, batchId: $batchId, eventId: $contentId""", ResponseCode.CLIENT_ERROR.getResponseCode)
