@@ -611,6 +611,12 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           if (validUserIds.contains(userId)) {
             val existingContents = getEventsConsumption(userId, contentId,contextId, batchId, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
+            if(MapUtils.isNotEmpty(existingContent)) {
+              var e = new ProjectCommonException(ResponseCode.invalidRequestData.getErrorCode,
+                s"""No enrolement details found for, userId: $userId, batchId: $batchId, eventId: $contentId""", ResponseCode.CLIENT_ERROR.getResponseCode)
+              logger.error(requestContext, "ContentConsumptionActor: processEvents : Failed to retrieve enrolemnt record for userId: " + userId + ", eventId:" + contentId, e)
+              throw e
+            }
             var updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId,minPercetageToComplete))
             updatedContent.remove("eventId")
             updatedContent.put("contentid", contentId)
