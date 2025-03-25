@@ -115,3 +115,5 @@ POST    /v2/user/event/state/read           @controllers.eventmanagement.EventCo
 
 POST    /private/v2/event/batch/create			    @controllers.eventmanagement.EventsController.createEventBatch(request: play.mvc.Http.Request)
 PATCH /private/v1/event/batch/cert/template/add       @controllers.certificate.CertificateController.privateAddEventCertificate(request: play.mvc.Http.Request)
+
+GET  /v1/user/events/enroll/summary	    @controllers.eventmanagement.EventController.getEnrolledEventsSummary(request: play.mvc.Http.Request)

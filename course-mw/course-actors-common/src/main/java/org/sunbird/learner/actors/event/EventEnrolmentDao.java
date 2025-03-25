@@ -13,4 +13,6 @@ public interface EventEnrolmentDao {
     List<Map<String, Object>> getUserEventEnrollment(Request request, String userId,String eventId ,String batchId);
 
     List<Map<String, Object>> getUserEventState(Request request);
+
+    List<Map<String,Object>> getEventEnrolmentList(Request request, String userId);
 }

@@ -165,4 +165,34 @@ public class EventController extends BaseController {
                 httpRequest);
     }
 
+    public CompletionStage<Result> getEnrolledEventsSummary(Http.Request httpRequest) {
+        return handleRequest(actorRef, "getEnrolEventSummary",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+
+                    request
+                            .getContext()
+                            .put(JsonKey.URL_QUERY_STRING, getQueryString(queryParams));
+                    request
+                            .getContext()
+                            .put(JsonKey.BATCH_DETAILS, httpRequest.queryString().get(JsonKey.BATCH_DETAILS));
+                    if (queryParams.containsKey("cache")) {
+                        request.getContext().put("cache", Boolean.parseBoolean(queryParams.get("cache")[0]));
+                    } else
+                        request.getContext().put("cache", true);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
 } 
