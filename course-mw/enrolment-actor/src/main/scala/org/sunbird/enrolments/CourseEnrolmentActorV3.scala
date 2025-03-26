@@ -331,6 +331,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
     if (null == courseContent || (!JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])
       && !isRetiredCoursesIncludedInEnrolList)) {
+      logger.info(null,"CourseEnrolmentActorV3 :: isCourseEligible :: Failed to fetch data from cache for courseId " + enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
       false
     }
     else {

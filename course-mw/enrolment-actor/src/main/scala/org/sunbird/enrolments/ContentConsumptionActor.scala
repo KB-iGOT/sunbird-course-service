@@ -609,6 +609,13 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           val userId = inputContent.get(JsonKey.USER_ID).asInstanceOf[String]
           // Process event consumption if the user ID is valid
           if (validUserIds.contains(userId)) {
+            val enrolmentRecords = getEventEnrolmentRecord(requestContext, userId, contentId, batchId)
+            if (CollectionUtils.isEmpty(enrolmentRecords)) {
+              var e = new ProjectCommonException(ResponseCode.invalidRequestData.getErrorCode,
+                s"""No enrolement details found for, userId: $userId, batchId: $batchId, eventId: $contentId""", ResponseCode.CLIENT_ERROR.getResponseCode)
+              logger.error(requestContext, "ContentConsumptionActor: processEvents : Failed to retrieve enrolemnt record for userId: " + userId + ", eventId:" + contentId, e)
+              throw e
+            }
             val existingContents = getEventsConsumption(userId, contentId,contextId, batchId, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
             var updatedContent = CassandraUtil.changeCassandraColumnMapping(processEventConsumption(inputContent, existingContent, userId,minPercetageToComplete))
@@ -768,7 +775,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
       }
     } else {
-      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").asInstanceOf[Double] >= minPercetageToComplete) {
+      if (inputStatus >= 2 ||  inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
         updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
         updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(null, inputCompletedTime))
         updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
@@ -850,5 +857,20 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       val topic = ProjectUtil.getConfigValue("dashboard_user_event_state")
       KafkaClient.send(userId, event, topic)
     }
+  }
+
+  def getEventEnrolmentRecord(requestContext: RequestContext, userId: String, contentId: String, batchId: String): java.util.List[java.util.Map[String, AnyRef]] = {
+    // Constructing filters for querying event consumption records
+    val filters = new java.util.HashMap[String, AnyRef]() {
+      {
+        put("userid", userId)
+        put("batchid", batchId)
+        put("contentid", contentId)
+        put("contextid", contentId)
+      }
+    }
+    val response = cassandraOperation.getRecords(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, filters, null)
+    // Extracting and returning the list of event consumption records from the response
+    response.getResult.getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
   }
 }
