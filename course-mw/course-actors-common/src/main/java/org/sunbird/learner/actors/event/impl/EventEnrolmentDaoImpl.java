@@ -362,7 +362,6 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 Map<String, Object> contentDetails =
                         getEventDetails(request.getRequestContext(), contentId);
                 String actualEventType = null;
-                String endDateStr = (String) request.get("eventEndDate");
                 boolean calendarEventEnabled = (boolean) request.get("calendarEventEnabled");
                 LocalTime endTime = LocalTime.of(0, 1);
                 if (MapUtils.isNotEmpty(contentDetails)) {
