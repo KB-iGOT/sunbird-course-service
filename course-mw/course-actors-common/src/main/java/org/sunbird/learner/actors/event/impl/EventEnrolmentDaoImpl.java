@@ -395,7 +395,9 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 }
             }
         }
-        return userEnrollmentList;
+        return userEnrollmentList.stream()
+                .filter(enrollment -> enrollment.containsKey("event"))
+                .collect(Collectors.toList());
     }
 
     private void processCalendarEvent(
