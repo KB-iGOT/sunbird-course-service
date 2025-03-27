@@ -281,15 +281,6 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 }
             }
 
-
-            for (Map<String, Object> enrollment : userEnrollmentList) {
-                String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
-                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
-                String userid = (String) enrollment.get(JsonKey.USER_ID);
-                String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, contentId, contextId, batchId);
-                enrollment.put("userEventConsumption", userEventConsumption);
-            }
         }
         return userEnrollmentList;
     }
@@ -362,7 +353,6 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 Map<String, Object> contentDetails =
                         getEventDetails(request.getRequestContext(), contentId);
                 String actualEventType = null;
-                String endDateStr = (String) request.get("eventEndDate");
                 boolean calendarEventEnabled = (boolean) request.get("calendarEventEnabled");
                 LocalTime endTime = LocalTime.of(0, 1);
                 if (MapUtils.isNotEmpty(contentDetails)) {
