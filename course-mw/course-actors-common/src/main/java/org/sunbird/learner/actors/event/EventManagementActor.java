@@ -263,8 +263,6 @@ public class EventManagementActor extends BaseActor {
 
         for (Map<String, Object> eventDetails : finalEnrolment) {
             Integer eventStatus = (Integer) eventDetails.get(JsonKey.STATUS);
-            List<Map<String, Object>> userEventConsumption = (List<Map<String, Object>>) eventDetails.get(JsonKey.USER_EVENT_CONSUMPTION);
-
             if (eventStatus != null && eventStatus == 2) {
                 eventsCompleted++;
                 eventsEnrolled++;
@@ -272,25 +270,22 @@ public class EventManagementActor extends BaseActor {
                 eventsEnrolled++;
             }
             int hoursSpentOnCourses = 0;
-            if (userEventConsumption != null && !userEventConsumption.isEmpty()) {
-                for (Map<String, Object> consumption : userEventConsumption) {
-                    String progressDetails = (String) consumption.get(JsonKey.PROGRESS_DETAILS);
-                    try {
-                        JsonNode progressDetailsJson = mapper.readTree(progressDetails);
-                        if (progressDetailsJson != null && progressDetailsJson.hasNonNull(JsonKey.DURATION)) {
-                            hoursSpentOnCourses += progressDetailsJson.get(JsonKey.DURATION).intValue();
-                        }
-                    } catch (Exception e) {
-                        logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
-                    }
+            String lrcProgressDetails = (String) eventDetails.get(JsonKey.LRC_PROGRESS_DETAILS);
+            try {
+                JsonNode lrcProgressDetailsJson = mapper.readTree(lrcProgressDetails);
+                if (lrcProgressDetailsJson != null && lrcProgressDetailsJson.hasNonNull(JsonKey.DURATION)) {
+                    hoursSpentOnCourses += lrcProgressDetailsJson.get(JsonKey.DURATION).intValue();
                 }
+            } catch (Exception e) {
+                logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
             }
+
             hoursSpentOnEvents += hoursSpentOnCourses;
         }
 
-        addInfo.put("eventsEnrolled", eventsEnrolled);
-        addInfo.put("eventsAttended", eventsCompleted);
-        addInfo.put("hoursSpentOnEvents", hoursSpentOnEvents);
+        addInfo.put(JsonKey.EVENTS_ENROLLED, eventsEnrolled);
+        addInfo.put(JsonKey.EVENTS_ATTENDED, eventsCompleted);
+        addInfo.put(JsonKey.HOURS_SPENT, hoursSpentOnEvents);
 
         return addInfo;
     }
