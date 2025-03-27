@@ -19,6 +19,7 @@ import org.sunbird.learner.actors.event.impl.EventEnrolmentDaoImpl;
 import org.sunbird.learner.util.Util;
 import org.sunbird.redis.RedisCache;
 
+import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -274,7 +275,9 @@ public class EventManagementActor extends BaseActor {
             try {
                 JsonNode lrcProgressDetailsJson = mapper.readTree(lrcProgressDetails);
                 if (lrcProgressDetailsJson != null && lrcProgressDetailsJson.hasNonNull(JsonKey.DURATION)) {
-                    hoursSpentOnCourses += lrcProgressDetailsJson.get(JsonKey.DURATION).intValue();
+                    String durationValue=lrcProgressDetailsJson.get(JsonKey.DURATION).asText();
+                    int duration = parseDurationValue(durationValue);
+                    hoursSpentOnCourses += duration;
                 }
             } catch (Exception e) {
                 logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
@@ -307,6 +310,19 @@ public class EventManagementActor extends BaseActor {
                             + userId,
                     e);
             throw e;
+        }
+    }
+
+    private static int parseDurationValue(String value) {
+        try {
+            // If value contains 'E' or 'e', it is likely in scientific notation
+            if (value.contains("E") || value.contains("e")) {
+                return new BigDecimal(value).intValue(); // Convert scientific notation to int
+            } else {
+                return Integer.parseInt(value); // Regular integer parsing
+            }
+        } catch (NumberFormatException e) {
+            return 0; // Default to 0 if parsing fails
         }
     }
 }
