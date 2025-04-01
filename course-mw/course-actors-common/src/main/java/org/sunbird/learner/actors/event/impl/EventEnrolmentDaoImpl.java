@@ -406,9 +406,10 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
             LocalDate startDate = LocalDate.parse(startDateStr);
             LocalDate endDate = LocalDate.parse(endDateStr);
-            if (startDate.isBefore(LocalDate.parse((String) contentDetails.get("startDate")))
-                    && startDate.isBefore(LocalDate.parse((String) contentDetails.get("endDate")))
-                    && endDate.isAfter(LocalDate.parse((String) contentDetails.get("endDate")))) {
+                if ((startDate.isBefore(LocalDate.parse((String) contentDetails.get("startDate")))
+                        || startDate.isEqual(LocalDate.parse((String) contentDetails.get("startDate"))))
+                        && (endDate.isAfter(LocalDate.parse((String) contentDetails.get("endDate")))
+                        || endDate.isEqual(LocalDate.parse((String) contentDetails.get("endDate"))))) {
                 addEventDetailsToEnrollment(
                         request,
                         enrollment,
