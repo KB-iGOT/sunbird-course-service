@@ -4,11 +4,13 @@ import akka.actor.ActorRef;
 import controllers.BaseController;
 import controllers.courseenrollment.validator.CourseEnrollmentRequestValidator;
 import controllers.eventmanagement.validator.EventRequestValidator;
+import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.util.ActorOperations;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerEnum;
 import org.sunbird.common.models.util.ProjectLogger;
 import org.sunbird.common.request.Request;
+import org.sunbird.common.responsecode.ResponseCode;
 import play.mvc.Http;
 import play.mvc.Result;
 
@@ -49,6 +51,12 @@ public class EventController extends BaseController {
                     Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
+                    if(!userId.equalsIgnoreCase(uid)){
+                        ProjectLogger.log("UserId in path and request are not same", LoggerEnum.INFO.name());
+                        throw new ProjectCommonException(ResponseCode.unAuthorized.getErrorCode(),
+                                ResponseCode.unAuthorized.getErrorMessage(),
+                                ResponseCode.UNAUTHORIZED.getResponseCode());
+                    }
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
 
@@ -77,6 +85,12 @@ public class EventController extends BaseController {
                     Request request = (Request) req;
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
+                    if(!userId.equalsIgnoreCase(uid)){
+                        ProjectLogger.log("UserId in path and request are not same", LoggerEnum.INFO.name());
+                        throw new ProjectCommonException(ResponseCode.unAuthorized.getErrorCode(),
+                                ResponseCode.unAuthorized.getErrorMessage(),
+                                ResponseCode.UNAUTHORIZED.getResponseCode());
+                    }
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
                     validator.validateEnrollListRequest(request);
@@ -103,6 +117,12 @@ public class EventController extends BaseController {
                     }
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
+                    if(!userId.equalsIgnoreCase(uid)){
+                        ProjectLogger.log("UserId in path and request are not same", LoggerEnum.INFO.name());
+                        throw new ProjectCommonException(ResponseCode.unAuthorized.getErrorCode(),
+                                ResponseCode.unAuthorized.getErrorMessage(),
+                                ResponseCode.UNAUTHORIZED.getResponseCode());
+                    }
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
 
@@ -243,6 +263,12 @@ public class EventController extends BaseController {
                                             .getOrDefault(
                                                     JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
+                    if(!userId.equalsIgnoreCase(uid)){
+                        ProjectLogger.log("UserId in path and request are not same", LoggerEnum.INFO.name());
+                        throw new ProjectCommonException(ResponseCode.unAuthorized.getErrorCode(),
+                                ResponseCode.unAuthorized.getErrorMessage(),
+                                ResponseCode.UNAUTHORIZED.getResponseCode());
+                    }
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
                     validator.validateEnrollListRequest(request);
