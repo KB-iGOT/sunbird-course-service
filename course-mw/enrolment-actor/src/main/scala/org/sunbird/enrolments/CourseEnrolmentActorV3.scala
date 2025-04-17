@@ -160,6 +160,10 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
       val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
       courseIdList.addAll(courseIdListFromRequest)
       if (courseIdListFromRequest.size() == 1) {
+        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] =  userCoursesDao.listEnrolments(request.getRequestContext, userId, courseIdListFromRequest);
+        if (CollectionUtils.isEmpty(courseEnrolment)) {
+          return new util.ArrayList[java.util.Map[String, AnyRef]]()
+        }
         enrichCourseIdFromProgram(request, courseIdList)
       }
     }
