@@ -1204,6 +1204,9 @@ public final class JsonKey {
   public static final String USER_EVENT_CONSUMPTION = "userEventConsumption";
   public static final String PROGRESS_DETAILS = "progressdetails";
   public static final String DB_INDEX = "redis_db_index";
+  public static final String EVENTS_ENROLLED = "eventsEnrolled";
+  public static final String EVENTS_ATTENDED = "eventsAttended";
+  public static final String HOURS_SPENT = "hoursSpentOnEvents";
 
   private JsonKey() {}
 }

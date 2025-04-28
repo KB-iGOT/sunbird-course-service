@@ -281,15 +281,6 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 }
             }
 
-
-            for (Map<String, Object> enrollment : userEnrollmentList) {
-                String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
-                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
-                String userid = (String) enrollment.get(JsonKey.USER_ID);
-                String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid, contentId, contextId, batchId);
-                enrollment.put("userEventConsumption", userEventConsumption);
-            }
         }
         return userEnrollmentList;
     }
@@ -395,7 +386,9 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 }
             }
         }
-        return userEnrollmentList;
+        return userEnrollmentList.stream()
+                .filter(enrollment -> enrollment.containsKey("event"))
+                .collect(Collectors.toList());
     }
 
     private void processCalendarEvent(
@@ -413,9 +406,12 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
             LocalDate startDate = LocalDate.parse(startDateStr);
             LocalDate endDate = LocalDate.parse(endDateStr);
-            if (startDate.isBefore(LocalDate.parse((String) contentDetails.get("startDate")))
-                    && startDate.isBefore(LocalDate.parse((String) contentDetails.get("endDate")))
-                    && endDate.isAfter(LocalDate.parse((String) contentDetails.get("endDate")))) {
+            LocalDate contentStartDate = LocalDate.parse((String) contentDetails.get(JsonKey.START_DATE));
+            LocalDate contentEndDate = LocalDate.parse((String) contentDetails.get(JsonKey.END_DATE));
+            if ((startDate.isBefore(contentStartDate)
+                    || startDate.isEqual(contentStartDate))
+                    && (endDate.isAfter(contentEndDate)
+                    || endDate.isEqual(contentEndDate))) {
                 addEventDetailsToEnrollment(
                         request,
                         enrollment,
