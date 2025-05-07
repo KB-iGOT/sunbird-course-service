@@ -70,27 +70,15 @@ public final class RequestValidator {
                     ERROR_CODE);
           }
         }
-        String courseId = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
-        map.put(JsonKey.COURSE_ID, map.get(courseId));
-        if (StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
-          throw new ProjectCommonException(
-                  ResponseCode.courseIdRequired.getErrorCode(),
-                  ResponseCode.courseIdRequiredError.getErrorMessage(),
-                  ERROR_CODE);
-        } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID))){
-          throw new ProjectCommonException(
-                  ResponseCode.invalidProgramId.getErrorCode(),
-                  ResponseCode.invalidProgramId.getErrorMessage(),
-                  ERROR_CODE);
-        }
+        String contentId = "";
         if (map.containsKey(JsonKey.CONTENT_ID)) {
-
           if (null == map.get(JsonKey.CONTENT_ID)) {
             throw new ProjectCommonException(
                     ResponseCode.contentIdRequired.getErrorCode(),
                     ResponseCode.contentIdRequiredError.getErrorMessage(),
                     ERROR_CODE);
           }
+          contentId = (String) map.get(JsonKey.CONTENT_ID);
           if (ProjectUtil.isNull(map.get(JsonKey.STATUS))) {
             throw new ProjectCommonException(
                     ResponseCode.contentStatusRequired.getErrorCode(),
@@ -102,6 +90,19 @@ public final class RequestValidator {
           throw new ProjectCommonException(
                   ResponseCode.contentIdRequired.getErrorCode(),
                   ResponseCode.contentIdRequiredError.getErrorMessage(),
+                  ERROR_CODE);
+        }
+        String courseId = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+        map.put(JsonKey.COURSE_ID, map.get(courseId));
+        if (StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
+          throw new ProjectCommonException(
+                  ResponseCode.courseIdRequired.getErrorCode(),
+                  ResponseCode.courseIdRequiredError.getErrorMessage(),
+                  ERROR_CODE);
+        } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID), contentId)){
+          throw new ProjectCommonException(
+                  ResponseCode.invalidProgramId.getErrorCode(),
+                  ResponseCode.invalidProgramId.getErrorMessage(),
                   ERROR_CODE);
         }
       }
@@ -1099,10 +1100,10 @@ public final class RequestValidator {
     }
   }
 
-  public static Boolean isProgramConsumptionAccepted(String contentId) {
+  public static Boolean isProgramConsumptionAccepted(String courseId, String contentId) {
     Boolean isProgram = false;
     try {
-      Map<String, Object> courseContent = getCourseContent(contentId);
+      Map<String, Object> courseContent = getCourseContent(courseId);
       String courseCategory = (String) courseContent.get("courseCategory");
       Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
       if (StringUtils.isBlank(courseCategory)) {
@@ -1118,7 +1119,13 @@ public final class RequestValidator {
                   ResponseCode.invalidTrackingAttribute.getErrorMessage(),
                   ERROR_CODE);
         } else if (cumulativeTracking) {
-          isProgram = true;
+          Map<String, Object> resourceContent =  getCourseContent(contentId);
+          String contextCategory = (String) courseContent.get(JsonKey.CONTEXT_CATEGORY);
+          if (isCategoryAllowed(contextCategory)) {
+            isProgram = false;
+          } else {
+            isProgram = true;
+          }
         }
       }
     } catch (Exception e) {
@@ -1140,6 +1147,12 @@ public final class RequestValidator {
     String categoriesList = ProjectUtil.getConfigValue(JsonKey.PROGRAM_CATEGORIES);
     Set<String> programCategories = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
     return programCategories.contains(category);
+  }
+
+  private static boolean isCategoryAllowed(String category) {
+    String categoriesList = ProjectUtil.getConfigValue(JsonKey.ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE);
+    Set<String> allowedCategoryList = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+    return allowedCategoryList.contains(category);
   }
 
 }

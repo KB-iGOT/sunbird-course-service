@@ -1207,6 +1207,9 @@ public final class JsonKey {
   public static final String EVENTS_ENROLLED = "eventsEnrolled";
   public static final String EVENTS_ATTENDED = "eventsAttended";
   public static final String HOURS_SPENT = "hoursSpentOnEvents";
+  public static final String CONTEXT_CATEGORY = "contextCategory";
+  public static final String FINAL_PROGRAM_ASSESSMENT = "Final Program Assessment";
+  public static final String ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE = "status_update_allowed_program_resources";
 
   private JsonKey() {}
 }
