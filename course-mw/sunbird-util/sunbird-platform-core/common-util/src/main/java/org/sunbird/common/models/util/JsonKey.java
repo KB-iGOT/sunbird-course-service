@@ -1210,6 +1210,7 @@ public final class JsonKey {
   public static final String CONTEXT_CATEGORY = "contextCategory";
   public static final String FINAL_PROGRAM_ASSESSMENT = "Final Program Assessment";
   public static final String ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE = "status_update_allowed_program_resources";
+  public static final String QUESTION_SET_MIME_TYPE = "application/vnd.sunbird.questionset";
 
   private JsonKey() {}
 }

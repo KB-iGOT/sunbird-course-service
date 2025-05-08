@@ -423,7 +423,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   private def enrichCourseIdFromProgram(request: Request, courseIdList:  java.util.List[String]) = {
     if (CollectionUtils.isNotEmpty(courseIdList) && courseIdList.size() == 1) {
       val courseId = courseIdList.get(0)
-      val contentData = getContentReadAPIData(courseId, List(JsonKey.COURSECATEGORY), request)
+      val contentData = getCourseContent(courseId)
       val primaryCategory: String = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
       if (util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_CHILDREN_COURSES_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(primaryCategory)) {
         val redisKey = s"$courseId:$courseId:childrenCourses"
@@ -454,7 +454,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val contentData: util.Map[String, AnyRef] = if (StringUtils.isNotBlank(responseString)) {
       JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
     } else {
-      ContentUtil.getContentReadV3(programId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+      ContentCacheHandler.getContent(programId)
     }
     contentData
   }
