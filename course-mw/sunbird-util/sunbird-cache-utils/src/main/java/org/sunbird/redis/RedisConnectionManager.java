@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RedisConnectionManager {
   private static String host = ProjectUtil.getConfigValue("sunbird_redis_host");
+  private static String data_redis_host = ProjectUtil.getConfigValue("data_redis_host");
   private static String port = ProjectUtil.getConfigValue("sunbird_redis_port");
   private static Boolean isRedisCluster = host.contains(",") ? true : false;
   private static String scanInterval = ProjectUtil.getConfigValue("sunbird_redis_scan_interval");
@@ -104,7 +105,7 @@ public class RedisConnectionManager {
     logger.info(null, "Creating new Redis client for dbIndex = " + dbIndex);
     Config config = new Config();
     SingleServerConfig singleServerConfig = config.useSingleServer();
-    singleServerConfig.setAddress(host + ":" + port);
+    singleServerConfig.setAddress(data_redis_host + ":" + port);
     singleServerConfig.setDatabase(dbIndex);
     singleServerConfig.setConnectionPoolSize(poolsize);
     config.setCodec(new StringCodec());
