@@ -52,6 +52,7 @@ public class RequestInterceptor {
     apiHeaderIgnoreMap.put("/v1/event/batch/cert/issue", var);
     apiHeaderIgnoreMap.put("/v2/featured/events", var);
     apiHeaderIgnoreMap.put("/v1/content/state/admin/update", var); //Exempting this API from authentication as it is used for Illumine integration (no x-auth-token). It is invoked directly by cb-ext service, not via Kong
+    apiHeaderIgnoreMap.put("/private/v1/user/events/list/:uid", var);
   }
 
   /**

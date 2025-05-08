@@ -41,13 +41,16 @@ public class EventController extends BaseController {
                 httpRequest);
     }
 
-    public CompletionStage<Result> getEnrolledEventsList(String uid, Http.Request httpRequest) {
+    public CompletionStage<Result> getEnrolledEventsList(String uid, Http.Request httpRequest, boolean isPrivate) {
         return handleRequest(actorRef, "listEnrol",
                 httpRequest.body().asJson(),
                 (req) -> {
                     Request request = (Request) req;
                     Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    if (isPrivate) {
+                        userId = uid;
+                    }
                     validator.validateRequestedBy(userId);
                     request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
@@ -70,6 +73,14 @@ public class EventController extends BaseController {
                 false,
                 httpRequest);
     }
+    public CompletionStage<Result> getEnrolledEventsList_v1(String uid, Http.Request httpRequest) {
+        return getEnrolledEventsList(uid, httpRequest, false);
+    }
+
+    public CompletionStage<Result> privateGetEnrolledEventsList_v1(String uid, Http.Request httpRequest) {
+        return getEnrolledEventsList(uid, httpRequest, true);
+    }
+
     public CompletionStage<Result> getUserEnrolledEventsList(String uid, Http.Request httpRequest) {
         return handleRequest(actorRef, "userEnrolList",
                 httpRequest.body().asJson(),
