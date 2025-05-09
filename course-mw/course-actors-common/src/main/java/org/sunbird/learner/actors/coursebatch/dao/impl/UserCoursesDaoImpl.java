@@ -248,7 +248,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     }
     result.put(JsonKey.CURRENT_OFFSET, (Integer) request.get(JsonKey.CURRENT_OFFSET));
     //Only active users will be returned.
-    result.put(JsonKey.COUNT, userList.size());
+    result.put(JsonKey.COUNT, count);
     result.put(JsonKey.PARTICIPANTS, userList);
     return result;
   }
