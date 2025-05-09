@@ -406,23 +406,31 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
             LocalDate startDate = LocalDate.parse(startDateStr);
             LocalDate endDate = LocalDate.parse(endDateStr);
-            LocalDate contentStartDate = LocalDate.parse((String) contentDetails.get(JsonKey.START_DATE));
-            LocalDate contentEndDate = LocalDate.parse((String) contentDetails.get(JsonKey.END_DATE));
-            if ((startDate.isBefore(contentStartDate)
-                    || startDate.isEqual(contentStartDate))
-                    && (endDate.isAfter(contentEndDate)
-                    || endDate.isEqual(contentEndDate))) {
-                addEventDetailsToEnrollment(
-                        request,
-                        enrollment,
-                        contentId,
-                        contextId,
-                        userid,
-                        batchId,
-                        contentDetails,
-                        actualEventType,
-                        requestedEventType,
-                        true);
+            log.info("Processing calendar event: contentId: {} userid: {}", contentId, userid);
+            String contentStartDateStr = (String) contentDetails.get(JsonKey.START_DATE);
+            String contentEndDateStr = (String) contentDetails.get(JsonKey.END_DATE);
+            LocalDate contentStartDate = null;
+            LocalDate contentEndDate = null;
+            if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
+                contentStartDate = LocalDate.parse(contentStartDateStr);
+                contentEndDate = LocalDate.parse(contentEndDateStr);
+
+                if ((startDate.isBefore(contentStartDate)
+                        || startDate.isEqual(contentStartDate))
+                        && (endDate.isAfter(contentEndDate)
+                        || endDate.isEqual(contentEndDate))) {
+                    addEventDetailsToEnrollment(
+                            request,
+                            enrollment,
+                            contentId,
+                            contextId,
+                            userid,
+                            batchId,
+                            contentDetails,
+                            actualEventType,
+                            requestedEventType,
+                            true);
+                }
             }
         }
     }
