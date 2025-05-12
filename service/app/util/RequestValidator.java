@@ -1141,8 +1141,10 @@ public final class RequestValidator {
     Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
     Map<String, Object> courseContent = (Map<String, Object>)coursesMap.get(courseId);
     if (courseContent == null || courseContent.isEmpty()) {
+      logger.info(null, "ContentCache doesn't have info, getting course details from redis for Id: " + courseId);
       courseContent = ContentCacheHandler.getContentV2(courseId);
     }
+    logger.info(null, "course details: " + mapper.writeValueAsString(courseContent));
     return courseContent;
   }
 
