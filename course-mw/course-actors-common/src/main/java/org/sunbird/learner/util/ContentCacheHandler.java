@@ -79,7 +79,7 @@ public class ContentCacheHandler implements Runnable {
 
     public static Map<String, Object> getContentV2(String id) throws Exception {
       int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
-      String cacheResponse = redisCacheUtil.get(id, null, ttl);
+      String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
       ObjectMapper mapper = new ObjectMapper();
       if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
         return mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
