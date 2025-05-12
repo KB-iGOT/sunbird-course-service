@@ -1107,6 +1107,7 @@ public final class RequestValidator {
       String courseCategory = (String) courseContent.get("courseCategory");
       Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
       if (StringUtils.isBlank(courseCategory)) {
+        logger.error(null, "Failed to get course category for Id: " + courseId);
         throw new ProjectCommonException(
                 ResponseCode.invalidCourseCategory.getErrorCode(),
                 ResponseCode.invalidCourseCategory.getErrorMessage(),
@@ -1114,6 +1115,7 @@ public final class RequestValidator {
       }
       if (isProgramCategory(courseCategory)) {
         if (cumulativeTracking == null) {
+          logger.error(null, "CumulativeTracking is not enabled for Id: " + courseId);
           throw new ProjectCommonException(
                   ResponseCode.invalidTrackingAttribute.getErrorCode(),
                   ResponseCode.invalidTrackingAttribute.getErrorMessage(),
@@ -1126,6 +1128,7 @@ public final class RequestValidator {
           } else {
             isProgram = true;
           }
+          logger.error(null, "ContextCategory is details Id: " + contentId + ", category: " + contextCategory + ", isProgram: " + isProgram);
         }
       }
     } catch (Exception e) {
