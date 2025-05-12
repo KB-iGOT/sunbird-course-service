@@ -1122,7 +1122,7 @@ public final class RequestValidator {
                   ERROR_CODE);
         } else if (cumulativeTracking) {
           Map<String, Object> resourceContent =  getCourseContent(contentId);
-          String contextCategory = (String) courseContent.get(JsonKey.CONTEXT_CATEGORY);
+          String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
           if (isCategoryAllowed(contextCategory)) {
             isProgram = false;
           } else {
