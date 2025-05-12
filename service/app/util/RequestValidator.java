@@ -1107,7 +1107,6 @@ public final class RequestValidator {
       String courseCategory = (String) courseContent.get("courseCategory");
       Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
       if (StringUtils.isBlank(courseCategory)) {
-        logger.info(null, "Failed to get course category for Id: " + courseId);
         throw new ProjectCommonException(
                 ResponseCode.invalidCourseCategory.getErrorCode(),
                 ResponseCode.invalidCourseCategory.getErrorMessage(),
@@ -1115,7 +1114,6 @@ public final class RequestValidator {
       }
       if (isProgramCategory(courseCategory)) {
         if (cumulativeTracking == null) {
-          logger.info(null, "CumulativeTracking is not enabled for Id: " + courseId);
           throw new ProjectCommonException(
                   ResponseCode.invalidTrackingAttribute.getErrorCode(),
                   ResponseCode.invalidTrackingAttribute.getErrorMessage(),
@@ -1144,7 +1142,6 @@ public final class RequestValidator {
       logger.info(null, "ContentCache doesn't have info, getting course details from redis for Id: " + courseId);
       courseContent = ContentCacheHandler.getContentV2(courseId);
     }
-    logger.info(null, "course details: " + mapper.writeValueAsString(courseContent));
     return courseContent;
   }
 
