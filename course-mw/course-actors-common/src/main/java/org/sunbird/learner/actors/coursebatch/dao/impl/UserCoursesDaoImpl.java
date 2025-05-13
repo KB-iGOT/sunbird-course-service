@@ -200,9 +200,23 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     String previousPageId = null;
     int currentOffSet = 1;
     String currentPagingState = null;
+    long count = 0L;
     Response countResponse = cassandraOperation.getCountOfRecordByIdentifier(requestContext, KEYSPACE_NAME,
             ENROLMENT_BATCH_LOOKUP, queryMap, JsonKey.USER_ID);
-    Long count = (Long) (((List<Map<String, Object>>)countResponse.getResult().get("response")).get(0)).get(JsonKey.USERS_COUNT);
+    if (countResponse != null
+            && countResponse.getResult() != null
+            && countResponse.getResult().get(JsonKey.RESPONSE) instanceof List) {
+
+      List<Map<String, Object>> responseList = (List<Map<String, Object>>) countResponse.getResult().get(JsonKey.RESPONSE);
+
+      if (!responseList.isEmpty()) {
+        Object countObj = responseList.get(0).get(JsonKey.USERS_COUNT);
+        if (countObj instanceof Number) {
+          count = ((Number) countObj).longValue();
+        }
+      }
+    }
+    logger.info(requestContext, "Total enrolment in the batch : " + (String) request.get(JsonKey.BATCH_ID) + " is: " + count);
     do {
       Response response = cassandraOperation.getRecordByIdentifierWithPage(requestContext, KEYSPACE_NAME,
           ENROLMENT_BATCH_LOOKUP, queryMap,
