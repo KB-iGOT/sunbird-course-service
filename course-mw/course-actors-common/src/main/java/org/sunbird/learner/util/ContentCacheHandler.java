@@ -5,6 +5,11 @@ import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerUtil;
 import org.sunbird.common.models.util.PropertiesCache;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.sunbird.cache.util.RedisCacheUtil;
+
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,5 +73,18 @@ public class ContentCacheHandler implements Runnable {
                     .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
             return (Map<String, Object>)contentMap.get(id);
         }
+    }
+
+    private static RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
+
+    public static Map<String, Object> getContentV2(String id) throws Exception {
+      int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
+      String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
+      ObjectMapper mapper = new ObjectMapper();
+      if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
+        return mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
+        });
+      }
+      return null;
     }
 }

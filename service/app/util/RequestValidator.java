@@ -1120,12 +1120,13 @@ public final class RequestValidator {
                   ERROR_CODE);
         } else if (cumulativeTracking) {
           Map<String, Object> resourceContent =  getCourseContent(contentId);
-          String contextCategory = (String) courseContent.get(JsonKey.CONTEXT_CATEGORY);
+          String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
           if (isCategoryAllowed(contextCategory)) {
             isProgram = false;
           } else {
             isProgram = true;
           }
+          logger.info(null, "ContextCategory is details Id: " + contentId + ", category: " + contextCategory + ", isProgram: " + isProgram);
         }
       }
     } catch (Exception e) {
@@ -1134,11 +1135,12 @@ public final class RequestValidator {
     return isProgram;
   }
 
-  public static Map<String, Object> getCourseContent(String courseId) {
+  public static Map<String, Object> getCourseContent(String courseId) throws Exception {
     Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
     Map<String, Object> courseContent = (Map<String, Object>)coursesMap.get(courseId);
     if (courseContent == null || courseContent.isEmpty()) {
-      courseContent = ContentCacheHandler.getContent(courseId);
+      logger.info(null, "ContentCache doesn't have info, getting course details from redis for Id: " + courseId);
+      courseContent = ContentCacheHandler.getContentV2(courseId);
     }
     return courseContent;
   }

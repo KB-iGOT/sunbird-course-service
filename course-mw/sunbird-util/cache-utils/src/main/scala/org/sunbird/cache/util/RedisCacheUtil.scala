@@ -329,4 +329,30 @@ class RedisCacheUtil {
     }
 
     def getList(key: String, index: Int): List[String] = getList(key, defaultListHandler, 0, index)
+
+    /**
+      * This method read string data from cache for a given key
+      *
+      * @param key
+      * @param ttl
+      * @param handler
+      * @return
+      */
+    def getUsingIndex(key: String, handler: (String) => String = defaultStringHandler, ttl: Int = 0, index: Int): String = {
+        val jedis = getConnection(index)
+        try {
+            var data = jedis.get(key)
+            if (null != handler && (null == data || data.isEmpty)) {
+                data = handler(key)
+                if (null != data && !data.isEmpty)
+                    set(key, data, ttl)
+            }
+            data
+        }
+        catch {
+            case e: Exception =>
+                logger.error(null, "Exception Occurred While Fetching String Data from Redis Cache for Key : " + key + "| Exception is:", e)
+                throw e
+        } finally returnConnection(jedis)
+    }
 }
