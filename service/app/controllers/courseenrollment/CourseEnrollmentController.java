@@ -119,6 +119,7 @@ public class CourseEnrollmentController extends BaseController {
           logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved, UserId : "+  userId +", courseId : "+courseId + ", batchId:"+batchId);
           req.getRequest().put(JsonKey.USER_ID, userId);
           validator.validateEnrollCourse(req);
+          validator.validateEnrolmentCriteria(req);
           return null;
         },
         getAllRequestHeaders(httpRequest),
