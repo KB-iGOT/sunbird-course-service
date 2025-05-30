@@ -438,7 +438,7 @@ public final class ContentUtil {
     logger.info(null, "ContentUtil::getContentV3:: Reading content using REST API." + collectionId);
     try {
       Map<String, String> headers = new HashMap<>();
-      if (allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
+      if (allHeaders != null && allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
         headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
       StringJoiner apiFields = new StringJoiner(",");
