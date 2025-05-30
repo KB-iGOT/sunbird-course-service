@@ -9,7 +9,7 @@ import java.util.{Calendar, Collections, Comparator, Date, TimeZone, UUID}
 import akka.actor.ActorRef
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.sunbird.common.models.util.JsonKey
-import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandler, ContentSearchUtil, ContentUtil, CourseBatchSchedulerUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentSearchUtil, ContentUtil, CourseBatchSchedulerUtil, JsonUtil, Util}
 
 import scala.collection.JavaConverters._
 import javax.inject.{Inject, Named}
@@ -576,11 +576,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
     }
 
     def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-        val coursesMap = ContentCacheHandler.getContentMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
-        var courseContent = coursesMap.get(courseId)
-        if (courseContent == null || courseContent.size() < 1)
-            courseContent = ContentCacheHandler.getContent(courseId)
-        courseContent
+        ContentCacheHandlerV2.getInstance().getContent(courseId)
     }
 
     def getBatchFrmLocalCache(batchId: String): java.util.Map[String, AnyRef] = {

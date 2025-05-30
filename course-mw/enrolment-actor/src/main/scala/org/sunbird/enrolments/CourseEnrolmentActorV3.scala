@@ -355,19 +355,11 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-    val coursesMap = ContentCacheHandler.getContentMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
-    var courseContent = coursesMap.get(courseId)
-    if (courseContent == null || courseContent.size() < 1)
-      courseContent = ContentCacheHandler.getContent(courseId)
-    courseContent
+    ContentCacheHandlerV2.getInstance().getContent(courseId)
   }
 
   def getExternalCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-    val coursesMap = ContentCacheHandler.getContentMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
-    var courseContent = coursesMap.get(courseId)
-    if (courseContent == null || courseContent.size() < 1)
-      courseContent = ContentCacheHandler.getExternalContent(courseId)
-    courseContent
+    ContentCacheHandlerV2.getInstance().getExternalContent(courseId)
   }
 
   def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request,version:String): util.List[util.Map[String, AnyRef]] = {
@@ -450,13 +442,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def getContentReadAPIData(programId: String, fieldList: List[String], request: Request): util.Map[String, AnyRef] = {
-    val responseString: String = cacheUtil.get(programId)
-    val contentData: util.Map[String, AnyRef] = if (StringUtils.isNotBlank(responseString)) {
-      JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
-    } else {
-      ContentCacheHandler.getContent(programId)
-    }
-    contentData
+    ContentCacheHandlerV2.getInstance().getContent(programId)
   }
 
   def updateProgressData(enrolments: java.util.List[java.util.Map[String, AnyRef]], requestContext: RequestContext): util.List[java.util.Map[String, AnyRef]] = {

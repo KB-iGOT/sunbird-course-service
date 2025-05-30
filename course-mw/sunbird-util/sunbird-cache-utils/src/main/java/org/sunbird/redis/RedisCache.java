@@ -14,11 +14,19 @@ public class RedisCache implements Cache {
   private static final String CACHE_MAP_LIST = "cache.mapNames";
   private Map<String, String> properties = readConfig();
   private String[] mapNameList = properties.get(CACHE_MAP_LIST).split(",");
-  private RedissonClient client;
+  private RedissonClient client = RedisConnectionManager.getClient();
+  private static RedisCache instance = null;
 
-  public RedisCache() {
-    client = RedisConnectionManager.getClient();
-  }
+  public static RedisCache getInstance() {
+    if (instance == null) {
+      synchronized (RedisCache.class) {
+        if (instance == null)
+          instance = new RedisCache();
+      }
+    }
+    return instance;
+  } 
+
   private LoggerUtil logger = new LoggerUtil(RedisCache.class);
 
   @Override
@@ -113,6 +121,10 @@ public class RedisCache implements Cache {
       logger.error(null, "RedisCache:get: Error occurred mapName = " + mapName + ", key = " + key + ", dbIndex = " + dbIndex, e);
     }
     return null;
+  }
+
+  public String getCache(String key) {
+    return getCache(key, RedisConnectionManager.getDefaultDbIndex());
   }
 
   public String getCache(String key, Integer dbIndex) {

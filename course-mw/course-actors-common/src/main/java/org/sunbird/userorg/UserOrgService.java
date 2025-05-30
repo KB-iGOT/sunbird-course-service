@@ -3,6 +3,8 @@ package org.sunbird.userorg;
 import java.util.List;
 import java.util.Map;
 
+import org.sunbird.common.request.RequestContext;
+
 public interface UserOrgService {
 
   Map<String, Object> getOrganisationById(String id);
@@ -16,4 +18,6 @@ public interface UserOrgService {
   List<Map<String, Object>> getUsers(Map<String, Object> request, String authToken);
 
   void sendEmailNotification(Map<String, Object> request, String authToken);
+
+  Map<String, Object> getUserDetailsById(String id, RequestContext requestContext) throws Exception;
 }

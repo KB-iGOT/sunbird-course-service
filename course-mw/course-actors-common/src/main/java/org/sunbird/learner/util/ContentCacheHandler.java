@@ -24,7 +24,7 @@ public class ContentCacheHandler implements Runnable {
   private static Map<String, Object> contentMap = new ConcurrentHashMap<>();
 
   private LoggerUtil logger = new LoggerUtil(ContentCacheHandler.class);
-  
+
   @Override
   public void run() {
     logger.info(null, "ContentCacheHandler:run: Cache refresh started.");
@@ -35,14 +35,14 @@ public class ContentCacheHandler implements Runnable {
   @SuppressWarnings("unchecked")
   private void cache(Map<String, Object> map) {
     try {
-     Map contents =  ContentUtil.getAllContent(Integer.parseInt(PropertiesCache.getInstance()
-             .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
-     Map externalContents =  ContentUtil.getAllExternalContent(Integer.parseInt(PropertiesCache.getInstance()
-                .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
+      Map contents = ContentUtil.getAllContent(Integer.parseInt(PropertiesCache.getInstance()
+          .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
+      Map externalContents = ContentUtil.getAllExternalContent(Integer.parseInt(PropertiesCache.getInstance()
+          .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
       contentMap.putAll(contents);
       contentMap.putAll(externalContents);
-          logger.debug(null, "content keyset " + map.keySet());
-      logger.info(null,  " cache size: " + map.size());
+      logger.debug(null, "content keyset " + map.keySet());
+      logger.info(null, " cache size: " + map.size());
     } catch (Exception e) {
       logger.error(null, "ContentCacheHandler:cache: Exception in retrieving content section " + e.getMessage(), e);
     }
@@ -54,37 +54,38 @@ public class ContentCacheHandler implements Runnable {
   }
 
   public static Map<String, Object> getContent(String id) {
-      Map<String, Object> obj = (Map<String, Object>)contentMap.get(id);
-    if(obj != null)
-       return obj;
-    else{
-        contentMap.putAll(ContentUtil.getAllContent(Arrays.asList(id),Integer.parseInt(PropertiesCache.getInstance()
-                .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
-       return (Map<String, Object>)contentMap.get(id);
+    Map<String, Object> obj = (Map<String, Object>) contentMap.get(id);
+    if (obj != null)
+      return obj;
+    else {
+      contentMap.putAll(ContentUtil.getAllContent(Arrays.asList(id), Integer.parseInt(PropertiesCache.getInstance()
+          .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
+      return (Map<String, Object>) contentMap.get(id);
     }
   }
 
-    public static Map<String, Object> getExternalContent(String id) {
-        Map<String, Object> obj = (Map<String, Object>)contentMap.get(id);
-        if(obj != null)
-            return obj;
-        else{
-            contentMap.putAll(ContentUtil.getAllExternalContent(Arrays.asList(id),Integer.parseInt(PropertiesCache.getInstance()
-                    .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
-            return (Map<String, Object>)contentMap.get(id);
-        }
+  public static Map<String, Object> getExternalContent(String id) {
+    Map<String, Object> obj = (Map<String, Object>) contentMap.get(id);
+    if (obj != null)
+      return obj;
+    else {
+      contentMap
+          .putAll(ContentUtil.getAllExternalContent(Arrays.asList(id), Integer.parseInt(PropertiesCache.getInstance()
+              .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
+      return (Map<String, Object>) contentMap.get(id);
     }
+  }
 
-    private static RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
+  private static RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
 
-    public static Map<String, Object> getContentV2(String id) throws Exception {
-      int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
-      String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
-      ObjectMapper mapper = new ObjectMapper();
-      if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
-        return mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
-        });
-      }
-      return null;
+  public static Map<String, Object> getContentV2(String id) throws Exception {
+    int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
+    String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
+    ObjectMapper mapper = new ObjectMapper();
+    if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
+      return mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
+      });
     }
+    return null;
+  }
 }

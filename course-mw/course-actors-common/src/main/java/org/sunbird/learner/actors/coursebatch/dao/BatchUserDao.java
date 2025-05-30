@@ -1,13 +1,9 @@
 package org.sunbird.learner.actors.coursebatch.dao;
-import java.security.Timestamp;
 import java.util.List;
 import java.util.Map;
 import org.sunbird.common.models.response.Response;
-import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.models.batch.user.BatchUser;
-import org.sunbird.models.course.batch.CourseBatch;
-import org.sunbird.models.user.courses.UserCourses;
 
 public interface BatchUserDao {
     /**

@@ -16,7 +16,7 @@ import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.responsecode.ResponseMessage;
 import org.sunbird.enrolments.CourseEnrolmentActor;
-import org.sunbird.learner.util.ContentCacheHandler;
+import org.sunbird.learner.util.ContentCacheHandlerV2;
 import org.sunbird.learner.util.ContentSearchUtil;
 
 import javax.ws.rs.core.MediaType;
@@ -1136,13 +1136,7 @@ public final class RequestValidator {
   }
 
   public static Map<String, Object> getCourseContent(String courseId) throws Exception {
-    Map<String, Object> coursesMap = ContentCacheHandler.getContentMap();
-    Map<String, Object> courseContent = (Map<String, Object>)coursesMap.get(courseId);
-    if (courseContent == null || courseContent.isEmpty()) {
-      logger.info(null, "ContentCache doesn't have info, getting course details from redis for Id: " + courseId);
-      courseContent = ContentCacheHandler.getContentV2(courseId);
-    }
-    return courseContent;
+    return ContentCacheHandlerV2.getInstance().getContent(courseId);
   }
 
   private static boolean isProgramCategory(String category) {

@@ -11,7 +11,7 @@ public class CacheFactory {
 
   public static Cache getInstance() {
     if (null == cache) {
-      cache = new RedisCache();
+      cache = RedisCache.getInstance();
     }
     return cache;
   }

@@ -19,7 +19,7 @@ public class BatchCacheHandler implements Runnable {
   private static Map<String, Object> batchMap = new ConcurrentHashMap<>();
 
   private LoggerUtil logger = new LoggerUtil(BatchCacheHandler.class);
-  
+
   @Override
   public void run() {
     logger.info(null, "BatchCacheHandler:run: Cache refresh started.");
@@ -30,13 +30,13 @@ public class BatchCacheHandler implements Runnable {
   @SuppressWarnings("unchecked")
   private void cache(Map<String, Object> map) {
     try {
-     Map contents =  ContentUtil.getAllBatches(Integer.parseInt(PropertiesCache.getInstance()
-             .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
+      Map contents = ContentUtil.getAllBatches(Integer.parseInt(PropertiesCache.getInstance()
+          .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH)));
       batchMap.putAll(contents);
-          logger.debug(null, "content keyset " + map.keySet());
-      logger.info(null,  " cache size: " + map.size());
+      logger.debug(null, "content keyset " + map.keySet());
+      logger.info(null, " cache size: " + map.size());
     } catch (Exception e) {
-      logger.error(null, "ContentCacheHandler:cache: Exception in retrieving content section " + e.getMessage(), e);
+      logger.error(null, "BatchCacheHandler:cache: Exception in retrieving content section " + e.getMessage(), e);
     }
   }
 
@@ -46,13 +46,13 @@ public class BatchCacheHandler implements Runnable {
   }
 
   public static Map<String, Object> getBatch(String id) {
-      Map<String, Object> obj = (Map<String, Object>) batchMap.get(id);
-    if(obj != null)
-       return obj;
-    else{
-        batchMap.putAll(ContentUtil.getAllBatches(Arrays.asList(id),Integer.parseInt(PropertiesCache.getInstance()
-                .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
-       return (Map<String, Object>) batchMap.get(id);
+    Map<String, Object> obj = (Map<String, Object>) batchMap.get(id);
+    if (obj != null)
+      return obj;
+    else {
+      batchMap.putAll(ContentUtil.getAllBatches(Arrays.asList(id), Integer.parseInt(PropertiesCache.getInstance()
+          .getProperty(JsonKey.PAGE_SIZE_CONTENT_FETCH))));
+      return (Map<String, Object>) batchMap.get(id);
     }
   }
 }

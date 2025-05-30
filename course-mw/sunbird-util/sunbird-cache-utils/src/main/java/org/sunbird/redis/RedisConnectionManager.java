@@ -111,4 +111,8 @@ public class RedisConnectionManager {
     config.setCodec(new StringCodec());
     return Redisson.create(config);
   }
+
+  public static int getDefaultDbIndex() {
+    return 0;  
+  }
 }

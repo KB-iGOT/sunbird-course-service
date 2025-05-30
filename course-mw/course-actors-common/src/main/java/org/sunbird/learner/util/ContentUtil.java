@@ -32,10 +32,11 @@ public final class ContentUtil {
 
   private static ObjectMapper mapper = new ObjectMapper();
   public static Map<String, String> headerMap = new HashMap<>();
-  private static String EKSTEP_COURSE_SEARCH_QUERY =
-          "{\"request\": {\"filters\":{\"contentType\": [\"Course\"], \"identifier\": \"COURSE_ID_PLACEHOLDER\", \"status\": \"Live\", \"mimeType\": \"application/vnd.ekstep.content-collection\", \"trackable.enabled\": \"Yes\"},\"limit\": 1}}";
+  private static String EKSTEP_COURSE_SEARCH_QUERY = "{\"request\": {\"filters\":{\"contentType\": [\"Course\"], \"identifier\": \"COURSE_ID_PLACEHOLDER\", \"status\": \"Live\", \"mimeType\": \"application/vnd.ekstep.content-collection\", \"trackable.enabled\": \"Yes\"},\"limit\": 1}}";
   private static LoggerUtil logger = new LoggerUtil(ContentUtil.class);
-  private ContentUtil() {}
+
+  private ContentUtil() {
+  }
 
   static {
     String header = ProjectUtil.getConfigValue(JsonKey.EKSTEP_AUTHORIZATION);
@@ -45,7 +46,7 @@ public final class ContentUtil {
   }
 
   /**
-   * @param params String
+   * @param params  String
    * @param headers Map<String, String>
    * @return Map<String,Object>
    */
@@ -64,14 +65,17 @@ public final class ContentUtil {
             PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_AUTHORIZATION));
       }
       logger.info(null, "making call for content search ==" + params);
-      String response =
-          HttpUtil.sendPostRequest(
-              baseSearchUrl
-                  + PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_CONTENT_SEARCH_URL),
-              params,
-              headers);
-      logger.info(null, "Content search response", null, new HashMap<>(){{put("response", response);}});
-      logger.info(null,  "Content search response got from search query: " + mapper.writeValueAsString(response));
+      String response = HttpUtil.sendPostRequest(
+          baseSearchUrl
+              + PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_CONTENT_SEARCH_URL),
+          params,
+          headers);
+      logger.info(null, "Content search response", null, new HashMap<>() {
+        {
+          put("response", response);
+        }
+      });
+      logger.info(null, "Content search response got from search query: " + mapper.writeValueAsString(response));
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
         String resmsgId = (String) ((Map<String, Object>) data.get("params")).get("resmsgid");
@@ -108,7 +112,11 @@ public final class ContentUtil {
       throws IOException {
     String url = baseURL + PropertiesCache.getInstance().getProperty(apiURL);
     logger.info(null,
-        "BaseMetricsActor:makePostRequest completed requested url :" + url, null, new HashMap<>(){{put("data", body);}});
+        "BaseMetricsActor:makePostRequest completed requested url :" + url, null, new HashMap<>() {
+          {
+            put("data", body);
+          }
+        });
     Map<String, String> headers = new HashMap<>();
     headers.put("Content-Type", "application/json; charset=utf-8");
     headers.put(JsonKey.AUTHORIZATION, authKey);
@@ -124,7 +132,11 @@ public final class ContentUtil {
 
     String result = response.getBody();
     logger.info(null,
-        "BaseMetricsActor:makePostRequest: Response from analytics store for metrics", null, new HashMap<>(){{put("result", result);}});
+        "BaseMetricsActor:makePostRequest: Response from analytics store for metrics", null, new HashMap<>() {
+          {
+            put("result", result);
+          }
+        });
     return result;
   }
 
@@ -136,12 +148,14 @@ public final class ContentUtil {
     return getEventContent(eventId);
   }
 
-  public static Map<String, Object> getContent(String courseId, List<String> fields, Map<String, String> incomingHeaders) {
+  public static Map<String, Object> getContent(String courseId, List<String> fields,
+      Map<String, String> incomingHeaders) {
     Map<String, Object> resMap = new HashMap<>();
     Map<String, String> headers = new HashMap<>();
     try {
       String fieldsStr = StringUtils.join(fields, ",");
-      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + courseId + "?fields=" + fieldsStr;
+      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + courseId
+          + "?fields=" + fieldsStr;
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
       headers.put(JsonKey.AUTHORIZATION, PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_AUTHORIZATION));
       if (incomingHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
@@ -151,14 +165,18 @@ public final class ContentUtil {
       logger.info(null, "making call for content read ==" + courseId);
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
 
-      logger.info(null, "Content read response", null, new HashMap<>(){{put("response", response);}});
+      logger.info(null, "Content read response", null, new HashMap<>() {
+        {
+          put("response", response);
+        }
+      });
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
         data = (Map<String, Object>) data.get(JsonKey.RESULT);
         if (MapUtils.isNotEmpty(data)) {
           Object content = data.get(JsonKey.CONTENT);
           resMap.put(JsonKey.CONTENT, content);
-        }else {
+        } else {
           logger.info(null, "EkStepRequestUtil:searchContent No data found");
         }
       } else {
@@ -180,14 +198,18 @@ public final class ContentUtil {
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
       logger.info(null, "making call for content read ==" + baseContentreadUrl);
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
-      logger.info(null, "Content read response", null, new HashMap<>(){{put("response", response);}});
+      logger.info(null, "Content read response", null, new HashMap<>() {
+        {
+          put("response", response);
+        }
+      });
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
         data = (Map<String, Object>) data.get(JsonKey.RESULT);
         if (MapUtils.isNotEmpty(data)) {
           Object content = data.get(JsonKey.CONTENT);
           resMap.put(JsonKey.CONTENT, content);
-        }else {
+        } else {
           logger.info(null, "EkStepRequestUtil:searchContent No data found");
         }
       } else {
@@ -201,9 +223,8 @@ public final class ContentUtil {
     return resMap;
   }
 
-
   public static Map<String, Object> getCourseObjectFromEkStep(
-          String courseId, Map<String, String> headers) {
+      String courseId, Map<String, String> headers) {
     logger.info(null, "Requested course id is ==" + courseId);
     if (!StringUtils.isBlank(courseId)) {
       try {
@@ -215,8 +236,8 @@ public final class ContentUtil {
           // return (Map<String, Object>) contentObject;
         } else {
           logger.info(null,
-                  "CourseEnrollmentActor:getCourseObjectFromEkStep: Content not found for requested courseId "
-                          + courseId);
+              "CourseEnrollmentActor:getCourseObjectFromEkStep: Content not found for requested courseId "
+                  + courseId);
         }
       } catch (Exception e) {
         logger.error(null, e.getMessage(), e);
@@ -231,12 +252,12 @@ public final class ContentUtil {
       String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.LEARNING_SERVICE_BASE_URL);
       Request request = new Request();
       request.put("content", data);
-      response =
-              HttpUtil.sendPatchRequest(
-                      contentUpdateBaseUrl
-                              + PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_CONTENT_UPDATE_URL)
-                              + collectionId, JsonUtil.serialize(request),
-                      headerMap);
+      response = HttpUtil.sendPatchRequest(
+          contentUpdateBaseUrl
+              + PropertiesCache.getInstance().getProperty(JsonKey.EKSTEP_CONTENT_UPDATE_URL)
+              + collectionId,
+          JsonUtil.serialize(request),
+          headerMap);
     } catch (Exception e) {
       logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
     }
@@ -263,12 +284,14 @@ public final class ContentUtil {
     }
     return flag;
   }
-  public static Map<String, Object> getAllBatches(List identifierList,int pageSize) {
-    //int recordStart = 0;
+
+  public static Map<String, Object> getAllBatches(List identifierList, int pageSize) {
+    // int recordStart = 0;
     int remainingRecords;
     Map<String, Object> allRecords = new HashMap<>();
     do {
-      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = batches(identifierList,allRecords.size(), pageSize);
+      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = batches(identifierList, allRecords.size(),
+          pageSize);
       int count = contentsResult.getKey();
       Map<String, Map<String, Object>> batchMap = contentsResult.getValue();
       allRecords.putAll(batchMap);
@@ -279,85 +302,95 @@ public final class ContentUtil {
 
     return allRecords;
   }
-  public static Map<String, Object> getAllContent(List identifierList,int pageSize) {
-    //int recordStart = 0;
+
+  public static Map<String, Object> getAllContent(List identifierList, int pageSize) {
+    // int recordStart = 0;
     int remainingRecords;
     Map<String, Object> allRecords = new HashMap<>();
     do {
-      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = contents(identifierList,allRecords.size(), pageSize);
+      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = contents(identifierList, allRecords.size(),
+          pageSize);
       int count = contentsResult.getKey();
       Map<String, Map<String, Object>> contentMap = contentsResult.getValue();
       allRecords.putAll(contentMap);
       // Update remaining records and move to the next page if needed
       remainingRecords = count - allRecords.size();
-     // recordStart = allRecords.size() - 1;
+      // recordStart = allRecords.size() - 1;
     } while (remainingRecords > 0);
 
     return allRecords;
   }
+
   public static Map<String, Object> getAllBatches(int pageSize) {
     return getAllBatches(null, pageSize);
   }
+
   public static Map<String, Object> getAllContent(int pageSize) {
     return getAllContent(null, pageSize);
   }
 
-  public static Map.Entry<Integer, Map<String, Map<String, Object>>> batches(List identifierList,int offset, int limit) {
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> batches(List identifierList, int offset,
+      int limit) {
     SearchDTO searchDTO = new SearchDTO();
     searchDTO.setOffset(offset);
     searchDTO.setLimit(limit);
     HashMap sort = new HashMap();
-    sort.put("createdDate","asc");
+    sort.put("createdDate", "asc");
     searchDTO.setSortBy(sort);
     HashMap filters = new java.util.HashMap<String, Object>();
-    if(identifierList != null && identifierList.size() > 0)
-      filters.put(JsonKey.BATCH_ID,identifierList);
+    if (identifierList != null && identifierList.size() > 0)
+      filters.put(JsonKey.BATCH_ID, identifierList);
     searchDTO.getAdditionalProperties().put(JsonKey.FILTERS, filters);
-    Future<Map<String, Object>> resultFuture = EsClientFactory.getInstance(JsonKey.REST).search(null,searchDTO, ProjectUtil.EsType.courseBatch.getTypeName(),isCotentElasticSearchTypeDoc());
-    HashMap result= (HashMap<String,Object>) ElasticSearchHelper.getResponseFromFuture(resultFuture);
+    Future<Map<String, Object>> resultFuture = EsClientFactory.getInstance(JsonKey.REST).search(null, searchDTO,
+        ProjectUtil.EsType.courseBatch.getTypeName(), isCotentElasticSearchTypeDoc());
+    HashMap result = (HashMap<String, Object>) ElasticSearchHelper.getResponseFromFuture(resultFuture);
     Long longCount = (Long) result.getOrDefault(JsonKey.COUNT, 0L);
     int count = longCount.intValue();
-    List<Map<String, Object>> batchesList =  (List<Map<String, Object>>) result.getOrDefault(JsonKey.CONTENT, new ArrayList<>());
+    List<Map<String, Object>> batchesList = (List<Map<String, Object>>) result.getOrDefault(JsonKey.CONTENT,
+        new ArrayList<>());
     Map<String, Map<String, Object>> batchesMap = new HashMap<>();
-     if (CollectionUtils.isNotEmpty(batchesList)) {
+    if (CollectionUtils.isNotEmpty(batchesList)) {
       for (Map<String, Object> batch : batchesList) {
         String batchId = (String) batch.get(JsonKey.IDENTIFIER);
-        if(null != batchId && !batchId.isEmpty())
-        batchesMap.put(batchId, batch);
-     }
+        if (null != batchId && !batchId.isEmpty())
+          batchesMap.put(batchId, batch);
+      }
     }
     return new AbstractMap.SimpleEntry<>(count, batchesMap);
   }
 
-    public static Map.Entry<Integer, Map<String, Map<String, Object>>> contents(List identifierList,int offset, int limit) {
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> contents(List identifierList, int offset,
+      int limit) {
     SearchDTO searchDTO = new SearchDTO();
     searchDTO.setOffset(offset);
     searchDTO.setLimit(limit);
     HashMap sort = new HashMap();
-    sort.put("createdOn","asc");
+    sort.put("createdOn", "asc");
     searchDTO.setSortBy(sort);
     HashMap filters = new java.util.HashMap<String, Object>();
     HashMap enabled = new HashMap();
-    enabled.put(JsonKey.TRACKABLE_ENABLED,JsonKey.YES);
+    enabled.put(JsonKey.TRACKABLE_ENABLED, JsonKey.YES);
     List<String> queryFields = new ArrayList<>();
-    String queryFieldsParam =  PropertiesCache.getInstance()
-            .getProperty(JsonKey.ENROL_FIELDS_LIST);
+    String queryFieldsParam = PropertiesCache.getInstance()
+        .getProperty(JsonKey.ENROL_FIELDS_LIST);
     queryFields.addAll(Arrays.asList(queryFieldsParam.split(",")));
     searchDTO.setFields(queryFields);
     filters.put(JsonKey.MIME_TYPE, Arrays.asList(JsonKey.COLLECTION_MIME_TYPE, JsonKey.QUESTION_SET_MIME_TYPE));
     List<String> status = new ArrayList<>();
     status.add(JsonKey.LIVE);
     status.add(JsonKey.RETIRED);
-    filters.put(JsonKey.STATUS,status);
-    if(identifierList != null && identifierList.size() > 0)
-      filters.put(JsonKey.IDENTIFIER,identifierList);
+    filters.put(JsonKey.STATUS, status);
+    if (identifierList != null && identifierList.size() > 0)
+      filters.put(JsonKey.IDENTIFIER, identifierList);
     searchDTO.getAdditionalProperties().put(JsonKey.FILTERS, filters);
     searchDTO.getAdditionalProperties().put(JsonKey.NESTED_KEY_FILTER, enabled);
-    Future<Map<String, Object>> resultFuture = EsClientFactory.getInstance(JsonKey.REST).search(null,searchDTO, ProjectUtil.EsType.compositeSearch.getTypeName(),isCotentElasticSearchTypeDoc());
-    HashMap result= (HashMap<String,Object>) ElasticSearchHelper.getResponseFromFuture(resultFuture);
+    Future<Map<String, Object>> resultFuture = EsClientFactory.getInstance(JsonKey.REST).search(null, searchDTO,
+        ProjectUtil.EsType.compositeSearch.getTypeName(), isCotentElasticSearchTypeDoc());
+    HashMap result = (HashMap<String, Object>) ElasticSearchHelper.getResponseFromFuture(resultFuture);
     Long longCount = (Long) result.getOrDefault(JsonKey.COUNT, 0L);
     int count = longCount.intValue();
-    List<Map<String, Object>> coursesList = (List<Map<String, Object>>) result.getOrDefault(JsonKey.CONTENT, new ArrayList<>());
+    List<Map<String, Object>> coursesList = (List<Map<String, Object>>) result.getOrDefault(JsonKey.CONTENT,
+        new ArrayList<>());
     Map<String, Map<String, Object>> coursesMap = new HashMap<>();
     if (CollectionUtils.isNotEmpty(coursesList)) {
       for (Map<String, Object> enrolment : coursesList) {
@@ -368,37 +401,41 @@ public final class ContentUtil {
     return new AbstractMap.SimpleEntry<>(count, coursesMap);
   }
 
-  public static  Map.Entry<Integer, Map<String, Map<String, Object>>> contents( int offset, int limit) {
-   return contents(null, offset,  limit);
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> contents(int offset, int limit) {
+    return contents(null, offset, limit);
   }
 
   private static boolean isCotentElasticSearchTypeDoc() {
     return Boolean.parseBoolean(
-            PropertiesCache.getInstance()
-                    .getProperty(JsonKey.CONTENT_ELASTIC_SEARCH_TYPE_DOC));
+        PropertiesCache.getInstance()
+            .getProperty(JsonKey.CONTENT_ELASTIC_SEARCH_TYPE_DOC));
   }
-    public static Map<String, Object> getContentReadV2 (String collectionId, Map < String, String > allHeaders){
-      try {
-        Map<String, String> headers = new HashMap<String, String>();
-        if (allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
-          headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
-        }
-        String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + collectionId + "?fields=primaryCategory,identifier,batches";
-        String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
-        if (response != null && !response.isEmpty()) {
-          Map<String, Object> data = mapper.readValue(response, Map.class);
-          if (JsonKey.OK.equalsIgnoreCase((String) data.get(JsonKey.RESPONSE_CODE))) {
-            Map<String, Object> contentResult = (Map<String, Object>) data.get(JsonKey.RESULT);
-            return (Map<String, Object>) contentResult.get(JsonKey.CONTENT);
-          }
-        }
-      } catch (Exception e) {
-        logger.error(null, "User don't have access to this programId " + collectionId, e);
+
+  public static Map<String, Object> getContentReadV2(String collectionId, Map<String, String> allHeaders) {
+    try {
+      Map<String, String> headers = new HashMap<String, String>();
+      if (allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
+        headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
-      return new HashMap<>();
+      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/"
+          + collectionId + "?fields=primaryCategory,identifier,batches";
+      String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
+      if (response != null && !response.isEmpty()) {
+        Map<String, Object> data = mapper.readValue(response, Map.class);
+        if (JsonKey.OK.equalsIgnoreCase((String) data.get(JsonKey.RESPONSE_CODE))) {
+          Map<String, Object> contentResult = (Map<String, Object>) data.get(JsonKey.RESULT);
+          return (Map<String, Object>) contentResult.get(JsonKey.CONTENT);
+        }
+      }
+    } catch (Exception e) {
+      logger.error(null, "User don't have access to this programId " + collectionId, e);
     }
-    
-  public static Map<String, Object> getContentReadV3(String collectionId, List<String> fields, Map<String, String> allHeaders) {
+    return new HashMap<>();
+  }
+
+  public static Map<String, Object> getContentReadV3(String collectionId, List<String> fields,
+      Map<String, String> allHeaders) {
+    logger.info(null, "ContentUtil::getContentV3:: Reading content using REST API." + collectionId);
     try {
       Map<String, String> headers = new HashMap<>();
       if (allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
@@ -408,7 +445,11 @@ public final class ContentUtil {
       for (String item : fields) {
         apiFields.add(item);
       }
-      String baseContentReadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + collectionId + "?fields=" + apiFields;
+      String baseContentReadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/"
+          + collectionId;
+      if (org.apache.commons.lang.StringUtils.isNotBlank(apiFields.toString())) {
+        baseContentReadUrl = baseContentReadUrl + "?fields=" + apiFields;
+      }
       String response = HttpUtil.sendGetRequest(baseContentReadUrl, headers);
       if (response != null && !response.isEmpty()) {
         Map<String, Object> data = mapper.readValue(response, Map.class);
@@ -444,33 +485,35 @@ public final class ContentUtil {
     return flag;
   }
 
-    public static boolean updateEventCollection(RequestContext requestContext, String collectionId, Map<String, Object> data) {
-        String response = "";
-        try {
-            String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
-            Request request = new Request();
-            request.put("event", data);
-            response =
-                    HttpUtil.sendPatchRequest(
-                            contentUpdateBaseUrl
-                                    + PropertiesCache.getInstance().getProperty(JsonKey.EVENT_UPDATE_URL)
-                                    + collectionId, JsonUtil.serialize(request),
-                            headerMap);
-        } catch (Exception e) {
-            logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
-        }
-        return JsonKey.SUCCESS.equalsIgnoreCase(response);
+  public static boolean updateEventCollection(RequestContext requestContext, String collectionId,
+      Map<String, Object> data) {
+    String response = "";
+    try {
+      String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL);
+      Request request = new Request();
+      request.put("event", data);
+      response = HttpUtil.sendPatchRequest(
+          contentUpdateBaseUrl
+              + PropertiesCache.getInstance().getProperty(JsonKey.EVENT_UPDATE_URL)
+              + collectionId,
+          JsonUtil.serialize(request),
+          headerMap);
+    } catch (Exception e) {
+      logger.error(requestContext, "Error while doing system update to collection " + e.getMessage(), e);
     }
+    return JsonKey.SUCCESS.equalsIgnoreCase(response);
+  }
 
   public static Map<String, Object> getAllExternalContent(int pageSize) {
     return getAllExternalContent(null, pageSize);
   }
 
-  public static Map<String,Object> getAllExternalContent(List<String> identifierList, int pageSize) {
+  public static Map<String, Object> getAllExternalContent(List<String> identifierList, int pageSize) {
     int remainingRecords;
     Map<String, Object> allRecords = new HashMap<>();
     do {
-      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = getExternalContents(identifierList,allRecords.size(), pageSize);
+      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = getExternalContents(identifierList,
+          allRecords.size(), pageSize);
       int count = contentsResult.getKey();
       Map<String, Map<String, Object>> contentMap = contentsResult.getValue();
       allRecords.putAll(contentMap);
@@ -481,14 +524,15 @@ public final class ContentUtil {
     return allRecords;
   }
 
-  public static Map.Entry<Integer, Map<String, Map<String, Object>>> getExternalContents(List identifierList,int offset, int limit) {
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> getExternalContents(List identifierList,
+      int offset, int limit) {
     Map<String, Object> searchObject = new HashMap<>();
     searchObject.put(JsonKey.PAGE_NUMBER, offset);
     searchObject.put(JsonKey.PAGE_SIZE, limit);
 
     Map<String, Object> filters = new HashMap<>();
-    if(identifierList != null && identifierList.size() > 0) {
-      filters.put(JsonKey.CONTENT_ID,identifierList);
+    if (identifierList != null && identifierList.size() > 0) {
+      filters.put(JsonKey.CONTENT_ID, identifierList);
       searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
     }
 
@@ -497,30 +541,30 @@ public final class ContentUtil {
     Map<String, Map<String, Object>> coursesMap = new HashMap<>();
     try {
       String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_SERVICE_BASE_URL);
-      response =
-              HttpUtil.sendPostRequest(
-                      contentUpdateBaseUrl
-                              + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
-                              , JsonUtil.serialize(searchObject),
-                      headerMap);
+      response = HttpUtil.sendPostRequest(
+          contentUpdateBaseUrl
+              + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
+          JsonUtil.serialize(searchObject),
+          headerMap);
 
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
-        count = (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-        List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+        count = (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+        List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
+            new ArrayList<>());
         filters.put(JsonKey.IS_ACTIVE, false);
         searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
-        response =
-                HttpUtil.sendPostRequest(
-                        contentUpdateBaseUrl
-                                + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
-                        , JsonUtil.serialize(searchObject),
-                        headerMap);
+        response = HttpUtil.sendPostRequest(
+            contentUpdateBaseUrl
+                + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
+            JsonUtil.serialize(searchObject),
+            headerMap);
 
         data = mapper.readValue(response, Map.class);
         if (MapUtils.isNotEmpty(data)) {
-          count = count + (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-          List<Map<String, Object>> retireCoursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+          count = count + (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+          List<Map<String, Object>> retireCoursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
+              new ArrayList<>());
           coursesList.addAll(retireCoursesList);
         }
         if (CollectionUtils.isNotEmpty(coursesList)) {
@@ -528,22 +572,22 @@ public final class ContentUtil {
             String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
             coursesMap.put(courseId, enrolment);
           }
-      }
-    } else {
-        if(identifierList != null && identifierList.size() > 0) {
+        }
+      } else {
+        if (identifierList != null && identifierList.size() > 0) {
           filters.put(JsonKey.IS_ACTIVE, false);
           searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
-          response =
-                  HttpUtil.sendPostRequest(
-                          contentUpdateBaseUrl
-                                  + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
-                          , JsonUtil.serialize(searchObject),
-                          headerMap);
+          response = HttpUtil.sendPostRequest(
+              contentUpdateBaseUrl
+                  + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
+              JsonUtil.serialize(searchObject),
+              headerMap);
 
           data = mapper.readValue(response, Map.class);
           if (MapUtils.isNotEmpty(data)) {
-            count = (int)data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-            List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
+            count = (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
+            List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
+                new ArrayList<>());
             if (CollectionUtils.isNotEmpty(coursesList)) {
               for (Map<String, Object> enrolment : coursesList) {
                 String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
@@ -555,7 +599,7 @@ public final class ContentUtil {
           }
         }
       }
-  } catch (Exception e) {
+    } catch (Exception e) {
       logger.error(null, "Issue while fetching the data " + e.getMessage(), e);
     }
     return new AbstractMap.SimpleEntry<>(count, coursesMap);

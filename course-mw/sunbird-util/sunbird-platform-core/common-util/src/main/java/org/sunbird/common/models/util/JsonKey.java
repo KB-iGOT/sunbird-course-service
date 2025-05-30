@@ -1212,6 +1212,16 @@ public final class JsonKey {
   public static final String ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE = "status_update_allowed_program_resources";
   public static final String QUESTION_SET_MIME_TYPE = "application/vnd.sunbird.questionset";
   public static final String CONTENT_TTL = "content_ttl";
+  public static final String USER_INFO_DB = "userInfo_db";
+  public static final String ACCESS_RULES_ENABLED = "accessRulesEnabled";
+  public static final String ACCESS_RULES = "accessRules";
+  public static final String BASIC = "basic";
+  public static final String COLON = ":";
+  public static final String ACCESS_SETTINGS_DB = "access_settings_db";
+  public static final String PROFILE_DETAILS = "profileDetails";
+  public static final String PROFILE_STATUS = "profileStatus";
+  public static final String PROFESSIONAL_DETAILS = "professionalDetails";
+  public static final String DESIGNATION = "designation";
 
   private JsonKey() {}
 }

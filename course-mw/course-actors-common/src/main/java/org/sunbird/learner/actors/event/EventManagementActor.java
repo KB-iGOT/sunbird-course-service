@@ -31,7 +31,7 @@ public class EventManagementActor extends BaseActor {
     private final UserCoursesService userCoursesService = new UserCoursesService();
 
     private EventEnrolmentDao eventBatchDao = new EventEnrolmentDaoImpl();
-    private RedisCache redisCache = new RedisCache();
+    private RedisCache redisCache = RedisCache.getInstance();
     private ObjectMapper mapper = new ObjectMapper();
 
 
