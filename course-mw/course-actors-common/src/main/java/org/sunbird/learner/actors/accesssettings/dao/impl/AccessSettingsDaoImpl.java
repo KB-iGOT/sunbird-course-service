@@ -43,7 +43,7 @@ public class AccessSettingsDaoImpl {
 
     public AccessControl readAccessSettings(RequestContext requestContext, String courseId) {
         Map<String, Object> primaryKey = new HashMap<>();
-        primaryKey.put(JsonKey.ID, courseId);
+        primaryKey.put(JsonKey.CONTEXT_ID, courseId);
         Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, TABLE_NAME,
                 primaryKey, null);
         if (response != null && response.getResponseCode() == ResponseCode.OK) {
