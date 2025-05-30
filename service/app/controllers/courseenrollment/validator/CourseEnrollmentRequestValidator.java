@@ -144,7 +144,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     // Get the course details from ContentCahceHandlerV2
     Map<String, Object> courseDetails = null;
     try {
-      ContentCacheHandlerV2.getInstance().getContent(courseId);
+      courseDetails = ContentCacheHandlerV2.getInstance().getContent(courseId);
     } catch (Exception e) {
       throw new ProjectCommonException(
            ResponseCode.courseNotFound.getErrorCode(),
