@@ -158,9 +158,9 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
     // Check if the course has accessRules enabled
-    String accessRulesEnabled = (String) courseDetails.get(JsonKey.ACCESS_RULES_ENABLED);
-    if (StringUtils.isBlank(accessRulesEnabled) || !Boolean.parseBoolean(accessRulesEnabled)) {
-      // If accessRulesEnabled is not present or false, it means access rules are not enabled for the course
+    Boolean accessSettingsEnabled = (Boolean) courseDetails.get(JsonKey.ACCESS_SETTINGS_ENABLED);
+    if (accessSettingsEnabled == null || !accessSettingsEnabled) {
+      // If accessSettingsEnabled is not present or false, it means access rules are not enabled for the course
       return;
     }
 

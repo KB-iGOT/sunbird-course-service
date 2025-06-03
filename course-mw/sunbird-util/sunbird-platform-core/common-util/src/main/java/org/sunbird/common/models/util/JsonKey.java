@@ -1213,7 +1213,7 @@ public final class JsonKey {
   public static final String QUESTION_SET_MIME_TYPE = "application/vnd.sunbird.questionset";
   public static final String CONTENT_TTL = "content_ttl";
   public static final String USER_INFO_DB = "userInfo_db";
-  public static final String ACCESS_RULES_ENABLED = "accessRulesEnabled";
+  public static final String ACCESS_SETTINGS_ENABLED = "accessSettingsEnabled";
   public static final String ACCESS_RULES = "accessRules";
   public static final String BASIC = "basic";
   public static final String COLON = ":";
