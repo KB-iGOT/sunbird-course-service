@@ -35,16 +35,18 @@ public class RuleEngineValidator {
         return instance;
     }
 
-    public boolean evaluateRules(Map<String, String> userAttributes, List<UserGroup> rules) {
+    public String evaluateRules(Map<String, String> userAttributes, List<UserGroup> rules) {
+        String errMsg = "";
         for (UserGroup rule : rules) {
             for (UserGroupCriteria criteria : rule.getUserGroupCriteriaList()) {
                 if (!criteria.evaluate(userAttributes)) {
+                    errMsg = String.format("User does not meet '%s' criteria.", criteria.getCriteriaKey());
                     logger.info(null, "Rule failed for user: " + userAttributes.get(JsonKey.USER_ID) +
-                                " with criteria: " + criteria.getCriteriaKey() + " for rule: " + rule.getRuleId());
-                    return false;
+                                " with criteria: " + criteria.getCriteriaKey() + " for rule: " + rule.getUserGroupId());
+                    return errMsg;
                 }
             }
         }
-        return true;
+        return errMsg;
     }
 }

@@ -1222,6 +1222,8 @@ public final class JsonKey {
   public static final String PROFILE_STATUS = "profileStatus";
   public static final String PROFESSIONAL_DETAILS = "professionalDetails";
   public static final String DESIGNATION = "designation";
+  public static final String CONTEXT_DATA = "contextData";
+  public static final String ACCESS_CONTROL = "accessControl";
 
   private JsonKey() {}
 }

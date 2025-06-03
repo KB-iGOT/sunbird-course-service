@@ -477,7 +477,7 @@ public interface ResponseMessage {
     String USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH = "User has already enrolled this course with different batch.";
     String COURSE_NOT_FOUND = "Course not found for the given course id.";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "Access rules are enabled for the course but no access rules found.";
-    String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible for enrollment in this course.";
+    String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible to enrol.";
   }
 
   interface Key {

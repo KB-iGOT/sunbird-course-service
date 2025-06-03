@@ -8,6 +8,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.LoggerUtil;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.accesssettings.model.AccessControl;
@@ -18,7 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.sunbird.common.responsecode.ResponseCode;
 
 public class AccessSettingsDaoImpl {
-
+    private LoggerUtil logger = new LoggerUtil(AccessSettingsDaoImpl.class);
     private static CassandraOperation cassandraOperation = ServiceFactory.getInstance();
     private static final String KEYSPACE_NAME = Util.dbInfoMap.get(JsonKey.ACCESS_SETTINGS_DB).getKeySpace();
     private static final String TABLE_NAME = Util.dbInfoMap.get(JsonKey.ACCESS_SETTINGS_DB).getTableName();
@@ -46,12 +47,22 @@ public class AccessSettingsDaoImpl {
         primaryKey.put(JsonKey.CONTEXT_ID, courseId);
         Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, TABLE_NAME,
                 primaryKey, null);
-        if (response != null && response.getResponseCode() == ResponseCode.OK) {
-            List<Map<String, Object>> accessSettingsList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-            if (CollectionUtils.isNotEmpty(accessSettingsList)) {
-                // Deserialize accessControl JSON to AccessControl object
-                return objectMapper.convertValue(accessSettingsList.get(0), AccessControl.class);
+        try {
+            if (response != null && response.getResponseCode() == ResponseCode.OK) {
+                List<Map<String, Object>> accessSettingsList = (List<Map<String, Object>>) response
+                        .get(JsonKey.RESPONSE);
+                if (CollectionUtils.isNotEmpty(accessSettingsList)) {
+                    Map<String, Object> dbRecord = accessSettingsList.get(0);
+                    Map<String, Object> contextData = objectMapper
+                            .readValue((String) dbRecord.get(JsonKey.CONTEXT_DATA), Map.class);
+                    if (contextData.containsKey(JsonKey.ACCESS_CONTROL)) {
+                        // Deserialize accessControl JSON to AccessControl object
+                        return objectMapper.convertValue(contextData.get(JsonKey.ACCESS_CONTROL), AccessControl.class);
+                    }
+                }
             }
+        } catch (Exception e) {
+            logger.error(requestContext, "Failed to read access settings for courseId: " + courseId, e);
         }
         return null;
     }

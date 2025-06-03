@@ -4,33 +4,33 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)  // Ignore any extra attributes in the JSON
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UserGroup {
 
-    @JsonProperty("ruleId")  // Map JSON ruleId to this field
-    private String ruleId;
+    @JsonProperty("userGroupId")
+    private String userGroupId;
 
-    @JsonProperty("ruleName")  // Map JSON ruleName to this field
-    private String ruleName;
+    @JsonProperty("userGroupName")
+    private String userGroupName;
 
-    @JsonProperty("userGroupCriteriaList")  // Map JSON userGroupCriteriaList to this field
+    @JsonProperty("userGroupCriteriaList")
     private List<UserGroupCriteria> userGroupCriteriaList;
 
     // Getters and setters
-    public String getRuleId() {
-        return ruleId;
+    public String getUserGroupId() {
+        return userGroupId;
     }
 
-    public void setRuleId(String ruleId) {
-        this.ruleId = ruleId;
+    public void setUserGroupId(String userGroupId) {
+        this.userGroupId = userGroupId;
     }
 
-    public String getRuleName() {
-        return ruleName;
+    public String getUserGroupName() {
+        return userGroupName;
     }
 
-    public void setRuleName(String ruleName) {
-        this.ruleName = ruleName;
+    public void setUserGroupName(String userGroupName) {
+        this.userGroupName = userGroupName;
     }
 
     public List<UserGroupCriteria> getUserGroupCriteriaList() {

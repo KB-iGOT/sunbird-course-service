@@ -19,7 +19,7 @@ import org.sunbird.learner.util.ContentCacheHandlerV2;
 import org.sunbird.userorg.UserOrgServiceImpl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.collections4.MapUtils;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
@@ -194,11 +194,11 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
     
     // If accessRules are enabled, check if the user has access to the course
-    boolean retValue = RuleEngineValidator.getInstance().evaluateRules(getUserAttributes(userProfile), accessControl.getUserGroups());
-    if (!retValue) {
+    String errMsg = RuleEngineValidator.getInstance().evaluateRules(getUserAttributes(userProfile), accessControl.getUserGroups());
+    if (StringUtils.isNotBlank(errMsg)) {
       throw new ProjectCommonException(
           ResponseCode.userNotEligibleForEnrollment.getErrorCode(),
-          ResponseCode.userNotEligibleForEnrollment.getErrorMessage(),
+          ResponseCode.userNotEligibleForEnrollment.getErrorMessage() + " " + errMsg,
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
