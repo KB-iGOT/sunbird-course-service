@@ -1,6 +1,6 @@
 package org.sunbird.learner.actors.accesssettings.model;
 
-import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -10,14 +10,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class UserGroupCriteria {
     @JsonProperty("criteriaKey")
     private String criteriaKey;
-    
+
     @JsonProperty("criteriaValue")
-    private List<String> criteriaValue;
+    private Set<String> criteriaValue;
 
     public UserGroupCriteria() {
     }
 
-    public UserGroupCriteria(String criteriaKey, List<String> criteriaValue) {
+    public UserGroupCriteria(String criteriaKey, Set<String> criteriaValue) {
         this.criteriaKey = criteriaKey;
         this.criteriaValue = criteriaValue;
     }
@@ -38,11 +38,11 @@ public class UserGroupCriteria {
         this.criteriaKey = criteriaKey;
     }
 
-    public List<String> getCriteriaValue() {
+    public Set<String> getCriteriaValue() {
         return criteriaValue;
     }
 
-    public void setCriteriaValue(List<String> criteriaValue) {
+    public void setCriteriaValue(Set<String> criteriaValue) {
         this.criteriaValue = criteriaValue;
     }
 }
