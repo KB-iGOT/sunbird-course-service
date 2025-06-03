@@ -441,14 +441,17 @@ public final class ContentUtil {
       if (allHeaders != null && allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
         headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
-      StringJoiner apiFields = new StringJoiner(",");
-      for (String item : fields) {
-        apiFields.add(item);
-      }
+      
       String baseContentReadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/"
           + collectionId;
-      if (org.apache.commons.lang.StringUtils.isNotBlank(apiFields.toString())) {
-        baseContentReadUrl = baseContentReadUrl + "?fields=" + apiFields;
+      if (CollectionUtils.isNotEmpty(fields)) {
+        StringJoiner apiFields = new StringJoiner(",");
+        for (String item : fields) {
+          apiFields.add(item);
+        }
+        if (org.apache.commons.lang.StringUtils.isNotBlank(apiFields.toString())) {
+          baseContentReadUrl = baseContentReadUrl + "?fields=" + apiFields;
+        }
       }
       String response = HttpUtil.sendGetRequest(baseContentReadUrl, headers);
       if (response != null && !response.isEmpty()) {
