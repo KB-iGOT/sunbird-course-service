@@ -35,18 +35,25 @@ public class RuleEngineValidator {
         return instance;
     }
 
-    public String evaluateRules(Map<String, String> userAttributes, List<UserGroup> rules) {
-        String errMsg = "";
+    public boolean evaluateRules(Map<String, String> userAttributes, List<UserGroup> rules) {
+        boolean isCourseAllowed = false;
         for (UserGroup rule : rules) {
+            // let's treat that 
+            boolean isRuleSuccess = true;
             for (UserGroupCriteria criteria : rule.getUserGroupCriteriaList()) {
                 if (!criteria.evaluate(userAttributes)) {
-                    errMsg = String.format("User does not meet '%s' criteria.", criteria.getCriteriaKey());
-                    logger.info(null, "Rule failed for user: " + userAttributes.get(JsonKey.USER_ID) +
-                                " with criteria: " + criteria.getCriteriaKey() + " for rule: " + rule.getUserGroupId());
-                    return errMsg;
+                    // User is not passed this criteria, skip this and continue to next userGroup rule.
+                    isRuleSuccess = false;
+                    break;
                 }
             }
+            if (isRuleSuccess) {
+                //We found one rule which user has passed all the criteria. Let's allow the user to enrol.
+                isCourseAllowed = true;
+                logger.info(null, String.format("User %s successfully passed the rule using id: %s", userAttributes.get(JsonKey.USER_ID), rule.getUserGroupId()));
+                break;
+            }
         }
-        return errMsg;
+        return isCourseAllowed;
     }
 }

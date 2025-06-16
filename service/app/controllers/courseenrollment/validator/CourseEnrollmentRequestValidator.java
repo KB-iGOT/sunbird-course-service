@@ -194,11 +194,11 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
     
     // If accessRules are enabled, check if the user has access to the course
-    String errMsg = RuleEngineValidator.getInstance().evaluateRules(getUserAttributes(userProfile), accessControl.getUserGroups());
-    if (StringUtils.isNotBlank(errMsg)) {
+    Boolean isCourseAllowed = RuleEngineValidator.getInstance().evaluateRules(getUserAttributes(userProfile), accessControl.getUserGroups());
+    if (!isCourseAllowed) {
       throw new ProjectCommonException(
           ResponseCode.userNotEligibleForEnrollment.getErrorCode(),
-          ResponseCode.userNotEligibleForEnrollment.getErrorMessage() + " " + errMsg,
+          ResponseCode.userNotEligibleForEnrollment.getErrorMessage(),
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
