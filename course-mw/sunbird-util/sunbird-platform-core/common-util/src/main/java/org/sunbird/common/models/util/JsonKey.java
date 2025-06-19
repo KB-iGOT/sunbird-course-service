@@ -1224,6 +1224,10 @@ public final class JsonKey {
   public static final String DESIGNATION = "designation";
   public static final String CONTEXT_DATA = "contextData";
   public static final String ACCESS_CONTROL = "accessControl";
+  public static final String CADRE_NAME = "cadreName";
+  public static final String CIVIL_SERVICE_NAME = "civilServiceName";
+  public static final String CADRE_BATCH = "cadreBatch";
+  public static final String CADRE_DETAILS = "cadreDetails";
 
   private JsonKey() {}
 }
