@@ -245,11 +245,11 @@ public class UserOrgServiceImpl implements UserOrgService {
   }
 
   public Map<String, Object> getUserDetailsById(String id, RequestContext requestContext) throws Exception {
-    Map<String, Object> user = getUserByIdFromRedis(id);
-    if (MapUtils.isEmpty(user)) {
-      user = getUserByIdFromCassandra(id, requestContext);
-    }
-    return user;
+    //Map<String, Object> user = getUserByIdFromRedis(id);
+    //if (MapUtils.isEmpty(user)) {
+      return getUserByIdFromCassandra(id, requestContext);
+    //}
+    //return user;
   }
 
   private Map<String, Object> getUserByIdFromRedis(String id) throws Exception  {
