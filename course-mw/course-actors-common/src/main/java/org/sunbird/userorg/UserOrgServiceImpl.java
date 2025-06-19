@@ -1,5 +1,6 @@
 package org.sunbird.userorg;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
@@ -256,7 +257,8 @@ public class UserOrgServiceImpl implements UserOrgService {
     Map<String, Object> userMap = null;
     if (StringUtils.isNotBlank(redisValue)) {
       try {
-        return new ObjectMapper().readValue(redisValue, Map.class);
+        return new ObjectMapper().readValue(redisValue, new TypeReference<Map<String, Object>>() {
+        });
       } catch (Exception e) {
         logger.error(null, "Error parsing user data from Redis for id: " + id, e);
         throwServerErrorException(ResponseCode.SERVER_ERROR, "Error parsing user data from Redis");
