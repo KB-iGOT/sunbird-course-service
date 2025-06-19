@@ -880,6 +880,10 @@ public enum ResponseCode {
   userNotEligibleForEnrollment(
       ResponseMessage.Key.USER_NOT_ELIGIBLE_FOR_ENROLLMENT,
       ResponseMessage.Message.USER_NOT_ELIGIBLE_FOR_ENROLLMENT),
+  invalidCompletionPercentage(
+          ResponseMessage.Key.INVALID_COMPLETION_PERCENTAGE_ERROR,
+          ResponseMessage.Message.INVALID_COMPLETION_PERCENTAGE_ERROR),
+
   OK(200),
   CLIENT_ERROR(400),
   SERVER_ERROR(500),
