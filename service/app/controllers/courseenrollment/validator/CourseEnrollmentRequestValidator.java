@@ -20,6 +20,7 @@ import org.sunbird.userorg.UserOrgServiceImpl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.collections4.MapUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
@@ -176,10 +177,11 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     // Get the userId from the request
     String userId = (String) enrolmentCriteriaRequestDto.getRequest().get(JsonKey.USER_ID);
     Map<String, Object> userProfile = null;
-    
+    Map<String, String> userProfileAttributes = null;
     try {
       // Fetch user profile details using UserOrgServiceImpl
       userProfile = (Map<String, Object>) UserOrgServiceImpl.getInstance().getUserDetailsById(userId, null);
+      userProfileAttributes = getUserAttributes(userProfile);
     } catch (Exception e) {
       throw new ProjectCommonException(
           ResponseCode.userNotFound.getErrorCode(),
@@ -194,7 +196,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
     
     // If accessRules are enabled, check if the user has access to the course
-    Boolean isCourseAllowed = RuleEngineValidator.getInstance().evaluateRules(getUserAttributes(userProfile), accessControl.getUserGroups());
+    Boolean isCourseAllowed = RuleEngineValidator.getInstance().evaluateRules(userProfileAttributes, accessControl.getUserGroups());
     if (!isCourseAllowed) {
       throw new ProjectCommonException(
           ResponseCode.userNotEligibleForEnrollment.getErrorCode(),
@@ -208,31 +210,39 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     userAttributes.put(JsonKey.USER_ID, (String) userProfileMap.get(JsonKey.ID));
     userAttributes.put(JsonKey.ROOT_ORG_ID, (String) userProfileMap.get(JsonKey.ROOT_ORG_ID));
     String designation = null, userGroup = null, profileStatus = null;
-    Map<String, Object> profileDetails = (Map<String, Object>) userProfileMap.get(JsonKey.PROFILE_DETAILS);
-    if (MapUtils.isNotEmpty(profileDetails)) {
-      profileStatus = (String) profileDetails.get(JsonKey.PROFILE_STATUS);
-
-      Map<String, Object> professionalDetails = (profileDetails.containsKey(JsonKey.PROFESSIONAL_DETAILS)) ? 
-          ((List<Map<String, Object>>) profileDetails.get(JsonKey.PROFESSIONAL_DETAILS)).get(0) : null;
-      if (MapUtils.isNotEmpty(professionalDetails)) {
-        designation = (String) professionalDetails.get(JsonKey.DESIGNATION);
-        userGroup = (String) professionalDetails.get(JsonKey.GROUP);
-      }
-      if (profileDetails.containsKey(JsonKey.CADRE_DETAILS)) {
-        Map<String, Object> cadreDetails = (Map<String, Object>) profileDetails.get(JsonKey.CADRE_DETAILS);
-        if (MapUtils.isNotEmpty(cadreDetails)) {
-          userAttributes.put(JsonKey.CADRE_NAME, (String) cadreDetails.get(JsonKey.CADRE_NAME));
-          userAttributes.put(JsonKey.CIVIL_SERVICE_NAME, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
-          if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
-            userAttributes.put(JsonKey.CADRE_BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
+    String profileDetailsStr = (String) userProfileMap.get(JsonKey.PROFILE_DETAILS);
+    try {
+      if (StringUtils.isNotBlank(profileDetailsStr)) {
+        Map<String, Object> profileDetails = new ObjectMapper().readValue(profileDetailsStr, new TypeReference<Map<String, Object>>() {
+        });
+        if (MapUtils.isNotEmpty(profileDetails)) {
+          userAttributes.put(JsonKey.PROFILE_STATUS, (String) profileDetails.get(JsonKey.PROFILE_STATUS));
+    
+          Map<String, Object> professionalDetails = (profileDetails.containsKey(JsonKey.PROFESSIONAL_DETAILS)) ? 
+              ((List<Map<String, Object>>) profileDetails.get(JsonKey.PROFESSIONAL_DETAILS)).get(0) : null;
+          if (MapUtils.isNotEmpty(professionalDetails)) {
+            userAttributes.put(JsonKey.DESIGNATION, (String) professionalDetails.get(JsonKey.DESIGNATION));
+            userAttributes.put(JsonKey.GROUP,  (String) professionalDetails.get(JsonKey.GROUP));
+          }
+          if (profileDetails.containsKey(JsonKey.CADRE_DETAILS)) {
+            Map<String, Object> cadreDetails = (Map<String, Object>) profileDetails.get(JsonKey.CADRE_DETAILS);
+            if (MapUtils.isNotEmpty(cadreDetails)) {
+              userAttributes.put(JsonKey.CADRE_NAME, (String) cadreDetails.get(JsonKey.CADRE_NAME));
+              userAttributes.put(JsonKey.CIVIL_SERVICE_NAME, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
+              if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
+                userAttributes.put(JsonKey.CADRE_BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
+              }
+            }
           }
         }
       }
+    } catch (Exception e) {
+      throw new ProjectCommonException(
+          ResponseCode.userNotFound.getErrorCode(),
+          ResponseCode.userNotFound.getErrorMessage(),
+          ResponseCode.CLIENT_ERROR.getResponseCode());
     }
-    
-    userAttributes.put(JsonKey.DESIGNATION, designation);
-    userAttributes.put(JsonKey.GROUP, userGroup);
-    userAttributes.put(JsonKey.PROFILE_STATUS, profileStatus);
+
     return userAttributes;
   }
 }
