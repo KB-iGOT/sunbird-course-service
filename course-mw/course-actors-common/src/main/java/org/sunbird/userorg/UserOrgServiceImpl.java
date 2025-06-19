@@ -283,6 +283,6 @@ public class UserOrgServiceImpl implements UserOrgService {
   }
 
   private String getUserBasicProfileRedisKey(String userId) {
-    return JsonKey.USER + JsonKey.COLON + JsonKey.BASIC + JsonKey.COLON + userId;
+    return JsonKey.USER + JsonKey.COLON + JsonKey.BASIC_PROFILE + JsonKey.COLON + userId;
   }
 }
