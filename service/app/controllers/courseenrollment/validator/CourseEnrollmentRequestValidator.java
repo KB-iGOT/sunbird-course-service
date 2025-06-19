@@ -218,17 +218,18 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
         designation = (String) professionalDetails.get(JsonKey.DESIGNATION);
         userGroup = (String) professionalDetails.get(JsonKey.GROUP);
       }
-    }
-    if (profileDetails.containsKey(JsonKey.CADRE_DETAILS)) {
-      Map<String, Object> cadreDetails = (Map<String, Object>) profileDetails.get(JsonKey.CADRE_DETAILS);
-      if (MapUtils.isNotEmpty(cadreDetails)) {
-        userAttributes.put(JsonKey.CADRE_NAME, (String) cadreDetails.get(JsonKey.CADRE_NAME));
-        userAttributes.put(JsonKey.CIVIL_SERVICE_NAME, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
-        if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
-          userAttributes.put(JsonKey.CADRE_BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
+      if (profileDetails.containsKey(JsonKey.CADRE_DETAILS)) {
+        Map<String, Object> cadreDetails = (Map<String, Object>) profileDetails.get(JsonKey.CADRE_DETAILS);
+        if (MapUtils.isNotEmpty(cadreDetails)) {
+          userAttributes.put(JsonKey.CADRE_NAME, (String) cadreDetails.get(JsonKey.CADRE_NAME));
+          userAttributes.put(JsonKey.CIVIL_SERVICE_NAME, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
+          if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
+            userAttributes.put(JsonKey.CADRE_BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
+          }
         }
       }
     }
+    
     userAttributes.put(JsonKey.DESIGNATION, designation);
     userAttributes.put(JsonKey.GROUP, userGroup);
     userAttributes.put(JsonKey.PROFILE_STATUS, profileStatus);
