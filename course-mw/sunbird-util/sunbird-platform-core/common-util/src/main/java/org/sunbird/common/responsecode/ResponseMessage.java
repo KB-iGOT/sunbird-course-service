@@ -478,6 +478,7 @@ public interface ResponseMessage {
     String COURSE_NOT_FOUND = "Course not found for the given course id.";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "Access rules are enabled for the course but no access rules found.";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible to enrol into this course.";
+    String INVALID_COMPLETION_PERCENTAGE_ERROR = "Invalid completion percentage, completion percentage should not be greater than 100.";
   }
 
   interface Key {
@@ -885,5 +886,6 @@ public interface ResponseMessage {
     String COURSE_NOT_FOUND = "COURSE_NOT_FOUND";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "ACCESS_RULES_ENABLED_BUT_NOT_FOUND";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "USER_NOT_ELIGIBLE_FOR_ENROLLMENT";
+    String INVALID_COMPLETION_PERCENTAGE_ERROR = "INVALID_COMPLETION_PERCENTAGE_ERROR";
   }
 }

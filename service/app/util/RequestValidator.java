@@ -1065,6 +1065,17 @@ public final class RequestValidator {
                     ResponseCode.contentStatusRequired.getErrorMessage(),
                     ERROR_CODE);
           }
+          Object completionObj = map.get(JsonKey.COMPLETION_PERCENTAGE);
+          Double completionPercentage = (completionObj instanceof Number)
+                  ? ((Number) completionObj).doubleValue()
+                  : null;
+
+          if (completionPercentage == null || completionPercentage > 100.0) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidCompletionPercentage.getErrorCode(),
+                    ResponseCode.invalidCompletionPercentage.getErrorMessage(),
+                    ERROR_CODE);
+          }
 
         } else {
           throw new ProjectCommonException(
