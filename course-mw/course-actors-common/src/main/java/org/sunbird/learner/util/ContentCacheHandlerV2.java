@@ -43,7 +43,7 @@ public class ContentCacheHandlerV2 {
             Map<String, Object> content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
             });
             contentMap.put(id, new CachedContent(content));
-            return (Map<String, Object>) contentMap.get(id);
+            return content;
         } else {
             logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id);
             Map<String, Object> content = ContentUtil.getContentReadV3(id, null, null);
