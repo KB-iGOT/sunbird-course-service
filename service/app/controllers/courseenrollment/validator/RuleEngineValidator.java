@@ -61,7 +61,7 @@ public class RuleEngineValidator {
             if (isRuleSuccess) {
                 //We found one rule which user has passed all the criteria. Let's allow the user to enrol.
                 isCourseAllowed = true;
-                logger.info(null, String.format("User %s successfully passed the rule using id: %s", userAttributes.get(JsonKey.USER_ID), rule.getUserGroupId()));
+                logger.info(null, String.format("User %s successfully passed the rule using id: %s", userAttributes.get(JsonKey.USER), rule.getUserGroupId()));
                 break;
             }
             logger.info(null, "isRuleSuccess: " + isRuleSuccess + "is course allowed: " + isCourseAllowed);
