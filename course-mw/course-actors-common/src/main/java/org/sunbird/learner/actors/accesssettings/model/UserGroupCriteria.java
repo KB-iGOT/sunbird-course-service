@@ -2,6 +2,9 @@ package org.sunbird.learner.actors.accesssettings.model;
 
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -28,7 +31,7 @@ public class UserGroupCriteria {
 
     public boolean evaluate(Map<String, String> userAttributes) {
         String userValue = userAttributes.get(criteriaKey);
-        if (userValue == null) {
+        if (StringUtils.isBlank(userValue)) {
             return false;
         }
         return criteriaValue.contains(userValue);
