@@ -14,7 +14,7 @@ import org.sunbird.common.util.JsonUtil
 import org.sunbird.helper.ServiceFactory
 import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.constants.{CourseJsonKey, InstructionEvent}
-import org.sunbird.learner.util.{ContentUtil, Util}
+import org.sunbird.learner.util.{ContentCacheHandlerV2, ContentUtil, Util}
 
 import java.time.{ZoneId, ZonedDateTime}
 import java.util
@@ -182,7 +182,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                             })
                             // First push the event to kafka and then update cassandra user_content_consumption table
                             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-                            val contentInfoMap = ContentUtil.getContentReadV3(courseId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+                            val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
                             val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
                             pushInstructionEvent(requestContext, userId, batchId, courseId, contents.asJava, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
                             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, contents)
@@ -499,7 +499,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                         val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
                         val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
                         val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-                        val contentInfoMap = ContentUtil.getContentReadV3(courseId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+                        val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
                         val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
                         pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
                         cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)

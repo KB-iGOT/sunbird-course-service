@@ -207,8 +207,8 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
   private Map<String, String> getUserAttributes(Map<String, Object> userProfileMap) {
     Map<String, String> userAttributes = new HashMap<>();
-    userAttributes.put(JsonKey.USER_ID, (String) userProfileMap.get(JsonKey.ID));
-    userAttributes.put(JsonKey.ROOT_ORG_ID, (String) userProfileMap.get(JsonKey.ROOT_ORG_ID));
+    userAttributes.put(JsonKey.USER, (String) userProfileMap.get(JsonKey.ID));
+    userAttributes.put(JsonKey.ROOT_ORG_ID.toLowerCase(), (String) userProfileMap.get(JsonKey.ROOT_ORG_ID));
     String designation = null, userGroup = null, profileStatus = null;
     String profileDetailsStr = (String) userProfileMap.get(JsonKey.PROFILE_DETAILS);
     try {
@@ -216,7 +216,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
         Map<String, Object> profileDetails = new ObjectMapper().readValue(profileDetailsStr, new TypeReference<Map<String, Object>>() {
         });
         if (MapUtils.isNotEmpty(profileDetails)) {
-          userAttributes.put(JsonKey.PROFILE_STATUS, (String) profileDetails.get(JsonKey.PROFILE_STATUS));
+          userAttributes.put(JsonKey.PROFILE_STATUS.toLowerCase(), (String) profileDetails.get(JsonKey.PROFILE_STATUS));
     
           Map<String, Object> professionalDetails = (profileDetails.containsKey(JsonKey.PROFESSIONAL_DETAILS)) ? 
               ((List<Map<String, Object>>) profileDetails.get(JsonKey.PROFESSIONAL_DETAILS)).get(0) : null;
@@ -227,10 +227,10 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
           if (profileDetails.containsKey(JsonKey.CADRE_DETAILS)) {
             Map<String, Object> cadreDetails = (Map<String, Object>) profileDetails.get(JsonKey.CADRE_DETAILS);
             if (MapUtils.isNotEmpty(cadreDetails)) {
-              userAttributes.put(JsonKey.CADRE_NAME, (String) cadreDetails.get(JsonKey.CADRE_NAME));
-              userAttributes.put(JsonKey.CIVIL_SERVICE_NAME, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
+              userAttributes.put(JsonKey.CADRE, (String) cadreDetails.get(JsonKey.CADRE_NAME));
+              userAttributes.put(JsonKey.SERVICE, (String) cadreDetails.get(JsonKey.CIVIL_SERVICE_NAME));
               if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
-                userAttributes.put(JsonKey.CADRE_BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
+                userAttributes.put(JsonKey.BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
               }
             }
           }

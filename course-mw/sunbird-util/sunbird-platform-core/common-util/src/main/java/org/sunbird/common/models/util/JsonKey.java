@@ -1229,6 +1229,7 @@ public final class JsonKey {
   public static final String CADRE_BATCH = "cadreBatch";
   public static final String CADRE_DETAILS = "cadreDetails";
   public static final String COMPLETION_PERCENTAGE="completionPercentage";
+  public static final String CADRE = "cadre";
 
   private JsonKey() {}
 }

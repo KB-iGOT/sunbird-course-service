@@ -667,7 +667,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val contentData: util.Map[String, AnyRef] = if (StringUtils.isNotBlank(responseString)) {
             JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
         } else {
-            ContentUtil.getContentReadV3(programId, fieldList, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+            ContentCacheHandlerV2.getInstance().getContent(programId)
         }
         contentData
     }

@@ -23,7 +23,7 @@ public class UserGroupCriteria {
     }
 
     public boolean evaluate(Map<String, String> userAttributes) {
-        String userValue = userAttributes.get(criteriaKey);
+        String userValue = userAttributes.get(criteriaKey.toLowerCase());
         if (userValue == null) {
             return false;
         }
