@@ -34,7 +34,7 @@ public class UserGroupCriteria {
         if (StringUtils.isBlank(userValue)) {
             return false;
         }
-        return criteriaValue.contains(userValue);
+        return criteriaValue.contains(userValue.toLowerCase());
     }
 
     public String getCriteriaKey() {

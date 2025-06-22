@@ -51,7 +51,8 @@ public class RuleEngineValidator {
             boolean isRuleSuccess = true;
             logger.info(null, "Validating rule: " + rule.getUserGroupId());
             for (UserGroupCriteria criteria : rule.getUserGroupCriteriaList()) {
-                logger.info(null, "Validating criteriaKey: " + criteria.getCriteriaKey() + ", with Value: " + criteria.getCriteriaValue());
+                logger.info(null, "Validating criteriaKey: " + criteria.getCriteriaKey() + ", with Value: " + criteria.getCriteriaValue() + 
+                    ", against: " + userAttributes.getValue(criteria.getCriteriaKey()));
                 if (!criteria.evaluate(userAttributes)) {
                     // User is not passed this criteria, skip this and continue to next userGroup rule.
                     isRuleSuccess = false;
