@@ -28,6 +28,8 @@ public enum ResponseCode {
       ResponseMessage.Message.CONTENT_ID_INVALID_ERROR),
   courseIdRequired(
       ResponseMessage.Key.COURSE_ID_MISSING_ERROR, ResponseMessage.Message.COURSE_ID_MISSING_ERROR),
+  programIdRequired(
+      ResponseMessage.Key.PROGRAM_ID_MISSING_ERROR, ResponseMessage.Message.PROGRAM_ID_MISSING_ERROR),
   contentIdRequired(
       ResponseMessage.Key.CONTENT_ID_MISSING_ERROR,
       ResponseMessage.Message.CONTENT_ID_MISSING_ERROR),

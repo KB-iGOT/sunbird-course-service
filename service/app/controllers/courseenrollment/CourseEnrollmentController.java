@@ -119,7 +119,7 @@ public class CourseEnrollmentController extends BaseController {
           logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved, UserId : "+  userId +", courseId : "+courseId + ", batchId:"+batchId);
           req.getRequest().put(JsonKey.USER_ID, userId);
           validator.validateEnrollCourse(req);
-          validator.validateEnrolmentCriteria(req);
+          validator.validateEnrolmentCriteria(req, true);
           return null;
         },
         getAllRequestHeaders(httpRequest),
@@ -294,6 +294,7 @@ public class CourseEnrollmentController extends BaseController {
                     req.getRequest().put(JsonKey.IS_ADMIN_API, false);
                     validator.validateRequestedBy(userId);
                     validator.validateEnrollProgram(req);
+                    validator.validateEnrolmentCriteria(req, false);
                     req.getRequest().put(JsonKey.USER_ID, userId);
                     req.getContext().put("verifyBatchType", batchType);
                     return null;

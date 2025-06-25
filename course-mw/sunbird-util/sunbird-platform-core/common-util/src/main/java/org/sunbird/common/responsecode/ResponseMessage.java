@@ -21,6 +21,7 @@ public interface ResponseMessage {
     String CONTENT_ID_INVALID_ERROR = "Please provide a valid content id.";
     String CONTENT_ID_MISSING_ERROR = "Please provide content id.";
     String COURSE_ID_MISSING_ERROR = "Please provide course id.";
+    String PROGRAM_ID_MISSING_ERROR = "Please provide program id.";
     String API_KEY_MISSING_ERROR = "APi key is mandatory.";
     String API_KEY_INVALID_ERROR = "APi key is invalid.";
     String INTERNAL_ERROR = "Process failed,please try again later.";
@@ -493,6 +494,7 @@ public interface ResponseMessage {
     String CONTENT_ID_INVALID_ERROR = "CONTENT_ID_INVALID_ERROR";
     String CONTENT_ID_MISSING_ERROR = "CONTENT_ID_REQUIRED_ERROR";
     String COURSE_ID_MISSING_ERROR = "COURSE_ID_REQUIRED_ERROR";
+    String PROGRAM_ID_MISSING_ERROR = "PROGRAM_ID_REQUIRED_ERROR";
     String API_KEY_MISSING_ERROR = "API_KEY_REQUIRED_ERROR";
     String API_KEY_INVALID_ERROR = "API_KEY_INVALID_ERROR";
     String INTERNAL_ERROR = "INTERNAL_ERROR";

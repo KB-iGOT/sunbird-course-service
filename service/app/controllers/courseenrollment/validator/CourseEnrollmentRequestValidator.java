@@ -139,9 +139,27 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
             JsonKey.COURSE_ID);
   }
 
-  public void validateEnrolmentCriteria(Request enrolmentCriteriaRequestDto) {
+  public void validateEnrolmentCriteria(Request requestDto, boolean isCourse) {
     // Get the courseId from the request
-    String courseId = (String) enrolmentCriteriaRequestDto.getRequest().get(JsonKey.COURSE_ID);
+    String courseId = "";
+    if (isCourse) {
+      courseId = (String) requestDto.getRequest().get(JsonKey.COURSE_ID);
+      if (StringUtils.isBlank(courseId)) {
+        throw new ProjectCommonException(
+            ResponseCode.courseIdRequired.getErrorCode(),
+            ResponseCode.courseIdRequired.getErrorMessage(),
+            ResponseCode.CLIENT_ERROR.getResponseCode());
+      }
+    } else {
+      courseId = (String) requestDto.getRequest().get(JsonKey.PROGRAM_ID);
+      if (StringUtils.isBlank(courseId)) {
+        throw new ProjectCommonException(
+            ResponseCode.programIdRequired.getErrorCode(),
+            ResponseCode.programIdRequired.getErrorMessage(),
+            ResponseCode.CLIENT_ERROR.getResponseCode());
+      }
+    }
+    
     // Get the course details from ContentCahceHandlerV2
     Map<String, Object> courseDetails = null;
     try {
@@ -166,7 +184,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
 
     // Parse the accessRules from the course details
-    AccessControl accessControl = AccessSettingsDaoImpl.getInstance().readAccessSettings(enrolmentCriteriaRequestDto.getRequestContext(), courseId);
+    AccessControl accessControl = AccessSettingsDaoImpl.getInstance().readAccessSettings(requestDto.getRequestContext(), courseId);
     if (accessControl == null) {
       throw new ProjectCommonException(
           ResponseCode.accessRulesEnabledButNotFound.getErrorCode(),
@@ -175,7 +193,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
 
     // Get the userId from the request
-    String userId = (String) enrolmentCriteriaRequestDto.getRequest().get(JsonKey.USER_ID);
+    String userId = (String) requestDto.getRequest().get(JsonKey.USER_ID);
     Map<String, Object> userProfile = null;
     Map<String, String> userProfileAttributes = null;
     try {
