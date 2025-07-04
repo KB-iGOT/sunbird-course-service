@@ -26,10 +26,12 @@ public enum ResponseCode {
   invalidContentId(
       ResponseMessage.Key.CONTENT_ID_INVALID_ERROR,
       ResponseMessage.Message.CONTENT_ID_INVALID_ERROR),
-  courseIdRequired(
-      ResponseMessage.Key.COURSE_ID_MISSING_ERROR, ResponseMessage.Message.COURSE_ID_MISSING_ERROR),
+    courseIdRequired(
+        ResponseMessage.Key.COURSE_ID_MISSING_ERROR, ResponseMessage.Message.COURSE_ID_MISSING_ERROR),
   programIdRequired(
       ResponseMessage.Key.PROGRAM_ID_MISSING_ERROR, ResponseMessage.Message.PROGRAM_ID_MISSING_ERROR),
+  batchIdRequired(
+          ResponseMessage.Key.BATCH_ID_MISSING_ERROR, ResponseMessage.Message.BATCH_ID_MISSING_ERROR),
   contentIdRequired(
       ResponseMessage.Key.CONTENT_ID_MISSING_ERROR,
       ResponseMessage.Message.CONTENT_ID_MISSING_ERROR),
@@ -876,6 +878,7 @@ public enum ResponseCode {
           ResponseMessage.Key.USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH,
           ResponseMessage.Message.USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH),
   courseNotFound(ResponseMessage.Key.COURSE_NOT_FOUND, ResponseMessage.Message.COURSE_NOT_FOUND),
+  BatchNotFound(ResponseMessage.Key.BATCH_NOT_FOUND, ResponseMessage.Message.BATCH_NOT_FOUND),
   accessRulesEnabledButNotFound(
       ResponseMessage.Key.ACCESS_RULES_ENABLED_BUT_NOT_FOUND,
       ResponseMessage.Message.ACCESS_RULES_ENABLED_BUT_NOT_FOUND),
@@ -885,6 +888,9 @@ public enum ResponseCode {
   invalidCompletionPercentage(
           ResponseMessage.Key.INVALID_COMPLETION_PERCENTAGE_ERROR,
           ResponseMessage.Message.INVALID_COMPLETION_PERCENTAGE_ERROR),
+  preEnrolmentResourceNotCompleted(
+          ResponseMessage.Key.PRE_ENROLLMENT_RESOURCE_NOT_COMPLETED,
+          ResponseMessage.Message.PRE_ENROLLMENT_RESOURCE_NOT_COMPLETED),
 
   OK(200),
   CLIENT_ERROR(400),

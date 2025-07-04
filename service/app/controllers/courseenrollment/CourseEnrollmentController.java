@@ -119,7 +119,7 @@ public class CourseEnrollmentController extends BaseController {
           logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved, UserId : "+  userId +", courseId : "+courseId + ", batchId:"+batchId);
           req.getRequest().put(JsonKey.USER_ID, userId);
           validator.validateEnrollCourse(req);
-          validator.validateEnrolmentCriteria(req, true);
+          validator.validateEnrolmentCriteria(req, true, false);
           return null;
         },
         getAllRequestHeaders(httpRequest),
@@ -294,7 +294,7 @@ public class CourseEnrollmentController extends BaseController {
                     req.getRequest().put(JsonKey.IS_ADMIN_API, false);
                     validator.validateRequestedBy(userId);
                     validator.validateEnrollProgram(req);
-                    validator.validateEnrolmentCriteria(req, false);
+                    validator.validateEnrolmentCriteria(req, false, false);
                     req.getRequest().put(JsonKey.USER_ID, userId);
                     req.getContext().put("verifyBatchType", batchType);
                     return null;
@@ -351,6 +351,9 @@ public class CourseEnrollmentController extends BaseController {
                     req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
                     logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved via Blended Program admin enroll, UserId : "+  userId +", courseId : "+courseId+ ", batchId:"+batchId);
                     validator.validateEnrollCourse(req);
+                    //call validateEnrollmentCriteriaMethod validateEnrolmentCriteria
+                    validator.validateEnrolmentCriteria(req, false, false);
+
                     return null;
                 },
                 getAllRequestHeaders(httpRequest),
