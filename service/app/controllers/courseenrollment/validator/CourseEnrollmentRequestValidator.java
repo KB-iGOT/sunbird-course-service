@@ -364,7 +364,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
         Object resultObj = assessmentDetails.getResult().get(JsonKey.RESPONSE);
         if (resultObj instanceof List && !((List<?>) resultObj).isEmpty()) {
           Object statusObj = ((Map<?, ?>) ((List<?>) resultObj).get(0)).get("status");
-          if ("submitted".equalsIgnoreCase(String.valueOf(statusObj))) {
+          if ("SUBMITTED".equalsIgnoreCase(String.valueOf(statusObj))) {
             return true;
           } else {
             throw new ProjectCommonException(
