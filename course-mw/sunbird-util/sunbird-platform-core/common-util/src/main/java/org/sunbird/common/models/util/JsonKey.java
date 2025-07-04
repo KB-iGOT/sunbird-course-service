@@ -1230,6 +1230,9 @@ public final class JsonKey {
   public static final String CADRE_DETAILS = "cadreDetails";
   public static final String COMPLETION_PERCENTAGE="completionPercentage";
   public static final String CADRE = "cadre";
+  public static final String KEYSPACE_SUNBIRD_RESOURCE = "sunbird_resource";
+  public static final String USER_ENTITY_CONSUMPTION = "user_entity_consumption";
+
 
   private JsonKey() {}
 }
