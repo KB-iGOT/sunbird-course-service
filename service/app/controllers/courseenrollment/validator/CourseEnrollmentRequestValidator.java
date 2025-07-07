@@ -7,6 +7,7 @@ import org.sunbird.common.models.util.*;
 import org.sunbird.common.request.BaseRequestValidator;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
+import org.sunbird.common.responsecode.ResponseMessage;
 import org.sunbird.learner.actors.accesssettings.model.AccessControl;
 import org.sunbird.learner.actors.accesssettings.dao.impl.AccessSettingsDaoImpl;
 
@@ -186,9 +187,12 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     // Parse the accessRules from the course details
     AccessControl accessControl = AccessSettingsDaoImpl.getInstance().readAccessSettings(requestDto.getRequestContext(), courseId);
     if (accessControl == null) {
+      String errorMsg = isCourse
+        ? ResponseMessage.Message.ACCESS_RULES_ENABLED_BUT_NOT_FOUND_COURSE
+        : ResponseMessage.Message.ACCESS_RULES_ENABLED_BUT_NOT_FOUND_PROGRAM;
       throw new ProjectCommonException(
           ResponseCode.accessRulesEnabledButNotFound.getErrorCode(),
-          ResponseCode.accessRulesEnabledButNotFound.getErrorMessage(),
+          errorMsg,
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
 
