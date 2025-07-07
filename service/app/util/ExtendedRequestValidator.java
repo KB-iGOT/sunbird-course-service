@@ -1,0 +1,236 @@
+package util;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.sunbird.common.Constants;
+import org.sunbird.common.exception.ProjectCommonException;
+import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.LoggerUtil;
+import org.sunbird.common.models.util.ProjectUtil;
+import org.sunbird.common.request.Request;
+import org.sunbird.common.responsecode.ResponseCode;
+import org.sunbird.learner.util.ContentCacheHandlerV2;
+
+import java.util.*;
+
+public class ExtendedRequestValidator {
+
+    private static final int ERROR_CODE = ResponseCode.CLIENT_ERROR.getResponseCode();
+    public static LoggerUtil logger = new LoggerUtil(RequestValidator.class);
+    private static ObjectMapper mapper = new ObjectMapper();
+
+
+    /**
+     * This method will do content state request data validation. if all mandatory data is coming then
+     * it won't do any thing if any mandatory data is missing then it will throw exception.
+     *
+     * @param contentRequestDto Request
+     */
+    @SuppressWarnings("unchecked")
+    public static void validateUpdateContent(Request contentRequestDto) {
+        List<Map<String, Object>> list =
+                (List<Map<String, Object>>) (contentRequestDto.getRequest().get(JsonKey.CONTENTS));
+        if(CollectionUtils.isNotEmpty(list)) {
+            for (Map<String, Object> map : list) {
+                if (null != map.get(JsonKey.LAST_UPDATED_TIME)) {
+                    boolean bool =
+                            ProjectUtil.isDateValidFormat(
+                                    "yyyy-MM-dd HH:mm:ss:SSSZ", (String) map.get(JsonKey.LAST_UPDATED_TIME));
+                    if (!bool) {
+                        throw new ProjectCommonException(
+                                ResponseCode.dateFormatError.getErrorCode(),
+                                ResponseCode.dateFormatError.getErrorMessage(),
+                                ERROR_CODE);
+                    }
+                }
+                if (null != map.get(JsonKey.LAST_COMPLETED_TIME)) {
+                    boolean bool =
+                            ProjectUtil.isDateValidFormat(
+                                    "yyyy-MM-dd HH:mm:ss:SSSZ", (String) map.get(JsonKey.LAST_COMPLETED_TIME));
+                    if (!bool) {
+                        throw new ProjectCommonException(
+                                ResponseCode.dateFormatError.getErrorCode(),
+                                ResponseCode.dateFormatError.getErrorMessage(),
+                                ERROR_CODE);
+                    }
+                }
+                String contentId = "";
+                if (map.containsKey(JsonKey.CONTENT_ID)) {
+                    if (null == map.get(JsonKey.CONTENT_ID)) {
+                        throw new ProjectCommonException(
+                                ResponseCode.contentIdRequired.getErrorCode(),
+                                ResponseCode.contentIdRequiredError.getErrorMessage(),
+                                ERROR_CODE);
+                    }
+                    contentId = (String) map.get(JsonKey.CONTENT_ID);
+                    if (ProjectUtil.isNull(map.get(JsonKey.STATUS))) {
+                        throw new ProjectCommonException(
+                                ResponseCode.contentStatusRequired.getErrorCode(),
+                                ResponseCode.contentStatusRequired.getErrorMessage(),
+                                ERROR_CODE);
+                    }
+
+                } else {
+                    throw new ProjectCommonException(
+                            ResponseCode.contentIdRequired.getErrorCode(),
+                            ResponseCode.contentIdRequiredError.getErrorMessage(),
+                            ERROR_CODE);
+                }
+                String courseId = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                map.put(JsonKey.COURSE_ID, map.get(courseId));
+                if (StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.courseIdRequired.getErrorCode(),
+                            ResponseCode.courseIdRequiredError.getErrorMessage(),
+                            ERROR_CODE);
+                } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID), contentId)){
+                    throw new ProjectCommonException(
+                            ResponseCode.invalidProgramId.getErrorCode(),
+                            ResponseCode.invalidProgramId.getErrorMessage(),
+                            ERROR_CODE);
+                }
+            }
+        }
+        List<Map<String, Object>> assessmentData =
+                (List<Map<String, Object>>) contentRequestDto.getRequest().get(JsonKey.ASSESSMENT_EVENTS);
+        if (CollectionUtils.isNotEmpty(assessmentData)) {
+            for (Map<String, Object> map : assessmentData) {
+                if (!map.containsKey(JsonKey.ASSESSMENT_TS)) {
+                    throw new ProjectCommonException(
+                            ResponseCode.assessmentAttemptDateRequired.getErrorCode(),
+                            ResponseCode.assessmentAttemptDateRequired.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.COURSE_ID)
+                        || StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.courseIdRequired.getErrorCode(),
+                            ResponseCode.courseIdRequiredError.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.CONTENT_ID)
+                        || StringUtils.isBlank((String) map.get(JsonKey.CONTENT_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.contentIdRequired.getErrorCode(),
+                            ResponseCode.contentIdRequiredError.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.BATCH_ID)
+                        || StringUtils.isBlank((String) map.get(JsonKey.BATCH_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.courseBatchIdRequired.getErrorCode(),
+                            ResponseCode.courseBatchIdRequired.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.USER_ID)
+                        || StringUtils.isBlank((String) map.get(JsonKey.USER_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.userIdRequired.getErrorCode(),
+                            ResponseCode.userIdRequired.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.ATTEMPT_ID)
+                        || StringUtils.isBlank((String) map.get(JsonKey.ATTEMPT_ID))) {
+                    throw new ProjectCommonException(
+                            ResponseCode.attemptIdRequired.getErrorCode(),
+                            ResponseCode.attemptIdRequired.getErrorMessage(),
+                            ERROR_CODE);
+                }
+
+                if (!map.containsKey(JsonKey.EVENTS)) {
+                    throw new ProjectCommonException(
+                            ResponseCode.eventsRequired.getErrorCode(),
+                            ResponseCode.eventsRequired.getErrorMessage(),
+                            ERROR_CODE);
+                }
+            }
+        }
+        // Validation for enrolment sync
+        if(CollectionUtils.isEmpty(list) && CollectionUtils.isEmpty(assessmentData)) {
+            contentRequestDto.getRequest().put(JsonKey.COURSE_ID, contentRequestDto.getOrDefault(JsonKey.COURSE_ID, contentRequestDto.getOrDefault(JsonKey.COLLECTION_ID, "")));
+            if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.COURSE_ID, ""))) {
+                throw new ProjectCommonException(
+                        ResponseCode.courseIdRequired.getErrorCode(),
+                        ResponseCode.courseIdRequiredError.getErrorMessage(),
+                        ERROR_CODE);
+            }
+            if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.BATCH_ID, ""))) {
+                throw new ProjectCommonException(
+                        ResponseCode.courseBatchIdRequired.getErrorCode(),
+                        ResponseCode.courseBatchIdRequired.getErrorMessage(),
+                        ERROR_CODE);
+            }
+
+            if (StringUtils.isBlank((String) contentRequestDto.getOrDefault(JsonKey.USER_ID, ""))) {
+                throw new ProjectCommonException(
+                        ResponseCode.userIdRequired.getErrorCode(),
+                        ResponseCode.userIdRequired.getErrorMessage(),
+                        ERROR_CODE);
+            }
+        }
+    }
+
+    public static Boolean isProgramConsumptionAccepted(String courseId, String contentId) {
+        Boolean isProgram = false;
+        try {
+            Map<String, Object> courseContent = getCourseContent(courseId);
+            String courseCategory = (String) courseContent.get("courseCategory");
+            Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
+            if (StringUtils.isBlank(courseCategory)) {
+                throw new ProjectCommonException(
+                        ResponseCode.invalidCourseCategory.getErrorCode(),
+                        ResponseCode.invalidCourseCategory.getErrorMessage(),
+                        ERROR_CODE);
+            }
+            if (StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course,courseCategory)) {
+                throw new ProjectCommonException(
+                        ResponseCode.invalidCourseCategory.getErrorCode(),
+                        ResponseCode.invalidCourseCategory.getErrorMessage(),
+                        ERROR_CODE);
+            }
+            if (isProgramCategory(courseCategory)) {
+                if (cumulativeTracking == null) {
+                    throw new ProjectCommonException(
+                            ResponseCode.invalidTrackingAttribute.getErrorCode(),
+                            ResponseCode.invalidTrackingAttribute.getErrorMessage(),
+                            ERROR_CODE);
+                } else if (cumulativeTracking) {
+                    Map<String, Object> resourceContent =  getCourseContent(contentId);
+                    String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
+                    if (isCategoryAllowed(contextCategory)) {
+                        isProgram = false;
+                    } else {
+                        isProgram = true;
+                    }
+                    logger.info(null, "ContextCategory is details Id: " + contentId + ", category: " + contextCategory + ", isProgram: " + isProgram);
+                }
+            }
+        } catch (Exception e) {
+            logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
+        }
+        return isProgram;
+    }
+
+    public static Map<String, Object> getCourseContent(String courseId) throws Exception {
+        return ContentCacheHandlerV2.getInstance().getContent(courseId);
+    }
+
+
+    private static boolean isCategoryAllowed(String category) {
+        String categoriesList = ProjectUtil.getConfigValue(JsonKey.ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE);
+        Set<String> allowedCategoryList = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+        return allowedCategoryList.contains(category);
+    }
+
+    private static boolean isProgramCategory(String category) {
+        String categoriesList = ProjectUtil.getConfigValue(JsonKey.PROGRAM_CATEGORIES);
+        Set<String> programCategories = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+        return programCategories.contains(category);
+    }
+}
