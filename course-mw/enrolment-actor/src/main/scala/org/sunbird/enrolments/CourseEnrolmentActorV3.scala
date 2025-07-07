@@ -86,13 +86,13 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
 
   def privateList(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: list :: UserId = " + userId)
-    try{
+    logger.info(request.getRequestContext, "CourseEnrolmentActorV3 :: list :: UserId = " + userId)
+    try {
       val response = getEnrolmentList(request, userId, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
@@ -247,12 +247,12 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
         }
       } else {
         var hoursSpentOnCourses: Int = 0
-        if (null != courseContent.get(JsonKey.DURATION)) {
-          hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
-        }
-        hoursSpentOnCompletedCourses += hoursSpentOnCourses
         val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
         if (certificatesIssue.nonEmpty) {
+          if (null != courseContent.get(JsonKey.DURATION)) {
+            hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+          }
+          hoursSpentOnCompletedCourses += hoursSpentOnCourses
           certificateIssued += 1
         }
       }
