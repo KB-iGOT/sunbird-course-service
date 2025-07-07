@@ -63,6 +63,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
 
     request.getOperation match {
       case "list" => list(request)
+      case "privateList" => privateList(request)
       case "enrolmentInfoStats" => enrolmentInfoStats(request)
       case "enrolV3Details" => enrolV3Details(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
@@ -71,6 +72,19 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def list(request: Request): Unit = {
+    val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: list :: UserId = " + userId)
+    try{
+      val response = getEnrolmentList(request, userId, false)
+      sender().tell(response, self)
+    } catch {
+      case e: Exception =>
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        throw e
+    }
+  }
+
+  def privateList(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext,"CourseEnrolmentActorV3 :: list :: UserId = " + userId)
     try{
@@ -178,25 +192,24 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     } else {
       enrolments = userCoursesDao.listEnrolments(request.getRequestContext, userId, null);
     }
-    val status: String = if (request.get(JsonKey.STATUS) != null)  request.get(JsonKey.STATUS).asInstanceOf[String] else null
+
+    val status: Array[String] = request.get(JsonKey.STATUS) match {
+      case arr: Array[String] => arr
+      case str: String => Array(str)
+      case _ => null
+    }
+
     if (CollectionUtils.isNotEmpty(enrolments)) {
       enrolments = enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
-      if (StringUtils.isNotBlank(status)) {
-        val statusValue: Integer = statusMap.getOrElse(status, -1).asInstanceOf[Integer]
-        if (statusValue.intValue() != -1) {
-          if (statusValue.intValue() == 1) {
-            enrolments = enrolments
-              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] != 2)
-              .toList
-              .asJava
-          } else {
-            enrolments = enrolments
-              .filter(e => e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Integer] == statusValue)
-              .toList
-              .asJava
-          }
-        }
+      // Map status strings to their integer values, ignoring unknown statuses
+      val statusValues: Set[Int] = status.flatMap(s => statusMap.get(s)).toSet
+      if (statusValues.nonEmpty) {
+        enrolments = enrolments
+          .filter(e => statusValues.contains(e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Int]))
+          .toList
+          .asJava
       }
+
       var limit: Integer = if (request.get(JsonKey.LIMIT) != null)  request.get(JsonKey.LIMIT).asInstanceOf[Integer] else -1
       if (limit > -1 && limit !=0) {
         val maximumAllowedLimit = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
@@ -228,12 +241,12 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
         }
       } else {
         var hoursSpentOnCourses: Int = 0
+        if (null != courseContent.get(JsonKey.DURATION)) {
+          hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+        }
+        hoursSpentOnCompletedCourses += hoursSpentOnCourses
         val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
         if (certificatesIssue.nonEmpty) {
-          if (null != courseContent.get(JsonKey.DURATION)) {
-            hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
-          }
-          hoursSpentOnCompletedCourses += hoursSpentOnCourses
           certificateIssued += 1
         }
       }
