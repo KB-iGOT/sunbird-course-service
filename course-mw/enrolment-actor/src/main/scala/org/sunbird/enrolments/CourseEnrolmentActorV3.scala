@@ -192,9 +192,15 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     } else {
       enrolments = userCoursesDao.listEnrolments(request.getRequestContext, userId, null);
     }
+    logger.info(
+      null,
+      "CourseEnrolmentActorV3 :: getActiveEnrollments :: status instance type = " +
+        Option(request.get(JsonKey.STATUS)).map(_.getClass.getName).getOrElse("null")
+    )
 
     val status: Array[String] = request.get(JsonKey.STATUS) match {
       case arr: Array[String] => arr
+      case list: java.util.List[String] => list.toArray(new Array[String](list.size()))
       case str: String => Array(str)
       case _ => null
     }
