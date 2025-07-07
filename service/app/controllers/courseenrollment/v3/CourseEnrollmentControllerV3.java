@@ -38,6 +38,18 @@ public class CourseEnrollmentControllerV3 extends BaseController {
                 httpRequest);
     }
 
+    public CompletionStage<Result> privateGetEnrolledCoursesV3(String uid, Http.Request httpRequest) {
+        return handleRequest(courseEnrolmentActorV3, "privateList",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    request.getRequest().put(JsonKey.USER_ID, uid);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
+
     public CompletionStage<Result> enrolmentUserInfoStats(String uid, Http.Request httpRequest) {
         return handleRequest(courseEnrolmentActorV3, "enrolmentInfoStats",
                 httpRequest.body().asJson(),
