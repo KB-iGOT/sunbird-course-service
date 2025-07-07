@@ -442,7 +442,7 @@ public final class ContentUtil {
         headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
       
-      String baseContentReadUrl = "https://dev.sunbirded.org/api/content/v3/read/"
+      String baseContentReadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/"
           + collectionId;
       logger.info(null, "ContentUtil::getContentV3:: baseContentReadUrl: " + baseContentReadUrl);
       if (CollectionUtils.isNotEmpty(fields)) {
