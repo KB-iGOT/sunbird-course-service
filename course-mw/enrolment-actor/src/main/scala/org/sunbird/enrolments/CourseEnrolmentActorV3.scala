@@ -192,11 +192,6 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     } else {
       enrolments = userCoursesDao.listEnrolments(request.getRequestContext, userId, null);
     }
-    logger.info(
-      null,
-      "CourseEnrolmentActorV3 :: getActiveEnrollments :: status instance type = " +
-        Option(request.get(JsonKey.STATUS)).map(_.getClass.getName).getOrElse("null")
-    )
 
     val status: Array[String] = request.get(JsonKey.STATUS) match {
       case arr: Array[String] => arr
@@ -208,12 +203,14 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     if (CollectionUtils.isNotEmpty(enrolments)) {
       enrolments = enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
       // Map status strings to their integer values, ignoring unknown statuses
-      val statusValues: Set[Int] = status.flatMap(s => statusMap.get(s)).toSet
-      if (statusValues.nonEmpty) {
-        enrolments = enrolments
-          .filter(e => statusValues.contains(e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Int]))
-          .toList
-          .asJava
+      if (status != null) {
+        val statusValues: Set[Int] = status.flatMap(s => statusMap.get(s)).toSet
+        if (statusValues.nonEmpty) {
+          enrolments = enrolments
+            .filter(e => statusValues.contains(e.getOrDefault(JsonKey.STATUS, (-1).asInstanceOf[AnyRef]).asInstanceOf[Int]))
+            .toList
+            .asJava
+        }
       }
 
       var limit: Integer = if (request.get(JsonKey.LIMIT) != null)  request.get(JsonKey.LIMIT).asInstanceOf[Integer] else -1
