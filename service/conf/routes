@@ -37,6 +37,7 @@ PATCH    /v1/content/state/admin/update     	@controllers.LearnerController.upda
 POST     /v2/program/admin/bulkEnroll	    		@controllers.courseenrollment.CourseEnrollmentController.adminBulkEnrollProgram(request: play.mvc.Http.Request)
 POST     /v1/openprogram/enrol	    		@controllers.courseenrollment.CourseEnrollmentController.openProgramEnroll(request: play.mvc.Http.Request)
 POST     /v1/user/enrol/courses/list/:uid	    @controllers.courseenrollment.v3.CourseEnrollmentControllerV3.getEnrolledCoursesV3(uid:String, request: play.mvc.Http.Request)
+POST     /private/v1/user/enrol/courses/list/:uid	    @controllers.courseenrollment.v3.CourseEnrollmentControllerV3.privateGetEnrolledCoursesV3(uid:String, request: play.mvc.Http.Request)
 GET      /v1/user/enrol/summary/:uid	    @controllers.courseenrollment.v3.CourseEnrollmentControllerV3.enrolmentUserInfoStats(uid:String, request: play.mvc.Http.Request)
 POST     /v1/user/enrol/courses/details/:uid	    @controllers.courseenrollment.v3.CourseEnrollmentControllerV3.getEnrolledCoursesDetailsV3(uid:String, request: play.mvc.Http.Request)
 
