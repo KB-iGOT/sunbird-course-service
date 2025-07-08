@@ -86,7 +86,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
 
   def privateList(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext,"enrolmentInfoStats :: list :: UserId = " + userId)
+    logger.info(request.getRequestContext, "CourseEnrolmentActorV3 :: list :: UserId = " + userId)
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
@@ -110,9 +110,9 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
       resp.put(JsonKey.COURSES, activeEnrolments)
       resp.put(JsonKey.EXTERNAL_COURSES, externalEnrolments)
       sender().tell(resp, self)
-    }catch {
+    } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list : user ::" + userId + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
