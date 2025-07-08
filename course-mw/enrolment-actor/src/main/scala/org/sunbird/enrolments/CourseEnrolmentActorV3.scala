@@ -86,13 +86,33 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
 
   def privateList(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext, "CourseEnrolmentActorV3 :: list :: UserId = " + userId)
+    logger.info(request.getRequestContext,"enrolmentInfoStats :: list :: UserId = " + userId)
+    val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+    val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
+    val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
+    isRetiredCoursesIncludedInEnrolList = true
+    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
+    if (CollectionUtils.isNotEmpty(enrolmentList)) {
+      allEnrolledCourses.addAll(enrolmentList)
+    }
+    val userCourseEnrolmentInfo = getUserEnrolmentCourseInfo(allEnrolledCourses.asScala.toList, request, userId);
+    var externalCourseInfo = new util.HashMap[String, AnyRef]()
+    val allExtEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
+    if (CollectionUtils.isNotEmpty(externalEnrolments)) {
+      val externalEnrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addExternalCourseDetails(externalEnrolments, false)
+      allExtEnrolledCourses.addAll(addExternalCourseDetails(externalEnrolments, false))
+      externalCourseInfo = getUserEnrolmentExternalCourseInfo(externalEnrolmentList.asScala.toList, request)
+    }
     try {
-      val response = getEnrolmentList(request, userId, false)
-      sender().tell(response, self)
-    } catch {
+      val resp: Response = new Response()
+      resp.put(JsonKey.USER_COURSE_ENROLMENT_INFO, userCourseEnrolmentInfo)
+      resp.put(JsonKey.USER_COURSE_EXTERNAL_ENROLMENT_INFO, externalCourseInfo)
+      resp.put(JsonKey.COURSES, activeEnrolments)
+      resp.put(JsonKey.EXTERNAL_COURSES, externalEnrolments)
+      sender().tell(resp, self)
+    }catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:" + e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list : user ::" + userId + "| Exception is:"+e.getMessage, e)
         throw e
     }
   }
