@@ -91,32 +91,6 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
                 }
-
-                if (StringUtils.isNotBlank(courseId)) {
-                    Map<String, Object> courseContent = null;
-                    try {
-                        courseContent = getCourseContent(courseId);
-                        if (MapUtils.isNotEmpty(courseContent)) {
-                            String courseCategory = (String) courseContent.get("courseCategory");
-                            if (StringUtils.isBlank(courseCategory) || StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
-                                throw new ProjectCommonException(
-                                        ResponseCode.invalidCourseCategory.getErrorCode(),
-                                        ResponseCode.invalidCourseCategory.getErrorMessage(),
-                                        ERROR_CODE);
-                            }
-                        }
-                    } catch (Exception e) {
-                        logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
-                    }
-                }
-                String language = (String) map.get(JsonKey.LANGUAGE);
-                if (StringUtils.isBlank(language)) {
-                    throw new ProjectCommonException(
-                            ResponseCode.languageRequired.getErrorCode(),
-                            ResponseCode.languageRequired.getErrorMessage(),
-                            ERROR_CODE
-                    );
-                }
             }
         }
         List<Map<String, Object>> assessmentData =
@@ -210,6 +184,12 @@ public class ExtendedRequestValidator {
             String courseCategory = (String) courseContent.get("courseCategory");
             Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
             if (StringUtils.isBlank(courseCategory)) {
+                throw new ProjectCommonException(
+                        ResponseCode.invalidCourseCategory.getErrorCode(),
+                        ResponseCode.invalidCourseCategory.getErrorMessage(),
+                        ERROR_CODE);
+            }
+            if (StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course,courseCategory)) {
                 throw new ProjectCommonException(
                         ResponseCode.invalidCourseCategory.getErrorCode(),
                         ResponseCode.invalidCourseCategory.getErrorMessage(),
