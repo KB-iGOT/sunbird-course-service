@@ -2,6 +2,7 @@ package util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.common.Constants;
 import org.sunbird.common.exception.ProjectCommonException;
@@ -89,6 +90,24 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorCode(),
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
+                }
+
+                if (StringUtils.isNotBlank(courseId)) {
+                    Map<String, Object> courseContent = null;
+                    try {
+                        courseContent = getCourseContent(courseId);
+                        if (MapUtils.isNotEmpty(courseContent)) {
+                            String courseCategory = (String) courseContent.get("courseCategory");
+                            if (StringUtils.isBlank(courseCategory) || StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course, courseCategory)) {
+                                throw new ProjectCommonException(
+                                        ResponseCode.invalidCourseCategory.getErrorCode(),
+                                        ResponseCode.invalidCourseCategory.getErrorMessage(),
+                                        ERROR_CODE);
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
+                    }
                 }
             }
         }
@@ -183,12 +202,6 @@ public class ExtendedRequestValidator {
             String courseCategory = (String) courseContent.get("courseCategory");
             Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
             if (StringUtils.isBlank(courseCategory)) {
-                throw new ProjectCommonException(
-                        ResponseCode.invalidCourseCategory.getErrorCode(),
-                        ResponseCode.invalidCourseCategory.getErrorMessage(),
-                        ERROR_CODE);
-            }
-            if (StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course,courseCategory)) {
                 throw new ProjectCommonException(
                         ResponseCode.invalidCourseCategory.getErrorCode(),
                         ResponseCode.invalidCourseCategory.getErrorMessage(),

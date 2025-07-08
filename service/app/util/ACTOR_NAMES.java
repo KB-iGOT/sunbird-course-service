@@ -55,7 +55,7 @@ public enum ACTOR_NAMES {
   EVENT_BATCH_CERTIFICATE_ACTOR(
       EventBatchCertificateActor.class, "event-batch-certificate-actor"),
   COURSE_ENROLMENT_ACTOR_V3(CourseEnrolmentActorV3.class, "course-enrolment-actor-v3"),
-  Extended_CONTENT_CONSUMPTION_ACTOR(ExtendedContentConsumptionActor.class, "extended-content-consumption-actor");
+  EXTENDED_CONTENT_CONSUMPTION_ACTOR(ExtendedContentConsumptionActor.class, "extended-content-consumption-actor");
 
 
   private ACTOR_NAMES(Class clazz, String name) {
