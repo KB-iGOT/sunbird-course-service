@@ -107,7 +107,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
         val resp: Response = new Response()
         resp.put(JsonKey.USER_COURSE_ENROLMENT_INFO, userCourseEnrolmentInfo)
         resp.put(JsonKey.USER_COURSE_EXTERNAL_ENROLMENT_INFO, externalCourseInfo)
-        resp.put(JsonKey.COURSES, externalEnrolments)
+        resp.put(JsonKey.COURSES, activeEnrolments)
         resp.put(JsonKey.EXTERNAL_COURSES, externalEnrolments)
         sender().tell(resp, self)
       }catch {
