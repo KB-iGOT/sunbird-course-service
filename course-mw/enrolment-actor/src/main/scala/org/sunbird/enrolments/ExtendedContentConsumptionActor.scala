@@ -278,6 +278,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     (selectMap, updateMap)
   }
 
+  // TODO: Add support to handle language-specific details
   @throws[Exception]
   private def pushInstructionEvent(requestContext: RequestContext, userId: String, batchId: String, courseId: String, contents: java.util.List[java.util.Map[String, AnyRef]], primaryCategory:String, parentCollections: java.util.List[String]): Unit = {
     val data = new java.util.HashMap[String, AnyRef]
@@ -314,7 +315,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     val batchId = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
     val courseId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
-    val language = request.getOrDefault(JsonKey.LANGUAGE, "").asInstanceOf[String]
+    val language = request.get(JsonKey.LANGUAGE).asInstanceOf[String]
     val contentIds = request.getRequest.getOrDefault(JsonKey.CONTENT_IDS, new java.util.ArrayList[String]()).asInstanceOf[java.util.List[String]]
     val fields = request.getRequest.getOrDefault(JsonKey.FIELDS, new java.util.ArrayList[String](){{ add(JsonKey.PROGRESS) }}).asInstanceOf[java.util.List[String]]
     val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
@@ -391,6 +392,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     sender().tell(response, self)
   }
 
+  // TODO: Add support to handle language-specific details
   def pushEnrolmentSyncEvent(userId: String, courseId: String, batchId: String) = {
     val now = System.currentTimeMillis()
     val event =
@@ -412,7 +414,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       val inputContent: util.Map[String, AnyRef] = contentList.get(0)
       val batchId = inputContent.get(JsonKey.BATCH_ID).asInstanceOf[String]
       val courseId = inputContent.get(JsonKey.COURSE_ID).asInstanceOf[String]
-      val language = inputContent.getOrDefault(JsonKey.LANGUAGE, "").asInstanceOf[String]
+      val language = inputContent.get(JsonKey.LANGUAGE).asInstanceOf[String]
       val batchDetailsList: List[java.util.Map[String, AnyRef]] = getBatchesV2(requestContext, batchId, courseId, null).toList
       if (!batchDetailsList.isEmpty) {
         val batchDetails: java.util.Map[String, AnyRef] = batchDetailsList.get(0)
@@ -568,7 +570,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     updatedContent
   }
 
-
+  // TODO: Add support to handle language-specific details
   private def pushCertficateGenerateKafkaTopic(userId: String, eventId: String, batchId: String,completionPercentage:Double) = {
     val now = System.currentTimeMillis()
     val event = s"""{
@@ -603,6 +605,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     }
   }
 
+  // TODO: Add support to handle language-specific details
   private def pushEventCompletionKafkaTopic(userId: String, eventId: String, batchId: String,completionPercentage:Double) = {
     val now = System.currentTimeMillis()
     val event = s"""{

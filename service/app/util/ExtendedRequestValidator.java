@@ -98,7 +98,7 @@ public class ExtendedRequestValidator {
                         courseContent = getCourseContent(courseId);
                         if (MapUtils.isNotEmpty(courseContent)) {
                             String courseCategory = (String) courseContent.get("courseCategory");
-                            if (StringUtils.isBlank(courseCategory) || StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course, courseCategory)) {
+                            if (StringUtils.isBlank(courseCategory) || StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
                                 throw new ProjectCommonException(
                                         ResponseCode.invalidCourseCategory.getErrorCode(),
                                         ResponseCode.invalidCourseCategory.getErrorMessage(),
@@ -108,6 +108,14 @@ public class ExtendedRequestValidator {
                     } catch (Exception e) {
                         logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
                     }
+                }
+                String language = (String) map.get(JsonKey.LANGUAGE);
+                if (StringUtils.isBlank(language)) {
+                    throw new ProjectCommonException(
+                            ResponseCode.languageRequired.getErrorCode(),
+                            ResponseCode.languageRequired.getErrorMessage(),
+                            ERROR_CODE
+                    );
                 }
             }
         }
