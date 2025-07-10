@@ -29,6 +29,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       Util.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB).getTableName();
   private static final String USER_ENROLMENTS = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_DB).getTableName();
   private static final String ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.ENROLLMENT_BATCH_DB).getTableName();
+  private static final String USER_ENROLMENTS_V2 = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
   public static UserCoursesDao getInstance() {
     if (userCoursesDao == null) {
       userCoursesDao = new UserCoursesDaoImpl();
@@ -325,6 +326,24 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
     }
     return null;
+  }
+
+  public Response insertExtendedEnrollmentV2(RequestContext requestContext, Map<String, Object> data) {
+    return cassandraOperation.insertRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, data);
+  }
+
+  @Override
+  public Response updateExtendedEnrollV2(RequestContext requestContext, String userId, String courseId, String batchId, Map<String, Object> updateAttributes) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.USER_ID, userId);
+    primaryKey.put(JsonKey.COURSE_ID, courseId);
+    primaryKey.put(JsonKey.BATCH_ID, batchId);
+    Map<String, Object> updateList = new HashMap<>();
+    updateList.putAll(updateAttributes);
+    updateList.remove(JsonKey.BATCH_ID_KEY);
+    updateList.remove(JsonKey.COURSE_ID_KEY);
+    updateList.remove(JsonKey.USER_ID_KEY);
+    return cassandraOperation.updateRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, updateList, primaryKey);
   }
 
 }
