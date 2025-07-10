@@ -1232,7 +1232,8 @@ public final class JsonKey {
   public static final String CADRE = "cadre";
   public static final String KEYSPACE_SUNBIRD_RESOURCE = "sunbird_resource";
   public static final String USER_ENTITY_CONSUMPTION = "user_entity_consumption";
-
+  public static final String LANGUAGE_MAP ="languageMapV1";
+  public static final String RECENT_LANGUAGE = "recent_language";
 
   private JsonKey() {}
 }

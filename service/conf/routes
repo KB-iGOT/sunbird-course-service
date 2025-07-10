@@ -127,3 +127,6 @@ PATCH    /v2/content/state/update     	@controllers.ExtendedLearnerController.up
 POST     /v2/content/state/read	        @controllers.ExtendedLearnerController.getContentState(request: play.mvc.Http.Request)
 POST     /private/v2/content/state/read	 @controllers.ExtendedLearnerController.privateGetContentState(request: play.mvc.Http.Request)
 PATCH    /v2/content/state/admin/update  @controllers.ExtendedLearnerController.updateContentStateByAdmin(request: play.mvc.Http.Request)
+
+#Extended Courses  apis
+POST    /v2/course/enroll      controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollCourseWithLanguage(request: play.mvc.Http.Request)

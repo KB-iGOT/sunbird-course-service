@@ -1,32 +1,29 @@
 package controllers.courseenrollment.validator;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.logstash.logback.encoder.org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
-import org.sunbird.common.models.util.*;
+import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.BaseRequestValidator;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.helper.ServiceFactory;
-import org.sunbird.learner.actors.accesssettings.model.AccessControl;
 import org.sunbird.learner.actors.accesssettings.dao.impl.AccessSettingsDaoImpl;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-
+import org.sunbird.learner.actors.accesssettings.model.AccessControl;
 import org.sunbird.learner.util.BatchCacheHandler;
 import org.sunbird.learner.util.ContentCacheHandlerV2;
+import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.userorg.UserOrgServiceImpl;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.collections4.MapUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
@@ -411,4 +408,66 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
   }
 
+  public void validateLanguageSupport(String reqLang, String courseId) {
+    if (StringUtils.isBlank(reqLang)) {
+      throw new ProjectCommonException(
+              ResponseCode.mandatoryParamsMissing.getErrorCode(),
+              "Missing mandatory parameter: language",
+              ResponseCode.CLIENT_ERROR.getResponseCode()
+      );
+    }
+
+    // Step 2: Fetch content metadata using courseId
+    List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP);
+    Map<String, Object> contentResponse = ContentUtil.getContent(courseId, fields);
+
+    Map<String, Object> contentData = (Map<String, Object>) contentResponse.get("content");
+    if (contentData == null || contentData.isEmpty()) {
+      throw new ProjectCommonException(
+              ResponseCode.resourceNotFound.getErrorCode(),
+              "Content 'content' node is missing or empty for courseId: " + courseId,
+              ResponseCode.RESOURCE_NOT_FOUND.getResponseCode()
+      );
+    }
+
+    // Read base language list
+    List<String> baseLangList = new ArrayList<>();
+    Object baseLangObj = contentData.get(JsonKey.LANGUAGE);
+    if (baseLangObj instanceof List) {
+      baseLangList = ((List<?>) baseLangObj)
+              .stream()
+              .map(Object::toString)
+              .map(String::toLowerCase)
+              .collect(Collectors.toList());
+    }
+    if (baseLangList.contains(reqLang.toLowerCase())) return;
+
+    //Read languageMap and validate
+    Map<String, Map<String, Object>> languageMap = new HashMap<>();
+    Object langMapObj = contentData.get(JsonKey.LANGUAGE_MAP);
+    if (langMapObj instanceof Map) {
+      Map<?, ?> tempMap = (Map<?, ?>) langMapObj;
+      for (Map.Entry<?, ?> entry : tempMap.entrySet()) {
+        if (entry.getValue() instanceof Map) {
+          languageMap.put(entry.getKey().toString().toLowerCase(),
+                  (Map<String, Object>) entry.getValue());
+        }
+      }
+    }
+
+    if (!languageMap.containsKey(reqLang.toLowerCase())) {
+      throw new ProjectCommonException(
+              ResponseCode.invalidParameterValue.getErrorCode(),
+              "Requested language [" + reqLang + "] is not available in the base language or language map.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+
+    String status = String.valueOf(languageMap.get(reqLang.toLowerCase()).getOrDefault("status", ""));
+    if (!"Live".equalsIgnoreCase(status)) {
+      throw new ProjectCommonException(
+              ResponseCode.invalidParameterValue.getErrorCode(),
+              "Requested language [" + reqLang + "] is not Live. Found status: " + status,
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+  }
 }
