@@ -1234,6 +1234,7 @@ public final class JsonKey {
   public static final String USER_ENTITY_CONSUMPTION = "user_entity_consumption";
   public static final String LANGUAGE_MAP ="languageMapV1";
   public static final String RECENT_LANGUAGE = "recent_language";
+  public static final String USER_ENROLMENTS_V2_DB ="user_enrolments_v2";
 
   private JsonKey() {}
 }
