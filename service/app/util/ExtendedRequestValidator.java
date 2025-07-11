@@ -92,31 +92,48 @@ public class ExtendedRequestValidator {
                             ERROR_CODE);
                 }
 
-                if (StringUtils.isNotBlank(courseId)) {
-                    Map<String, Object> courseContent = null;
-                    try {
-                        courseContent = getCourseContent(courseId);
-                        if (MapUtils.isNotEmpty(courseContent)) {
-                            String courseCategory = (String) courseContent.get("courseCategory");
-                            if (StringUtils.isBlank(courseCategory) || StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
+                try {
+                    Map<String, Object> courseContent = getCourseContent(contentId);
+                    String courseCategory = (String) courseContent.get("courseCategory");
+
+                    if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
+                        String language = (String) map.get(JsonKey.LANGUAGE);
+                        if (StringUtils.isBlank(language)) {
+                            throw new ProjectCommonException(
+                                    ResponseCode.languageRequired.getErrorCode(),
+                                    ResponseCode.languageRequired.getErrorMessage(),
+                                    ERROR_CODE
+                            );
+                        } else {
+                            List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
+                            boolean notPresent = languages.stream()
+                                    .map(String::toLowerCase)
+                                    .noneMatch(lang -> lang.equals(language.toLowerCase()));
+                            if (notPresent) {
                                 throw new ProjectCommonException(
-                                        ResponseCode.invalidCourseCategory.getErrorCode(),
-                                        ResponseCode.invalidCourseCategory.getErrorMessage(),
-                                        ERROR_CODE);
+                                        ResponseCode.languageRequired.getErrorCode(),
+                                        ResponseCode.languageRequired.getErrorMessage(),
+                                        ERROR_CODE
+                                );
+                            }
+                            map.put(JsonKey.LANGUAGE, language.toLowerCase());
+                        }
+                    } else {
+                        String id = StringUtils.isNotBlank((String) map.get(JsonKey.COURSE_ID))
+                                ? (String) map.get(JsonKey.COURSE_ID)
+                                : (String) map.get(JsonKey.COLLECTION_ID);
+                        Map<String, Object> courseIdContent = getCourseContent(id);
+                        if (MapUtils.isNotEmpty(courseIdContent)) {
+                            List<String> languages = (List<String>) courseIdContent.get(JsonKey.LANGUAGE);
+                            if (CollectionUtils.isNotEmpty(languages)) {
+                                map.put(JsonKey.LANGUAGE, languages.get(0).toLowerCase());
                             }
                         }
-                    } catch (Exception e) {
-                        logger.error(null, "Error during content read parse for Content ID: " + contentId, e);
                     }
+                } catch (Exception e) {
+                    logger.error(null, "Error fetching course content for contentId: " + contentId, e);
                 }
-                String language = (String) map.get(JsonKey.LANGUAGE);
-                if (StringUtils.isBlank(language)) {
-                    throw new ProjectCommonException(
-                            ResponseCode.languageRequired.getErrorCode(),
-                            ResponseCode.languageRequired.getErrorMessage(),
-                            ERROR_CODE
-                    );
-                }
+
             }
         }
         List<Map<String, Object>> assessmentData =
