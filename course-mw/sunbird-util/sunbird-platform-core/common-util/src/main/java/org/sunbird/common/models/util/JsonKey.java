@@ -1235,6 +1235,15 @@ public final class JsonKey {
   public static final String LANGUAGE_MAP ="languageMapV1";
   public static final String RECENT_LANGUAGE = "recent_language";
   public static final String USER_ENROLMENTS_V2_DB ="user_enrolments_v2";
+  public static final String LANGUAGE_NOT_IN_BASE_OR_MAP = "Requested language [%s] is not available in the base language or language map.";
+  public static final String MULTILINGUAL_COURSE = "Multilingual Course";
+  public static final String LANGUAGE_NOT_LIVE = "Requested language [%s] is not Live. Found status: %s";
+  public static final String LANGUAGE_AND_BASE_MISSING = "Both requested and base language are missing for courseId: %s";
+  public static final String LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE = "Language not provided, but course category is 'Multilingual Course'. Please specify a language.";
+
+
+
+
 
   private JsonKey() {}
 }

@@ -411,7 +411,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
   public String validateLanguageSupport(String reqLang, String courseId) {
     List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP, JsonKey.COURSECATEGORY);
     Map<String, Object> contentResponse = ContentUtil.getContent(courseId, fields);
-    Map<String, Object> contentData = (Map<String, Object>) contentResponse.get("content");
+    Map<String, Object> contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
     if (contentData == null || contentData.isEmpty()) {
       throw new ProjectCommonException(
               ResponseCode.resourceNotFound.getErrorCode(),
@@ -448,15 +448,15 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
       if (!languageMap.containsKey(reqLang.toLowerCase())) {
         throw new ProjectCommonException(
                 ResponseCode.invalidParameterValue.getErrorCode(),
-                "Requested language [" + reqLang + "] is not available in the base language or language map.",
+                String.format(JsonKey.LANGUAGE_NOT_IN_BASE_OR_MAP, reqLang),
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
       String status = String.valueOf(languageMap.get(reqLang.toLowerCase()).getOrDefault("status", ""));
-      if (!"Live".equalsIgnoreCase(status)) {
+      if (!JsonKey.LIVE.equalsIgnoreCase(status)) {
         throw new ProjectCommonException(
                 ResponseCode.invalidParameterValue.getErrorCode(),
-                "Requested language [" + reqLang + "] is not Live. Found status: " + status,
+                String.format(JsonKey.LANGUAGE_NOT_LIVE, reqLang, status),
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
@@ -466,15 +466,15 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
       if (StringUtils.isBlank(baseLang)) {
         throw new ProjectCommonException(
                 ResponseCode.mandatoryParamsMissing.getErrorCode(),
-                "Both requested and base language are missing for courseId: " + courseId,
+                String.format(JsonKey.LANGUAGE_AND_BASE_MISSING, courseId),
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
       String courseCategory = (String) contentData.getOrDefault(JsonKey.COURSECATEGORY, "");
-      if ("Multilingual Course".equalsIgnoreCase(courseCategory)) {
+      if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
         throw new ProjectCommonException(
                 ResponseCode.invalidParameterValue.getErrorCode(),
-                "Language not provided, but course category is 'Multilingual Course'. Please specify a language.",
+                JsonKey.LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE,
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
