@@ -50,9 +50,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val courseId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     val batchId = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
-    val reqLangOpt = Option(request.get(JsonKey.LANGUAGE)).map(_.toString.toLowerCase)
+    val recentLangOpt = Option(request.getContext.get(JsonKey.RECENT_LANGUAGE)).map(_.toString.toLowerCase)
 
-    logger.info(request.getRequestContext, s"ExtendedCourseEnrolmentActor :: enrollWithLanguage :: Request received for courseId=$courseId, userId=$userId, batchId=$batchId, reqLang=$reqLangOpt")
+    logger.info(request.getRequestContext, s"ExtendedCourseEnrolmentActor :: enrollWithLanguage :: Request received for courseId=$courseId, userId=$userId, batchId=$batchId, recentLanguage=$recentLangOpt")
 
     val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES)
     val contentData = getContentReadAPIData(courseId, fieldList, request)
@@ -76,7 +76,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
 
     // set recent_language
-    reqLangOpt.foreach(lang => data.put(JsonKey.RECENT_LANGUAGE, lang))
+    recentLangOpt.foreach(lang => data.put(JsonKey.RECENT_LANGUAGE, lang))
 
     val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
     if (hasAccess) {

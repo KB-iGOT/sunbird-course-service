@@ -14,6 +14,7 @@ import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.coursebatch.dao.UserCoursesDao;
+import org.sunbird.learner.util.ExtendedUtil;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.user.courses.UserCourses;
 import org.sunbird.common.models.util.LoggerUtil;
@@ -29,7 +30,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       Util.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB).getTableName();
   private static final String USER_ENROLMENTS = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_DB).getTableName();
   private static final String ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.ENROLLMENT_BATCH_DB).getTableName();
-  private static final String USER_ENROLMENTS_V2 = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
+  private static final String USER_ENROLMENTS_V2 = ExtendedUtil.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
   public static UserCoursesDao getInstance() {
     if (userCoursesDao == null) {
       userCoursesDao = new UserCoursesDaoImpl();

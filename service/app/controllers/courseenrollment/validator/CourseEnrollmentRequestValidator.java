@@ -408,20 +408,10 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
   }
 
-  public void validateLanguageSupport(String reqLang, String courseId) {
-    if (StringUtils.isBlank(reqLang)) {
-      throw new ProjectCommonException(
-              ResponseCode.mandatoryParamsMissing.getErrorCode(),
-              "Missing mandatory parameter: language",
-              ResponseCode.CLIENT_ERROR.getResponseCode()
-      );
-    }
-
-    // Step 2: Fetch content metadata using courseId
-    List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP);
+  public String validateLanguageSupport(String reqLang, String courseId) {
+    List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP, JsonKey.COURSECATEGORY);
     Map<String, Object> contentResponse = ContentUtil.getContent(courseId, fields);
-
-    Map<String, Object> contentData = (Map<String, Object>) contentResponse.get("content");
+    Map<String, Object> contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
     if (contentData == null || contentData.isEmpty()) {
       throw new ProjectCommonException(
               ResponseCode.resourceNotFound.getErrorCode(),
@@ -429,8 +419,6 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
               ResponseCode.RESOURCE_NOT_FOUND.getResponseCode()
       );
     }
-
-    // Read base language list
     List<String> baseLangList = new ArrayList<>();
     Object baseLangObj = contentData.get(JsonKey.LANGUAGE);
     if (baseLangObj instanceof List) {
@@ -440,34 +428,57 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
               .map(String::toLowerCase)
               .collect(Collectors.toList());
     }
-    if (baseLangList.contains(reqLang.toLowerCase())) return;
-
-    //Read languageMap and validate
-    Map<String, Map<String, Object>> languageMap = new HashMap<>();
-    Object langMapObj = contentData.get(JsonKey.LANGUAGE_MAP);
-    if (langMapObj instanceof Map) {
-      Map<?, ?> tempMap = (Map<?, ?>) langMapObj;
-      for (Map.Entry<?, ?> entry : tempMap.entrySet()) {
-        if (entry.getValue() instanceof Map) {
-          languageMap.put(entry.getKey().toString().toLowerCase(),
-                  (Map<String, Object>) entry.getValue());
+    String baseLang = baseLangList.isEmpty() ? null : baseLangList.get(0);
+    if (StringUtils.isNotBlank(reqLang)) {
+      //If reqLang is provided, validate it
+      if (baseLangList.contains(reqLang.toLowerCase())) {
+        return reqLang.toLowerCase();
+      }
+      Map<String, Map<String, Object>> languageMap = new HashMap<>();
+      Object langMapObj = contentData.get(JsonKey.LANGUAGE_MAP);
+      if (langMapObj instanceof Map) {
+        Map<?, ?> tempMap = (Map<?, ?>) langMapObj;
+        for (Map.Entry<?, ?> entry : tempMap.entrySet()) {
+          if (entry.getValue() instanceof Map) {
+            languageMap.put(entry.getKey().toString().toLowerCase(),
+                    (Map<String, Object>) entry.getValue());
+          }
         }
       }
-    }
-
-    if (!languageMap.containsKey(reqLang.toLowerCase())) {
-      throw new ProjectCommonException(
-              ResponseCode.invalidParameterValue.getErrorCode(),
-              "Requested language [" + reqLang + "] is not available in the base language or language map.",
-              ResponseCode.CLIENT_ERROR.getResponseCode());
-    }
-
-    String status = String.valueOf(languageMap.get(reqLang.toLowerCase()).getOrDefault("status", ""));
-    if (!"Live".equalsIgnoreCase(status)) {
-      throw new ProjectCommonException(
-              ResponseCode.invalidParameterValue.getErrorCode(),
-              "Requested language [" + reqLang + "] is not Live. Found status: " + status,
-              ResponseCode.CLIENT_ERROR.getResponseCode());
+      if (!languageMap.containsKey(reqLang.toLowerCase())) {
+        throw new ProjectCommonException(
+                ResponseCode.invalidParameterValue.getErrorCode(),
+                String.format(JsonKey.LANGUAGE_NOT_IN_BASE_OR_MAP, reqLang),
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+      String status = String.valueOf(languageMap.get(reqLang.toLowerCase()).getOrDefault("status", ""));
+      if (!JsonKey.LIVE.equalsIgnoreCase(status)) {
+        throw new ProjectCommonException(
+                ResponseCode.invalidParameterValue.getErrorCode(),
+                String.format(JsonKey.LANGUAGE_NOT_LIVE, reqLang, status),
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+      return reqLang.toLowerCase();
+    } else {
+      // If no base language either, throw error
+      if (StringUtils.isBlank(baseLang)) {
+        throw new ProjectCommonException(
+                ResponseCode.mandatoryParamsMissing.getErrorCode(),
+                String.format(JsonKey.LANGUAGE_AND_BASE_MISSING, courseId),
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+      String courseCategory = (String) contentData.getOrDefault(JsonKey.COURSECATEGORY, "");
+      if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
+        throw new ProjectCommonException(
+                ResponseCode.invalidParameterValue.getErrorCode(),
+                JsonKey.LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE,
+                ResponseCode.CLIENT_ERROR.getResponseCode()
+        );
+      }
+      return baseLang;
     }
   }
 }
