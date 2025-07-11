@@ -91,6 +91,49 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
                 }
+
+                try {
+                    Map<String, Object> courseContent = getCourseContent(contentId);
+                    String courseCategory = (String) courseContent.get("courseCategory");
+
+                    if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
+                        String language = (String) map.get(JsonKey.LANGUAGE);
+                        if (StringUtils.isBlank(language)) {
+                            throw new ProjectCommonException(
+                                    ResponseCode.languageRequired.getErrorCode(),
+                                    ResponseCode.languageRequired.getErrorMessage(),
+                                    ERROR_CODE
+                            );
+                        } else {
+                            List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
+                            boolean notPresent = languages.stream()
+                                    .map(String::toLowerCase)
+                                    .noneMatch(lang -> lang.equals(language.toLowerCase()));
+                            if (notPresent) {
+                                throw new ProjectCommonException(
+                                        ResponseCode.languageRequired.getErrorCode(),
+                                        ResponseCode.languageRequired.getErrorMessage(),
+                                        ERROR_CODE
+                                );
+                            }
+                            map.put(JsonKey.LANGUAGE, language.toLowerCase());
+                        }
+                    } else {
+                        String id = StringUtils.isNotBlank((String) map.get(JsonKey.COURSE_ID))
+                                ? (String) map.get(JsonKey.COURSE_ID)
+                                : (String) map.get(JsonKey.COLLECTION_ID);
+                        Map<String, Object> courseIdContent = getCourseContent(id);
+                        if (MapUtils.isNotEmpty(courseIdContent)) {
+                            List<String> languages = (List<String>) courseIdContent.get(JsonKey.LANGUAGE);
+                            if (CollectionUtils.isNotEmpty(languages)) {
+                                map.put(JsonKey.LANGUAGE, languages.get(0).toLowerCase());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error(null, "Error fetching course content for contentId: " + contentId, e);
+                }
+
             }
         }
         List<Map<String, Object>> assessmentData =
@@ -184,12 +227,6 @@ public class ExtendedRequestValidator {
             String courseCategory = (String) courseContent.get("courseCategory");
             Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
             if (StringUtils.isBlank(courseCategory)) {
-                throw new ProjectCommonException(
-                        ResponseCode.invalidCourseCategory.getErrorCode(),
-                        ResponseCode.invalidCourseCategory.getErrorMessage(),
-                        ERROR_CODE);
-            }
-            if (StringUtils.equalsIgnoreCase(Constants.Multi_Lingual_Course,courseCategory)) {
                 throw new ProjectCommonException(
                         ResponseCode.invalidCourseCategory.getErrorCode(),
                         ResponseCode.invalidCourseCategory.getErrorMessage(),
