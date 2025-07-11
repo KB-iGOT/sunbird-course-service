@@ -76,4 +76,6 @@ public interface UserCoursesDao {
   Response updateExtendedEnrollV2(RequestContext requestContext, String userId, String courseId, String batchId, Map<String, Object> updateAttributes);
 
   Response insertExtendedEnrollmentV2(RequestContext requestContext, Map<String, Object> userCoursesDetails);
+
+  List<UserCourses> extendedReadV2(RequestContext requestContext, String userId, String courseId);
 }

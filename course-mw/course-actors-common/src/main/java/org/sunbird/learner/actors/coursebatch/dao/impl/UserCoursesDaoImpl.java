@@ -347,4 +347,24 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return cassandraOperation.updateRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, updateList, primaryKey);
   }
 
+  @Override
+  public List<UserCourses> extendedReadV2(RequestContext requestContext, String userId, String courseId) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.USER_ID, userId);
+    primaryKey.put(JsonKey.COURSE_ID, courseId);
+
+    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, primaryKey, null);
+    List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+    if (CollectionUtils.isEmpty(userCoursesList)) {
+      return null;
+    }
+    try {
+      return mapper.convertValue(userCoursesList, new TypeReference<List<UserCourses>>() {
+      });
+    } catch (Exception e) {
+      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
+    }
+    return null;
+  }
+
 }
