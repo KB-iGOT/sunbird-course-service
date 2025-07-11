@@ -4,15 +4,12 @@ import akka.actor.ActorRef;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.common.models.util.JsonKey;
-import org.sunbird.common.request.ExtendedLearnerStateRequestValidator;
-import org.sunbird.common.request.LearnerStateRequestValidator;
 import org.sunbird.common.request.Request;
 import org.sunbird.keys.SunbirdKey;
 import play.mvc.Http;
 import play.mvc.Result;
 import util.Attrs;
 import util.ExtendedRequestValidator;
-import util.RequestValidator;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -24,7 +21,7 @@ import java.util.concurrent.CompletionStage;
 public class ExtendedLearnerController extends BaseController {
 
 
-    private ExtendedLearnerStateRequestValidator validator = new ExtendedLearnerStateRequestValidator();
+    private util.ExtendedLearnerStateRequestValidator validator = new util.ExtendedLearnerStateRequestValidator();
 
 
     @Inject
