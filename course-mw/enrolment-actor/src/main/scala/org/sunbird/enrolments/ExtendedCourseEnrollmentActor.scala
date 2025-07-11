@@ -64,7 +64,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
     // Validate batch access
     val batchData: CourseBatch = courseBatchDao.readById(courseId, batchId, request.getRequestContext)
-    var enrolmentData: util.List[UserCourses] = userCoursesDao.readV2(request.getRequestContext, userId, courseId)
+    var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)
     if (CollectionUtils.isEmpty(enrolmentData)) enrolmentData = new util.ArrayList[UserCourses]()
 
     val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
