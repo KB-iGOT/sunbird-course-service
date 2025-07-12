@@ -436,9 +436,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)
             val updateData = getLatestReadDetails(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
-            val status = inputContent.getOrDefault("status", "").asInstanceOf[Number].intValue();
-            val langContentStatus = buildLangContentStatus(language, contentId, status);
-            updateData._2.put("lang_contentstatus", langContentStatus)
+            updateData._2.put(JsonKey.RECENT_LANGUAGE, language)
             cassandraOperation.updateRecordV2(requestContext, enrolmentDBInfo.getKeySpace, enrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
           }
         }
