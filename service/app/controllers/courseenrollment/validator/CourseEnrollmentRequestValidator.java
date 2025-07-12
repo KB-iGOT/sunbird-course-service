@@ -409,7 +409,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
   }
 
   public String validateLanguageSupport(String reqLang, String courseId) {
-    List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP, JsonKey.COURSECATEGORY);
+    List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP, JsonKey.COURSECATEGORY, JsonKey.IDENTIFIER);
     Map<String, Object> contentResponse = ContentUtil.getContent(courseId, fields);
     Map<String, Object> contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
     if (contentData == null || contentData.isEmpty()) {
@@ -419,6 +419,15 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
               ResponseCode.RESOURCE_NOT_FOUND.getResponseCode()
       );
     }
+    String courseCategory = (String) contentData.getOrDefault(JsonKey.COURSECATEGORY, "");
+    if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
+      throw new ProjectCommonException(
+              ResponseCode.invalidParameterValue.getErrorCode(),
+              JsonKey.LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE,
+              ResponseCode.CLIENT_ERROR.getResponseCode()
+      );
+    }
+
     List<String> baseLangList = new ArrayList<>();
     Object baseLangObj = contentData.get(JsonKey.LANGUAGE);
     if (baseLangObj instanceof List) {
@@ -470,15 +479,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
-      String courseCategory = (String) contentData.getOrDefault(JsonKey.COURSECATEGORY, "");
-      if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
-        throw new ProjectCommonException(
-                ResponseCode.invalidParameterValue.getErrorCode(),
-                JsonKey.LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE,
-                ResponseCode.CLIENT_ERROR.getResponseCode()
-        );
-      }
-      return baseLang;
     }
+    return baseLang;
   }
 }
