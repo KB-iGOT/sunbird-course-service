@@ -29,7 +29,7 @@ public class ExtendedRequestValidator {
      * @param contentRequestDto Request
      */
     @SuppressWarnings("unchecked")
-    public static void validateUpdateContent(Request contentRequestDto) {
+    public static void validateUpdateContent(Request contentRequestDto) throws Exception {
         List<Map<String, Object>> list =
                 (List<Map<String, Object>>) (contentRequestDto.getRequest().get(JsonKey.CONTENTS));
         if(CollectionUtils.isNotEmpty(list)) {
@@ -92,6 +92,17 @@ public class ExtendedRequestValidator {
                             ERROR_CODE);
                 }
 
+                Map<String, Object> courseDetails = getCourseContent(StringUtils.isNotBlank((String) map.get(JsonKey.COURSE_ID))
+                        ? (String) map.get(JsonKey.COURSE_ID)
+                        : (String) map.get(JsonKey.COLLECTION_ID));
+                String category = (String) courseDetails.get(JsonKey.COURSECATEGORY);
+                if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, category))
+                {
+                        throw new ProjectCommonException(
+                                ResponseCode.languageRequired.getErrorCode(),
+                               JsonKey.MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR,
+                                ERROR_CODE);
+                }
                 try {
                     Map<String, Object> courseContent = getCourseContent(contentId);
                     String courseCategory = (String) courseContent.get("courseCategory");

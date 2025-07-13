@@ -1240,6 +1240,8 @@ public final class JsonKey {
   public static final String LANGUAGE_NOT_LIVE = "Requested language [%s] is not Live. Found status: %s";
   public static final String LANGUAGE_AND_BASE_MISSING = "Both requested and base language are missing for courseId: %s";
   public static final String LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE = "Cannot enroll in a course with 'Multilingual Course' category.";
+  public static final String MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR = "Invalid course category for progress update. Progress cannot be updated for courses categorized as 'Multilingual Course'.";
+
 
 
 
