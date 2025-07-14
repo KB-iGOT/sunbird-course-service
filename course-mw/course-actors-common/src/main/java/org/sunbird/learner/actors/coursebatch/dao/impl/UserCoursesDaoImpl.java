@@ -147,8 +147,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return userList;
   }
 
-  @Override
-  public List<Map<String, Object>> listEnrolments(RequestContext requestContext, String userId, List<String> courseIdList) {
+  private List<Map<String, Object>> listEnrolmentsInternal(RequestContext requestContext, String userId, List<String> courseIdList, String tableName) {
     Map<String, Object> primaryKey = new HashMap<>();
     primaryKey.put(JsonKey.USER_ID, userId);
 
@@ -156,10 +155,10 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
     if (courseIdList != null && courseIdList.size() == 1) {
       primaryKey.put(JsonKey.COURSE_ID_KEY, courseIdList);
-      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
     } else {
-      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
       if (courseIdList != null && !courseIdList.isEmpty() && userCoursesList != null) {
         List<Map<String, Object>> filteredList = new ArrayList<>();
@@ -294,13 +293,13 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return null;
   }
 
-  @Override
-  public List<Map<String, Object>> getEnrolmentByBatchIdAndCourseId(RequestContext requestContext, String userId, String courseId, String batchId) {
+  private List<Map<String, Object>> getEnrolmentByBatchIdAndCourseIdInternal(
+          RequestContext requestContext, String userId, String courseId, String batchId, String tableName) {
     Map<String, Object> primaryKey = new HashMap<>();
     primaryKey.put(JsonKey.USER_ID, userId);
     primaryKey.put(JsonKey.COURSE_ID, courseId);
     primaryKey.put(JsonKey.BATCH_ID, batchId);
-    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
     List<Map<String, Object>> userCoursesList =
             (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
     if (CollectionUtils.isEmpty(userCoursesList)) {
@@ -365,6 +364,28 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
     }
     return null;
+  }
+
+  @Override
+  public List<Map<String, Object>> listEnrolments(RequestContext requestContext, String userId, List<String> courseIdList) {
+    return listEnrolmentsInternal(requestContext, userId, courseIdList, USER_ENROLMENTS);
+  }
+
+  @Override
+  public List<Map<String, Object>> listEnrolments_v2(RequestContext requestContext, String userId, List<String> courseIdList) {
+    return listEnrolmentsInternal(requestContext, userId, courseIdList, USER_ENROLMENTS_V2);
+  }
+
+  @Override
+  public List<Map<String, Object>> getEnrolmentByBatchIdAndCourseId(
+          RequestContext requestContext, String userId, String courseId, String batchId) {
+    return getEnrolmentByBatchIdAndCourseIdInternal(requestContext, userId, courseId, batchId, USER_ENROLMENTS);
+  }
+
+  @Override
+  public List<Map<String, Object>> getEnrolmentByBatchIdAndCourseId_v2(
+          RequestContext requestContext, String userId, String courseId, String batchId) {
+    return getEnrolmentByBatchIdAndCourseIdInternal(requestContext, userId, courseId, batchId, USER_ENROLMENTS_V2);
   }
 
 }
