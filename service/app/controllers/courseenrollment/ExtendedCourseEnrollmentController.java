@@ -40,7 +40,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     // Normalize language if present
                     String reqLang = null;
                     if (requestMap.containsKey(JsonKey.LANGUAGE)) {
-                        reqLang = ((String) requestMap.get(JsonKey.LANGUAGE)).toLowerCase();
+                        reqLang = ((String) requestMap.get(JsonKey.LANGUAGE));
                         requestMap.put(JsonKey.LANGUAGE, reqLang);
                     }
                     logger.info(req.getRequestContext(),
