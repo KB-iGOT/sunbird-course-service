@@ -45,7 +45,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     }
                     logger.info(req.getRequestContext(),
                             "extendedCourseEnrolmentActor : enrollCourseWithLanguage request received, userId=" + userId +
-                                    ", courseId=" + courseId + ", batchId=" + batchId);
+                                    ", courseId=" + courseId + ", batchId=" + batchId + ",RequestLanguage" + reqLang);
 
                     // Validations
                     validator.validateRequestedBy(userId);
