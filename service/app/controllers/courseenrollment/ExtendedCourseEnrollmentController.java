@@ -17,12 +17,12 @@ public class ExtendedCourseEnrollmentController extends BaseController {
 
     @Inject
     @Named("extended-course-enrolment-actor")
-    private ActorRef courseEnrolmentActor;
+    private ActorRef extendedCourseEnrolmentActor;
 
     private CourseEnrollmentRequestValidator validator = new CourseEnrollmentRequestValidator();
 
     public CompletionStage<Result> enrollCourseWithLanguage(Http.Request httpRequest) {
-        return handleRequest(courseEnrolmentActor, "enrollV2",
+        return handleRequest(extendedCourseEnrolmentActor, "enrollV2",
                 httpRequest.body().asJson(),
                 (requestObj) -> {
                     Request req = (Request) requestObj;
@@ -40,11 +40,11 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     // Normalize language if present
                     String reqLang = null;
                     if (requestMap.containsKey(JsonKey.LANGUAGE)) {
-                        reqLang = ((String) requestMap.get(JsonKey.LANGUAGE)).toLowerCase();
+                        reqLang = ((String) requestMap.get(JsonKey.LANGUAGE));
                         requestMap.put(JsonKey.LANGUAGE, reqLang);
                     }
                     logger.info(req.getRequestContext(),
-                            "CourseEnrollmentController : enrollCourseWithLanguage request received, userId=" + userId +
+                            "extendedCourseEnrolmentActor : enrollCourseWithLanguage request received, userId=" + userId +
                                     ", courseId=" + courseId + ", batchId=" + batchId);
 
                     // Validations
@@ -57,6 +57,68 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     return null;
                 },
                 getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getEnrolledCoursesDetails(String uid, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolV3Details",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollListRequestDetails(request);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getEnrolledCourses(String uid, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "list",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollListRequest(request);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> privateGetEnrolledCoursesV3(String uid, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "privateList",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    request.getRequest().put(JsonKey.USER_ID, uid);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> enrolmentUserInfoStats(String uid, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolmentInfoStats",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
                 httpRequest);
     }
 }
