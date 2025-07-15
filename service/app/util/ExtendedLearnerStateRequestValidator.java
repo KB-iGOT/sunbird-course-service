@@ -61,21 +61,25 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
             );
         }
 
-        String courseCategory = (String) courseContent.get("courseCategory");
+        List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
         String language = (String) request.getRequest().get(JsonKey.LANGUAGE);
 
-        if (Constants.MULTI_LINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
-            if (org.apache.commons.lang3.StringUtils.isBlank(language)) {
+        if (org.apache.commons.lang3.StringUtils.isBlank(language)) {
+            if (CollectionUtils.isNotEmpty(languages)) {
+                request.getRequest().put(JsonKey.LANGUAGE, languages.get(0).toLowerCase());
+            } else {
                 throw new ProjectCommonException(
                         ResponseCode.languageRequired.getErrorCode(),
                         ResponseCode.languageRequired.getErrorMessage(),
                         ERROR_CODE
                 );
             }
-            List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
-            if (CollectionUtils.isEmpty(languages) || languages.stream()
-                    .map(String::toLowerCase)
-                    .noneMatch(lang -> lang.equals(language.toLowerCase()))) {
+        } else {
+            boolean match = CollectionUtils.isNotEmpty(languages) &&
+                    languages.stream()
+                            .map(String::toLowerCase)
+                            .anyMatch(lang -> lang.equals(language.toLowerCase()));
+            if (!match) {
                 throw new ProjectCommonException(
                         ResponseCode.languageRequired.getErrorCode(),
                         ResponseCode.languageRequired.getErrorMessage(),
@@ -83,11 +87,6 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
                 );
             }
             request.getRequest().put(JsonKey.LANGUAGE, language.toLowerCase());
-        } else {
-            List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
-            if (CollectionUtils.isNotEmpty(languages)) {
-                request.getRequest().put(JsonKey.LANGUAGE, languages.get(0).toLowerCase());
-            }
         }
     }
 
