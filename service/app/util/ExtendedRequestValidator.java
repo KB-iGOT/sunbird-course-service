@@ -103,46 +103,32 @@ public class ExtendedRequestValidator {
                                JsonKey.MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR,
                                 ERROR_CODE);
                 }
-                try {
-                    Map<String, Object> courseContent = getCourseContent(contentId);
-                    String courseCategory = (String) courseContent.get("courseCategory");
-
-                    if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, courseCategory)) {
-                        String language = (String) map.get(JsonKey.LANGUAGE);
-                        if (StringUtils.isBlank(language)) {
-                            throw new ProjectCommonException(
-                                    ResponseCode.languageRequired.getErrorCode(),
-                                    ResponseCode.languageRequired.getErrorMessage(),
-                                    ERROR_CODE
-                            );
-                        } else {
-                            List<String> languages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
-                            boolean notPresent = languages.stream()
-                                    .map(String::toLowerCase)
-                                    .noneMatch(lang -> lang.equals(language.toLowerCase()));
-                            if (notPresent) {
-                                throw new ProjectCommonException(
-                                        ResponseCode.languageRequired.getErrorCode(),
-                                        ResponseCode.languageRequired.getErrorMessage(),
-                                        ERROR_CODE
-                                );
-                            }
-                            map.put(JsonKey.LANGUAGE, language.toLowerCase());
-                        }
+                Map<String, Object> courseContent = getCourseContent(contentId);
+                List<String> allowedLanguages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
+                String incomingLanguage = (String) map.get(JsonKey.LANGUAGE);
+                if (StringUtils.isBlank(incomingLanguage)) {
+                    if (CollectionUtils.isNotEmpty(allowedLanguages)) {
+                        map.put(JsonKey.LANGUAGE, allowedLanguages.get(0).toLowerCase());
                     } else {
-                        String id = StringUtils.isNotBlank((String) map.get(JsonKey.COURSE_ID))
-                                ? (String) map.get(JsonKey.COURSE_ID)
-                                : (String) map.get(JsonKey.COLLECTION_ID);
-                        Map<String, Object> courseIdContent = getCourseContent(id);
-                        if (MapUtils.isNotEmpty(courseIdContent)) {
-                            List<String> languages = (List<String>) courseIdContent.get(JsonKey.LANGUAGE);
-                            if (CollectionUtils.isNotEmpty(languages)) {
-                                map.put(JsonKey.LANGUAGE, languages.get(0).toLowerCase());
-                            }
-                        }
+                        throw new ProjectCommonException(
+                                ResponseCode.languageRequired.getErrorCode(),
+                                ResponseCode.languageRequired.getErrorMessage(),
+                                ERROR_CODE
+                        );
                     }
-                } catch (Exception e) {
-                    logger.error(null, "Error fetching course content for contentId: " + contentId, e);
+                } else {
+                    boolean match = CollectionUtils.isNotEmpty(allowedLanguages) &&
+                            allowedLanguages.stream()
+                                    .map(String::toLowerCase)
+                                    .anyMatch(lang -> lang.equals(incomingLanguage.toLowerCase()));
+                    if (!match) {
+                        throw new ProjectCommonException(
+                                ResponseCode.languageRequired.getErrorCode(),
+                                ResponseCode.languageRequired.getErrorMessage(),
+                                ERROR_CODE
+                        );
+                    }
+                    map.put(JsonKey.LANGUAGE, incomingLanguage.toLowerCase());
                 }
 
             }
