@@ -125,8 +125,9 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     isRetiredCoursesIncludedInEnrolList = true
     val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
-    if (CollectionUtils.isNotEmpty(enrolmentList)) {
-      allEnrolledCourses.addAll(enrolmentList)
+    val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
+    if (CollectionUtils.isNotEmpty(updatedEnrolmentList)) {
+      allEnrolledCourses.addAll(updatedEnrolmentList)
     }
     val userCourseEnrolmentInfo = getUserEnrolmentCourseInfo(allEnrolledCourses.asScala.toList, request, userId);
     var externalCourseInfo = new util.HashMap[String, AnyRef]()
