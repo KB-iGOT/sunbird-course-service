@@ -478,6 +478,8 @@ public interface ResponseMessage {
     String USER_ALREADY_ENROLLED_COURSE_DIFFERENT_BATCH = "User has already enrolled this course with different batch.";
     String COURSE_NOT_FOUND = "Course not found for the given course id.";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "Access rules are enabled for the course but no access rules found.";
+    String ACCESS_RULES_ENABLED_BUT_NOT_FOUND_COURSE = "This course has been created for select learners, please keep your profile updated to ensure such selective content's if meant for you can be enrolled.";
+    String ACCESS_RULES_ENABLED_BUT_NOT_FOUND_PROGRAM = "This program has been created for select learners, please keep your profile updated to ensure such selective content's if meant for you can be enrolled.";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible to enrol into this course.";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "Invalid completion percentage, completion percentage should not be greater than 100.";
   }
