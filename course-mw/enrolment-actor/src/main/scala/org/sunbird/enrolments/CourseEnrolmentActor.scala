@@ -129,6 +129,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             dataMap.put("edata",requestMap)
             val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
             InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
         }
@@ -198,6 +199,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             dataMap.put("edata",requestMap)
             val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
             InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
         }
@@ -659,6 +661,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         sender().tell(successResponse(), self)
         generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
         notifyUser(userId, batchData, JsonKey.ADD)
+        cacheUtil.delete(getCacheBatchKey(batchId))
     }
 
     def getContentReadAPIData(programId: String, fieldList: List[String], request: Request): util.Map[String, AnyRef] = {
@@ -893,6 +896,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
                     map.put(JsonKey.ERRORMSG, e.getMessage)
                     response.put(userId, status)
             }
+            cacheUtil.delete(getCacheBatchKey(batchId))
             resp.put(JsonKey.RESPONSE, response)
         }
         sender().tell(resp, self)
@@ -1009,6 +1013,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             ProjectCommonException.throwClientErrorException(ResponseCode.courseBatchAlreadyCompleted, ResponseCode.courseBatchAlreadyCompleted.getErrorMessage)
     }
 
+    def getCacheBatchKey(batchId: String) = s"$batchId:active-participants-count"
 }
 
 
