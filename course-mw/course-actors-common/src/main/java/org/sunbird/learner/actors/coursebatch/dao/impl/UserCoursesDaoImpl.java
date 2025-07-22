@@ -12,6 +12,7 @@ import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.Constants;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.PropertiesCache;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.coursebatch.dao.UserCoursesDao;
@@ -316,6 +317,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
   public long getCountOfActiveParticipants(RequestContext requestContext,String batchId) {
     int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_TTL));
+    int participantFetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
     String key = getCacheKey(batchId);
     String responseString = redisCacheUtil.get(key,null,ttl);
     if (StringUtils.isNotBlank(responseString)) {
@@ -334,7 +336,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
                 queryMap,
                 null,
                 pageState,
-                5
+                participantFetchSize
         );
 
         List<Map<String, Object>> userCoursesList =
