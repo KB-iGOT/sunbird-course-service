@@ -1231,6 +1231,8 @@ public final class JsonKey {
   public static final String COMPLETION_PERCENTAGE="completionPercentage";
   public static final String CADRE = "cadre";
   public static final String EXTERNAL_COURSES = "external_courses";
+  public static final String PARTICIPANTS_TTL = "participants_ttl";
+  public static final String PARTICIPANTS_FETCH_SIZE = "participants_fetch_size";
 
   private JsonKey() {}
 }
