@@ -315,50 +315,35 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return null;
   }
 
-  public long getCountOfActiveParticipants(RequestContext requestContext,String batchId) {
+  public long getCountOfActiveParticipants(RequestContext requestContext, String batchId) {
     int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_TTL));
-    int participantFetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
-    String key = getCacheKey(batchId);
-    String responseString = redisCacheUtil.get(key,null,ttl);
-    if (StringUtils.isNotBlank(responseString)) {
-      return Long.parseLong(responseString);
-    } else {
-      List<String> userList = new ArrayList<>();
-      String pageState = null;
+    int fetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
+    String cacheKey = getCacheKey(batchId);
+    String cachedCount = redisCacheUtil.get(cacheKey, null, ttl);
+    if (StringUtils.isNotBlank(cachedCount)) {
+      return Long.parseLong(cachedCount);
+    }
+    List<String> activeUsers = new ArrayList<>();
+    String pageState = null;
+    do {
+      Map<String, Object> query = Map.of(JsonKey.BATCH_ID, batchId);
+      Response response = cassandraOperation.getRecordByIdentifierWithPage(
+              requestContext, KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, query, null, pageState, fetchSize
+      );
 
-      do {
-        Map<String, Object> queryMap = new HashMap<>();
-        queryMap.put(JsonKey.BATCH_ID, batchId);
-        Response response = cassandraOperation.getRecordByIdentifierWithPage(
-                requestContext,
-                KEYSPACE_NAME,
-                ENROLMENT_BATCH_LOOKUP,
-                queryMap,
-                null,
-                pageState,
-                participantFetchSize
-        );
+      List<Map<String, Object>> userCourses = (List<Map<String, Object>>) response.getResult().get(JsonKey.RESPONSE);
 
-        List<Map<String, Object>> userCoursesList =
-                (List<Map<String, Object>>) response.getResult().get(JsonKey.RESPONSE);
-
-        if (userCoursesList != null) {
-          for (Map<String, Object> userCourse : userCoursesList) {
-            Object isActive = userCourse.get(JsonKey.ACTIVE);
-            if (isActive != null && (boolean) isActive) {
-              userList.add((String) userCourse.get(JsonKey.USER_ID));
-            }
+      if (userCourses != null) {
+        for (Map<String, Object> userCourse : userCourses) {
+          if (Boolean.TRUE.equals(userCourse.get(JsonKey.ACTIVE))) {
+            activeUsers.add((String) userCourse.get(JsonKey.USER_ID));
           }
         }
-
-        pageState = (String) response.getResult().get(JsonKey.PAGE_ID);
-
-      } while (pageState != null);
-
-      redisCacheUtil.set(key, String.valueOf(userList.size()), ttl);
-      return userList.size();
-    }
-
+      }
+      pageState = (String) response.getResult().get(JsonKey.PAGE_ID);
+    } while (pageState != null);
+    redisCacheUtil.set(cacheKey, String.valueOf(activeUsers.size()), ttl);
+    return activeUsers.size();
   }
 
   private String getCacheKey(String batchId) {
