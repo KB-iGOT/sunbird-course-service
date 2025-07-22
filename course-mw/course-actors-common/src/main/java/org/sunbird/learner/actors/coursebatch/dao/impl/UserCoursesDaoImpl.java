@@ -316,13 +316,13 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   }
 
   public long getCountOfActiveParticipants(RequestContext requestContext, String batchId) {
-    int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_TTL));
-    int fetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
     String cacheKey = getCacheKey(batchId);
-    String cachedCount = redisCacheUtil.get(cacheKey, null, ttl);
+    String cachedCount = redisCacheUtil.get(cacheKey, null, null);
     if (StringUtils.isNotBlank(cachedCount)) {
       return Long.parseLong(cachedCount);
     }
+    int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_TTL));
+    int fetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
     List<String> activeUsers = new ArrayList<>();
     String pageState = null;
     do {
@@ -333,7 +333,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
       List<Map<String, Object>> userCourses = (List<Map<String, Object>>) response.getResult().get(JsonKey.RESPONSE);
 
-      if (userCourses != null) {
+      if (collectionUtils.isNotEmpty(userCourses)) {
         for (Map<String, Object> userCourse : userCourses) {
           if (Boolean.TRUE.equals(userCourse.get(JsonKey.ACTIVE))) {
             activeUsers.add((String) userCourse.get(JsonKey.USER_ID));
