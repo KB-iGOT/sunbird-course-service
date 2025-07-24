@@ -51,9 +51,11 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     validator.validateRequestedBy(userId);
                     validator.validateEnrollCourse(req);
                     validator.validateEnrolmentCriteria(req, true, false);
-                    String validatedLang = validator.validateLanguageSupport(reqLang, courseId);
-                    req.getContext().put(JsonKey.RECENT_LANGUAGE, validatedLang);
-
+                    Map<String, String> validatedLangAndContent = validator.validateLanguageSupport(reqLang, courseId);
+                    if (validatedLangAndContent != null && validatedLangAndContent.get(JsonKey.COURSE_ID) != null) {
+                        requestMap.put(JsonKey.RECENT_LANGUAGE, validatedLangAndContent.get(JsonKey.RECENT_LANGUAGE));
+                        requestMap.put(JsonKey.COURSE_ID, validatedLangAndContent.get(JsonKey.COURSE_ID));
+                    }
                     return null;
                 },
                 getAllRequestHeaders(httpRequest),
