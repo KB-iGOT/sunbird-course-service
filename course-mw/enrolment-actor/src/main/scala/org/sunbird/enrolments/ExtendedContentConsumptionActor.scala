@@ -335,7 +335,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       }).asJava
       response.put(JsonKey.RESPONSE, filteredContents)
 
-      response.put("languageProgress", getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
+      response.put(JsonKey.LANGUAGE_PROGRESS, getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
     } else {
       response.put(JsonKey.RESPONSE, new java.util.ArrayList[AnyRef]())
     }
@@ -655,9 +655,9 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                          ): Map[String, Double] = {
 
     val filters = Map[String, AnyRef](
-      "userid" -> userId,
-      "courseid" -> courseId,
-      "batchid" -> batchId
+      JsonKey.USER_ID_KEY -> userId,
+      JsonKey.COURSE_ID_KEY -> courseId,
+      JsonKey.BATCH_ID_KEY -> batchId
     ).asJava
 
     val result = cassandraOperation.getRecords(
@@ -674,7 +674,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
     if (responseList.isEmpty) return Map.empty
 
-    val langContentStatus = Option(responseList.get(0).get("langContentStatus"))
+    val langContentStatus = Option(responseList.get(0).get(JsonKey.LANG_CONTENT_STATUS))
       .getOrElse(new java.util.HashMap[String, java.util.Map[String, Integer]]())
       .asInstanceOf[java.util.Map[String, java.util.Map[String, Integer]]]
 
@@ -684,20 +684,20 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
     val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId)
 
-    val languageMap = Option(courseMetadata.get("languageMapV1"))
+    val languageMap = Option(courseMetadata.get(JsonKey.LANGUAGE_MAP))
       .map(_.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]].asScala)
       .getOrElse(Map.empty)
 
     languageMap.flatMap {
       case (lang, langMeta) =>
-        val langCourseId = Option(langMeta.get("id")).map(_.toString).getOrElse("")
+        val langCourseId = Option(langMeta.get(JsonKey.ID)).map(_.toString).getOrElse("")
         val completedCount = langContentMap.getOrElse(lang, Map.empty).count(_._2 == 2)
 
         val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId)
 
-        val status = Option(langMeta.get("status")).map(_.toString).getOrElse("")
-        if ("live".equalsIgnoreCase(status)) {
-          val leafNodesCount = Option(courseDetails.get("leafNodes"))
+        val status = Option(langMeta.get(JsonKey.STATUS)).map(_.toString).getOrElse("")
+        if (JsonKey.LIVE.equalsIgnoreCase(status)) {
+          val leafNodesCount = Option(courseDetails.get(JsonKey.LEAF_NODES))
             .map(_.asInstanceOf[java.util.List[String]].size())
             .getOrElse(0)
 
