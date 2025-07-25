@@ -279,7 +279,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
   // TODO: Add support to handle language-specific details
   @throws[Exception]
-  private def pushInstructionEvent(requestContext: RequestContext, userId: String, batchId: String, courseId: String, contents: java.util.List[java.util.Map[String, AnyRef]], primaryCategory:String, parentCollections: java.util.List[String]): Unit = {
+  private def pushInstructionEvent(requestContext: RequestContext, userId: String, batchId: String, courseId: String, contents: java.util.List[java.util.Map[String, AnyRef]], primaryCategory:String, parentCollections: java.util.List[String], language: String): Unit = {
     val data = new java.util.HashMap[String, AnyRef]
     data.put(CourseJsonKey.ACTOR, new java.util.HashMap[String, AnyRef]() {{
       put(JsonKey.ID, InstructionEvent.BATCH_USER_STATE_UPDATE.getActorId)
@@ -303,6 +303,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       put(JsonKey.PARENT_COLLECTIONS, parentCollections)
       put(CourseJsonKey.ACTION, InstructionEvent.BATCH_USER_STATE_UPDATE.getAction)
       put(CourseJsonKey.ITERATION, 1.asInstanceOf[AnyRef])
+      put(JsonKey.LANGUAGE, language)
     }})
     val topic = ProjectUtil.getConfigValue("kafka_topics_instruction_v2")
     logger.info(requestContext,"LearnerStateUpdateActor: pushInstructionEvent :Event Data " + data + " and Topic " + topic)
@@ -435,7 +436,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
             val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
             val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
-            pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
+            pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList, language)
             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)
             val updateData = getLatestReadDetails(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             updateData._2.put(JsonKey.RECENT_LANGUAGE, language)
