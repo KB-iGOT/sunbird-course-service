@@ -3,6 +3,8 @@ package controllers.courseenrollment;
 import akka.actor.ActorRef;
 import controllers.BaseController;
 import controllers.courseenrollment.validator.CourseEnrollmentRequestValidator;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.Request;
 import play.mvc.Http;
@@ -45,15 +47,18 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     }
                     logger.info(req.getRequestContext(),
                             "extendedCourseEnrolmentActor : enrollCourseWithLanguage request received, userId=" + userId +
-                                    ", courseId=" + courseId + ", batchId=" + batchId);
+                                    ", courseId=" + courseId + ", batchId=" + batchId + ",RequestLanguage" + reqLang);
 
                     // Validations
                     validator.validateRequestedBy(userId);
                     validator.validateEnrollCourse(req);
                     validator.validateEnrolmentCriteria(req, true, false);
-                    String validatedLang = validator.validateLanguageSupport(reqLang, courseId);
-                    req.getContext().put(JsonKey.RECENT_LANGUAGE, validatedLang);
-
+                    Map<String, String> validatedLangAndContent = validator.validateLanguageSupport(reqLang, courseId);
+                    if (MapUtils.isNotEmpty(validatedLangAndContent)
+                            && StringUtils.isNotBlank(MapUtils.getString(validatedLangAndContent, JsonKey.COURSE_ID))) {
+                        requestMap.put(JsonKey.RECENT_LANGUAGE, validatedLangAndContent.get(JsonKey.RECENT_LANGUAGE));
+                        requestMap.put(JsonKey.COURSE_ID, validatedLangAndContent.get(JsonKey.COURSE_ID));
+                    }
                     return null;
                 },
                 getAllRequestHeaders(httpRequest),

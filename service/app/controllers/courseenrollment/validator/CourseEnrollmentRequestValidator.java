@@ -10,6 +10,7 @@ import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.LoggerUtil;
 import org.sunbird.common.request.BaseRequestValidator;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
@@ -28,6 +29,8 @@ import java.util.stream.Collectors;
 public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
   private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
+
+  private static LoggerUtil logger = new LoggerUtil(ContentUtil.class);
 
   public CourseEnrollmentRequestValidator() {}
 
@@ -408,7 +411,8 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
   }
 
-  public String validateLanguageSupport(String reqLang, String courseId) {
+  public Map<String, String> validateLanguageSupport(String reqLang, String courseId) {
+    Map<String, String> result = new HashMap<>();
     List<String> fields = Arrays.asList(JsonKey.LANGUAGE, JsonKey.LANGUAGE_MAP, JsonKey.COURSECATEGORY, JsonKey.IDENTIFIER);
     Map<String, Object> contentResponse = ContentUtil.getContent(courseId, fields);
     Map<String, Object> contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
@@ -420,13 +424,16 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
       );
     }
     String courseCategory = (String) contentData.getOrDefault(JsonKey.COURSECATEGORY, "");
+    String recentLangFromMultilingual = null;
     if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
-      throw new ProjectCommonException(
-              ResponseCode.invalidParameterValue.getErrorCode(),
-              JsonKey.LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE,
-              ResponseCode.CLIENT_ERROR.getResponseCode()
-      );
+      //if courseCategory is multilingual course then we are replacing with base language courseId.
+      Map<String, String> courseIdWithLanguage = getBaseLanguageId(contentData);
+      courseId = courseIdWithLanguage.get(JsonKey.ID);
+      recentLangFromMultilingual = courseIdWithLanguage.get(JsonKey.RECENT_LANGUAGE);
+      contentResponse = ContentUtil.getContent(courseId, fields);
+      contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
     }
+    result.put(JsonKey.COURSE_ID, courseId);
 
     List<String> baseLangList = new ArrayList<>();
     Object baseLangObj = contentData.get(JsonKey.LANGUAGE);
@@ -441,7 +448,8 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     if (StringUtils.isNotBlank(reqLang)) {
       //If reqLang is provided, validate it
       if (baseLangList.contains(reqLang.toLowerCase())) {
-        return reqLang.toLowerCase();
+        result.put(JsonKey.RECENT_LANGUAGE, reqLang.toLowerCase());
+        return result;
       }
       Map<String, Map<String, Object>> languageMap = new HashMap<>();
       Object langMapObj = contentData.get(JsonKey.LANGUAGE_MAP);
@@ -469,10 +477,14 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
                 ResponseCode.CLIENT_ERROR.getResponseCode()
         );
       }
-      return reqLang.toLowerCase();
+      result.put(JsonKey.RECENT_LANGUAGE, reqLang.toLowerCase());
+      return result;
     } else {
-      // If no base language either, throw error
-      if (StringUtils.isBlank(baseLang)) {
+      if (StringUtils.isNotBlank(recentLangFromMultilingual)) {
+        result.put(JsonKey.RECENT_LANGUAGE, recentLangFromMultilingual.toLowerCase());
+      } else if (StringUtils.isNotBlank(baseLang)) {
+        result.put(JsonKey.RECENT_LANGUAGE, baseLang);
+      } else {
         throw new ProjectCommonException(
                 ResponseCode.mandatoryParamsMissing.getErrorCode(),
                 String.format(JsonKey.LANGUAGE_AND_BASE_MISSING, courseId),
@@ -480,6 +492,43 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
         );
       }
     }
-    return baseLang;
+    return result;
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, String> getBaseLanguageId(Map<String, Object> contentData) {
+    Object langMapV1Obj = contentData.get(JsonKey.LANGUAGE_MAP);
+
+    if (langMapV1Obj instanceof Map) {
+      Map<String, Object> langMapV1 = (Map<String, Object>) langMapV1Obj;
+
+      for (Map.Entry<String, Object> entry : langMapV1.entrySet()) {
+        String language = entry.getKey();
+        Object langEntry = entry.getValue();
+
+        if (langEntry instanceof Map) {
+          Map<String, Object> langDetails = (Map<String, Object>) langEntry;
+
+          boolean isBaseLanguage = Boolean.parseBoolean(String.valueOf(langDetails.getOrDefault(JsonKey.IS_BASE_LANGUAGE, false)));
+          String status = String.valueOf(langDetails.getOrDefault(JsonKey.STATUS, ""));
+
+          if (isBaseLanguage && JsonKey.LIVE.equalsIgnoreCase(status)) {
+            String baseContentId = String.valueOf(langDetails.get(JsonKey.ID));
+            if (StringUtils.isNotBlank(baseContentId)) {
+              logger.info(null, JsonKey.MULTILINGUAL_COURSE_SWITCH_LOG+ baseContentId);
+              Map<String, String> result = new HashMap<>();
+              result.put(JsonKey.ID, baseContentId);
+              result.put(JsonKey.RECENT_LANGUAGE, language);
+              return result;
+            }
+          }
+        }
+      }
+    }
+    throw new ProjectCommonException(
+            ResponseCode.invalidParameterValue.getErrorCode(),
+            JsonKey.ERROR_MULTILINGUAL_BASE_LANG_NOT_FOUND,
+            ResponseCode.CLIENT_ERROR.getResponseCode()
+    );
   }
 }
