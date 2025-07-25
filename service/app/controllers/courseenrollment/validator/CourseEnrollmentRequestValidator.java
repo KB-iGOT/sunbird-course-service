@@ -428,7 +428,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     if (JsonKey.MULTILINGUAL_COURSE.equalsIgnoreCase(courseCategory)) {
       //if courseCategory is multilingual course then we are replacing with base language courseId.
       Map<String, String> courseIdWithLanguage = getBaseLanguageId(contentData);
-      courseId = courseIdWithLanguage.get("id");
+      courseId = courseIdWithLanguage.get(JsonKey.ID);
       recentLangFromMultilingual = courseIdWithLanguage.get(JsonKey.RECENT_LANGUAGE);
       contentResponse = ContentUtil.getContent(courseId, fields);
       contentData = (Map<String, Object>) contentResponse.get(JsonKey.CONTENT);
@@ -509,13 +509,13 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
         if (langEntry instanceof Map) {
           Map<String, Object> langDetails = (Map<String, Object>) langEntry;
 
-          boolean isBase = Boolean.parseBoolean(String.valueOf(langDetails.getOrDefault("isBaseLanguage", false)));
+          boolean isBaseLanguage = Boolean.parseBoolean(String.valueOf(langDetails.getOrDefault(JsonKey.IS_BASE_LANGUAGE, false)));
           String status = String.valueOf(langDetails.getOrDefault(JsonKey.STATUS, ""));
 
-          if (isBase && JsonKey.LIVE.equalsIgnoreCase(status)) {
+          if (isBaseLanguage && JsonKey.LIVE.equalsIgnoreCase(status)) {
             String baseContentId = String.valueOf(langDetails.get(JsonKey.ID));
             if (StringUtils.isNotBlank(baseContentId)) {
-              logger.info(null, "Multilingual course detected. Switching contentId to base language contentId= "+ baseContentId);
+              logger.info(null, JsonKey.MULTILINGUAL_COURSE_SWITCH_LOG+ baseContentId);
               Map<String, String> result = new HashMap<>();
               result.put(JsonKey.ID, baseContentId);
               result.put(JsonKey.RECENT_LANGUAGE, language);
@@ -527,7 +527,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
     }
     throw new ProjectCommonException(
             ResponseCode.invalidParameterValue.getErrorCode(),
-            "Base language content not found or not live in languageMapV1 for multilingual course.",
+            JsonKey.ERROR_MULTILINGUAL_BASE_LANG_NOT_FOUND,
             ResponseCode.CLIENT_ERROR.getResponseCode()
     );
   }
