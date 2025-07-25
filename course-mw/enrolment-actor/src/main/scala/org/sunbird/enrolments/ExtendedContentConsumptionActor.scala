@@ -304,7 +304,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       put(CourseJsonKey.ACTION, InstructionEvent.BATCH_USER_STATE_UPDATE.getAction)
       put(CourseJsonKey.ITERATION, 1.asInstanceOf[AnyRef])
     }})
-    val topic = ProjectUtil.getConfigValue("kafka_topics_instruction")
+    val topic = ProjectUtil.getConfigValue("kafka_topics_instruction_v2")
     logger.info(requestContext,"LearnerStateUpdateActor: pushInstructionEvent :Event Data " + data + " and Topic " + topic)
     if(pushTokafkaEnabled)
       InstructionEventGenerator.pushInstructionEvent(userId, topic, data)
@@ -333,6 +333,8 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         formattedMap
       }).asJava
       response.put(JsonKey.RESPONSE, filteredContents)
+
+      response.put("languageProgress", getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
     } else {
       response.put(JsonKey.RESPONSE, new java.util.ArrayList[AnyRef]())
     }
@@ -643,5 +645,68 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                              status: Int): java.util.Map[String, java.util.Map[String, java.lang.Integer]] = {
     Map(language -> Map(contentId -> Integer.valueOf(status)).asJava).asJava
   }
+
+  def getLanguageProgress(
+                           userId: String,
+                           courseId: String,
+                           batchId: String,
+                           requestContext: RequestContext
+                         ): Map[String, Double] = {
+
+    val filters = Map[String, AnyRef](
+      "userid" -> userId,
+      "courseid" -> courseId,
+      "batchid" -> batchId
+    ).asJava
+
+    val result = cassandraOperation.getRecords(
+      requestContext,
+      enrolmentDBInfo.getKeySpace,
+      enrolmentDBInfo.getTableName,
+      filters,
+      null
+    )
+
+    val responseList = result.getResult
+      .getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]())
+      .asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+
+    if (responseList.isEmpty) return Map.empty
+
+    val langContentStatus = Option(responseList.get(0).get("langContentStatus"))
+      .getOrElse(new java.util.HashMap[String, java.util.Map[String, Integer]]())
+      .asInstanceOf[java.util.Map[String, java.util.Map[String, Integer]]]
+
+    val langContentMap: Map[String, Map[String, Int]] = langContentStatus.asScala.map {
+      case (lang, contents) => (lang, contents.asScala.map { case (k, v) => (k, v.toInt) }.toMap)
+    }.toMap
+
+    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId)
+
+    val languageMap = Option(courseMetadata.get("languageMapV1"))
+      .map(_.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]].asScala)
+      .getOrElse(Map.empty)
+
+    languageMap.flatMap {
+      case (lang, langMeta) =>
+        val langCourseId = Option(langMeta.get("id")).map(_.toString).getOrElse("")
+        val completedCount = langContentMap.getOrElse(lang, Map.empty).count(_._2 == 2)
+
+        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId)
+
+        val status = Option(langMeta.get("status")).map(_.toString).getOrElse("")
+        if ("live".equalsIgnoreCase(status)) {
+          val leafNodesCount = Option(courseDetails.get("leafNodes"))
+            .map(_.asInstanceOf[java.util.List[String]].size())
+            .getOrElse(0)
+
+          if (leafNodesCount > 0) {
+            val percent = (completedCount.toDouble / leafNodesCount) * 100
+            Some(lang -> BigDecimal(percent).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
+          } else None
+        } else None
+    }.toMap
+  }
+
 
 }
