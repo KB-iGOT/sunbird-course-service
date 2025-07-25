@@ -83,7 +83,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val courseId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     val batchId = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
-    val recentLangOpt = Option(request.getContext.get(JsonKey.RECENT_LANGUAGE)).map(_.toString.toLowerCase)
+    val recentLangOpt = Option(request.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String])
 
     logger.info(request.getRequestContext, s"ExtendedCourseEnrolmentActor :: enrollWithLanguage :: Request received for courseId=$courseId, userId=$userId, batchId=$batchId, recentLanguage=$recentLangOpt")
 

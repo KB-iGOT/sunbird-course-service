@@ -1241,6 +1241,11 @@ public final class JsonKey {
   public static final String LANGUAGE_AND_BASE_MISSING = "Both requested and base language are missing for courseId: %s";
   public static final String LANGUAGE_MISSING_FOR_MULTILINGUAL_COURSE = "Cannot enroll in a course with 'Multilingual Course' category.";
   public static final String MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR = "Invalid course category for progress update. Progress cannot be updated for courses categorized as 'Multilingual Course'.";
+  public static final String MULTILINGUAL_COURSE_SWITCH_LOG = "Multilingual course detected. Switching contentId to base language contentId= ";
+  public static final String ERROR_MULTILINGUAL_BASE_LANG_NOT_FOUND = "Base language content not found or not live in languageMapV1 for multilingual course.";
+  public static final String IS_BASE_LANGUAGE = "isBaseLanguage";
+
+
 
 
 
