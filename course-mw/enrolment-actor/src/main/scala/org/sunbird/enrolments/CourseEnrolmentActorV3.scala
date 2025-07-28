@@ -193,9 +193,14 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     var batchId: String = null
     if (request.get(Constants.COURSE_ID) != null) {
       val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
+      if (courseIdListFromRequest.exists(id => id == null || id.trim.isEmpty)) {
+        throw new IllegalArgumentException("Course ID list contains null or empty string elements.")
+      }
       courseIdList.addAll(courseIdListFromRequest)
       if (courseIdListFromRequest.size() == 1) {
-        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] =  userCoursesDao.listEnrolments(request.getRequestContext, userId, courseIdListFromRequest);
+        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] =
+          userCoursesDao.listEnrolments(request.getRequestContext, userId, courseIdListFromRequest)
+
         if (CollectionUtils.isEmpty(courseEnrolment)) {
           return new util.ArrayList[java.util.Map[String, AnyRef]]()
         }
