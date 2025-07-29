@@ -834,28 +834,37 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val isAdminAPI: Boolean = request.get(JsonKey.IS_ADMIN_API).asInstanceOf[Boolean]
         val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES)
         val contentData = getContentReadAPIData(programId, fieldList, request)
-
-        if (isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.ADMIN_PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
-            ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
-
-        if (!isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
-            ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
+//        if (isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.ADMIN_PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
+//            ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
+//
+//        if (!isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
+//            ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
 
         val userIds = request.get(JsonKey.USERID_LIST).asInstanceOf[java.util.List[String]]
-        val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
-        val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
-
+        val batchId = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
+        val batchData = courseBatchDao.readById(programId, batchId, request.getRequestContext)
+        val enrolledUsers = userCoursesDao.getBatchParticipants(request.getRequestContext, batchId, true)
+        val maxBatchSize = batchData.getBatchAttributes.get(JsonKey.CURRENT_BATCH_SIZE).toString.toInt
+        if (enrolledUsers.size() + userIds.size() > maxBatchSize) {
+            val remainingSlots = maxBatchSize - enrolledUsers.size()
+            ProjectCommonException.throwClientErrorException(
+                ResponseCode.batchSizeExceeded,MessageFormat.format(
+                    ResponseCode.batchSizeExceeded.getErrorMessage(),Integer.valueOf(remainingSlots)))
+        }
         for (userId <- userIds) {
             try {
                 var enrolmentData: UserCourses = null
                 val enrolmentDataList: java.util.List[UserCourses] = userCoursesDao.readAll(request.getRequestContext, userId, programId)
                 if (null != enrolmentDataList) {
                     for (enrolment <- enrolmentDataList) {
-                        if (enrolment.isActive) {
-                            ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse);
-                        }
                         if (enrolment.getBatchId.equals(batchId)) {
-                            enrolmentData = enrolment
+                            if (enrolment.isActive) {
+                                ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse);
+                            } else {
+                                enrolmentData = enrolment;
+                            }
+                        } else if (enrolment.isActive) {
+                            ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch);
                         }
                     }
                 }

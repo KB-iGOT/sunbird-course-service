@@ -885,6 +885,9 @@ public enum ResponseCode {
   invalidCompletionPercentage(
           ResponseMessage.Key.INVALID_COMPLETION_PERCENTAGE_ERROR,
           ResponseMessage.Message.INVALID_COMPLETION_PERCENTAGE_ERROR),
+  batchSizeExceeded(
+          ResponseMessage.Key.BATCH_SIZE_EXCEEDED,
+          ResponseMessage.Message.BATCH_SIZE_EXCEEDED_VALUE),
 
   OK(200),
   CLIENT_ERROR(400),
