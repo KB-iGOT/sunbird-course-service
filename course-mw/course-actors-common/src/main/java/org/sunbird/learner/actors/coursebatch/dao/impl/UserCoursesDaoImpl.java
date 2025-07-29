@@ -426,4 +426,29 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return getEnrolmentByBatchIdAndCourseIdInternal(requestContext, userId, courseId, batchId, USER_ENROLMENTS_V2);
   }
 
+  public List<UserCourses> extendedReadAllV2(RequestContext requestContext, String userId, String courseId) {
+    Map<String, Object> primaryKey = new HashMap<>();
+    primaryKey.put(JsonKey.USER_ID, userId);
+    primaryKey.put(JsonKey.COURSE_ID, courseId);
+    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, primaryKey, null);
+    List<Map<String, Object>> userCoursesList =
+            (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+    if (CollectionUtils.isEmpty(userCoursesList)) {
+      return null;
+    }
+    try {
+      List<UserCourses> convertedUserCoursesList = new ArrayList<>();
+      for (Object userCourseObj : userCoursesList) {
+        if (userCourseObj instanceof Map) {
+          Map<String, Object> userCourseMap = (Map<String, Object>) userCourseObj;
+          convertedUserCoursesList.add(mapper.convertValue(userCourseMap, UserCourses.class));
+        }
+      }
+      return convertedUserCoursesList;
+    } catch (Exception e) {
+      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
+    }
+    return null;
+  }
+
 }

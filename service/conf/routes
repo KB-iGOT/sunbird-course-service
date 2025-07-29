@@ -134,3 +134,4 @@ POST     /v2/user/enrol/courses/details/:uid	    @controllers.courseenrollment.E
 POST     /v2/user/enrol/courses/list/:uid	    @controllers.courseenrollment.ExtendedCourseEnrollmentController.getEnrolledCourses(uid:String, request: play.mvc.Http.Request)
 POST     /private/v2/user/enrol/courses/list/:uid	    @controllers.courseenrollment.ExtendedCourseEnrollmentController.privateGetEnrolledCoursesV3(uid:String, request: play.mvc.Http.Request)
 GET      /v2/user/enrol/summary/:uid	    @controllers.courseenrollment.ExtendedCourseEnrollmentController.enrolmentUserInfoStats(uid:String, request: play.mvc.Http.Request)
+POST     /v2/program/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollProgramV2(request: play.mvc.Http.Request)

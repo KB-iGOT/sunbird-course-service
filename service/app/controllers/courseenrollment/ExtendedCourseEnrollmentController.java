@@ -12,6 +12,7 @@ import play.mvc.Result;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
@@ -124,6 +125,31 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 null,
                 getAllRequestHeaders((httpRequest)),
                 false,
+                httpRequest);
+    }
+
+    public CompletionStage<Result> enrollProgramV2(Http.Request httpRequest) {
+        return enrollProgramV2(httpRequest, false);
+    }
+
+    public CompletionStage<Result> enrollProgramV2(Http.Request httpRequest, Boolean batchType) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolProgramV2",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String programId = req.getRequest().containsKey(JsonKey.PROGRAM_ID) ? JsonKey.PROGRAM_ID : JsonKey.COLLECTION_ID;
+                    req.getRequest().put(JsonKey.PROGRAM_ID, req.getRequest().get(programId));
+                    String userId = (String) req.getContext().getOrDefault(JsonKey.REQUESTED_FOR, req.getContext().get(JsonKey.REQUESTED_BY));
+                    req.getRequest().put(JsonKey.IS_ADMIN_API, false);
+                    validator.validateRequestedBy(userId);
+                    validator.validateEnrollProgram(req);
+                    validator.validateEnrolmentCriteria(req, false, false);
+                    req.getRequest().put(JsonKey.USER_ID, userId);
+                    req.getContext().put("verifyBatchType", batchType);
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
                 httpRequest);
     }
 }
