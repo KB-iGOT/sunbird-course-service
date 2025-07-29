@@ -633,11 +633,14 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val enrolmentDataList: java.util.List[UserCourses] = userCoursesDao.readAll(request.getRequestContext, userId, programId)
         if (null != enrolmentDataList) {
             for (enrolment <- enrolmentDataList) {
-                if (enrolment.isActive) {
-                    ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse);
-                }
                 if (enrolment.getBatchId.equals(batchId)) {
-                    enrolmentData = enrolment
+                    if (enrolment.isActive) {
+                        ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse);
+                    } else {
+                        enrolmentData = enrolment;
+                    }
+                } else if (enrolment.isActive) {
+                    ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch);
                 }
             }
         }
