@@ -17,7 +17,7 @@ import org.apache.commons.collections4.{CollectionUtils, MapUtils}
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.common.exception.ProjectCommonException
 import org.sunbird.common.models.response.Response
-import org.sunbird.common.models.util.ProjectUtil.{EnrolmentType, getConfigValue}
+import org.sunbird.common.models.util.ProjectUtil.{EnrolmentType, convertJsonStringToMap, getConfigValue}
 import org.sunbird.common.models.util._
 import org.sunbird.common.request.{Request, RequestContext}
 import org.sunbird.common.responsecode.ResponseCode
@@ -848,13 +848,41 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val userIds = request.get(JsonKey.USERID_LIST).asInstanceOf[java.util.List[String]]
         val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
         val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
-        val enrolledUsers = userCoursesDao.getBatchParticipants(request.getRequestContext, batchId, true)
-        val maxBatchSize = batchData.getBatchAttributes.get(JsonKey.CURRENT_BATCH_SIZE).toString.toInt
-        if (enrolledUsers.size() + userIds.size() > maxBatchSize) {
-            val remainingSlots = maxBatchSize - enrolledUsers.size()
+        val enrolledUsers = Option(userCoursesDao.getBatchParticipants(request.getRequestContext, batchId, true))
+          .getOrElse(new java.util.ArrayList[Any]())
+
+        val batchAttributes = batchData.getBatchAttributes
+        val maxBatchSizeStr = Option(batchAttributes.get(JsonKey.CURRENT_BATCH_SIZE))
+          .map(_.toString.trim)
+          .getOrElse("")
+
+        val courseCategory = Option(contentData.get(JsonKey.COURSECATEGORY))
+          .map(_.toString.trim)
+          .getOrElse("")
+
+        val isBlendedProgram = courseCategory.equalsIgnoreCase(JsonKey.BLENDED_PROGRAM)
+        val isMaxBatchSizeValid = maxBatchSizeStr.nonEmpty && maxBatchSizeStr.forall(_.isDigit)
+
+        if (isBlendedProgram && !isMaxBatchSizeValid) {
             ProjectCommonException.throwClientErrorException(
-                ResponseCode.batchSizeExceeded,MessageFormat.format(
-                    ResponseCode.batchSizeExceeded.getErrorMessage(),Integer.valueOf(remainingSlots)))
+                ResponseCode.batchSizeNotDefined,
+                ResponseCode.batchSizeNotDefined.getErrorMessage
+            )
+        }
+
+        if (isMaxBatchSizeValid) {
+            val maxBatchSize = maxBatchSizeStr.toInt
+            val currentSize = enrolledUsers.size() + userIds.size()
+            if (currentSize > maxBatchSize) {
+                val remainingSlots = maxBatchSize - enrolledUsers.size()
+                ProjectCommonException.throwClientErrorException(
+                    ResponseCode.batchSizeExceeded,
+                    MessageFormat.format(
+                        ResponseCode.batchSizeExceeded.getErrorMessage,
+                        Integer.valueOf(remainingSlots)
+                    )
+                )
+            }
         }
         for (userId <- userIds) {
             try {
