@@ -18,8 +18,6 @@ import org.sunbird.learner.util.ExtendedUtil;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.user.courses.UserCourses;
 import org.sunbird.common.models.util.LoggerUtil;
-import org.sunbird.cache.util.RedisCacheUtil;
-import org.sunbird.common.models.util.PropertiesCache;
 
 public class UserCoursesDaoImpl implements UserCoursesDao {
   protected LoggerUtil logger = new LoggerUtil(this.getClass()); 
@@ -39,8 +37,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     }
     return userCoursesDao;
   }
-  private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
-
+  
   @Override
   public UserCourses read(RequestContext requestContext, String batchId, String userId) {
     Map<String, Object> primaryKey = new HashMap<>();
@@ -161,7 +158,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
     } else {
-      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
       if (courseIdList != null && !courseIdList.isEmpty() && userCoursesList != null) {
         List<Map<String, Object>> filteredList = new ArrayList<>();
@@ -331,41 +328,6 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return null;
   }
 
-  public long getCountOfActiveParticipants(RequestContext requestContext, String batchId) {
-    String cacheKey = getCacheKey(batchId);
-    int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_TTL));
-    String cachedCount = redisCacheUtil.get(cacheKey, null, ttl);
-    if (StringUtils.isNotBlank(cachedCount)) {
-      return Long.parseLong(cachedCount);
-    }
-    int fetchSize = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.PARTICIPANTS_FETCH_SIZE));
-    List<String> activeUsers = new ArrayList<>();
-    String pageState = null;
-    do {
-      Map<String, Object> query = Map.of(JsonKey.BATCH_ID, batchId);
-      Response response = cassandraOperation.getRecordByIdentifierWithPage(
-              requestContext, KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, query, null, pageState, fetchSize
-      );
-
-      List<Map<String, Object>> userCourses = (List<Map<String, Object>>) response.getResult().get(JsonKey.RESPONSE);
-
-      if (CollectionUtils.isNotEmpty(userCourses)) {
-        for (Map<String, Object> userCourse : userCourses) {
-          if (Boolean.TRUE.equals(userCourse.get(JsonKey.ACTIVE))) {
-            activeUsers.add((String) userCourse.get(JsonKey.USER_ID));
-          }
-        }
-      }
-      pageState = (String) response.getResult().get(JsonKey.PAGE_ID);
-    } while (pageState != null);
-    redisCacheUtil.set(cacheKey, String.valueOf(activeUsers.size()), ttl);
-    return activeUsers.size();
-  }
-
-  private String getCacheKey(String batchId) {
-    return batchId + ":active-participants-count";
-  }
-
   public Response insertExtendedEnrollmentV2(RequestContext requestContext, Map<String, Object> data) {
     return cassandraOperation.insertRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, data);
   }
@@ -424,31 +386,6 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   public List<Map<String, Object>> getEnrolmentByBatchIdAndCourseId_v2(
           RequestContext requestContext, String userId, String courseId, String batchId) {
     return getEnrolmentByBatchIdAndCourseIdInternal(requestContext, userId, courseId, batchId, USER_ENROLMENTS_V2);
-  }
-
-  public List<UserCourses> extendedReadAllV2(RequestContext requestContext, String userId, String courseId) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.USER_ID, userId);
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, primaryKey, null);
-    List<Map<String, Object>> userCoursesList =
-            (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-    if (CollectionUtils.isEmpty(userCoursesList)) {
-      return null;
-    }
-    try {
-      List<UserCourses> convertedUserCoursesList = new ArrayList<>();
-      for (Object userCourseObj : userCoursesList) {
-        if (userCourseObj instanceof Map) {
-          Map<String, Object> userCourseMap = (Map<String, Object>) userCourseObj;
-          convertedUserCoursesList.add(mapper.convertValue(userCourseMap, UserCourses.class));
-        }
-      }
-      return convertedUserCoursesList;
-    } catch (Exception e) {
-      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
-    }
-    return null;
   }
 
 }

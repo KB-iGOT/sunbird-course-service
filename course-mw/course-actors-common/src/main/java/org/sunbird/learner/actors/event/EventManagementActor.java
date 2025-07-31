@@ -281,13 +281,11 @@ public class EventManagementActor extends BaseActor {
             int hoursSpentOnCourses = 0;
             String lrcProgressDetails = (String) eventDetails.get(JsonKey.LRC_PROGRESS_DETAILS);
             try {
-                if (StringUtils.isNotBlank(lrcProgressDetails) && isCertificateExist) {
-                    JsonNode lrcProgressDetailsJson = mapper.readTree(lrcProgressDetails);
-                    if (lrcProgressDetailsJson.hasNonNull(JsonKey.DURATION)) {
-                        String durationValue = lrcProgressDetailsJson.get(JsonKey.DURATION).asText();
-                        int duration = parseDurationValue(durationValue);
-                        hoursSpentOnCourses += duration;
-                    }
+                JsonNode lrcProgressDetailsJson = mapper.readTree(lrcProgressDetails);
+                if (lrcProgressDetailsJson != null && lrcProgressDetailsJson.hasNonNull(JsonKey.DURATION) && isCertificateExist) {
+                    String durationValue=lrcProgressDetailsJson.get(JsonKey.DURATION).asText();
+                    int duration = parseDurationValue(durationValue);
+                    hoursSpentOnCourses += duration;
                 }
             } catch (Exception e) {
                 logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
