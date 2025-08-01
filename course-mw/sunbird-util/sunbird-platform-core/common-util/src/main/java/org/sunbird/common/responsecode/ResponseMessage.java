@@ -482,6 +482,8 @@ public interface ResponseMessage {
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND_PROGRAM = "This program has been created for select learners, please keep your profile updated to ensure such selective content/s if meant for you can be enrolled.";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible to enrol into this course.";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "Invalid completion percentage, completion percentage should not be greater than 100.";
+    String BATCH_SIZE_EXCEEDED_VALUE = "Max batch size exceeded. Only {0} more users can be enrolled to this batch.";
+    String BATCH_SIZE_NOT_DEFINED_VALUE = "Batch size is not defined for this course batch.";
   }
 
   interface Key {
@@ -891,5 +893,7 @@ public interface ResponseMessage {
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "ACCESS_RULES_ENABLED_BUT_NOT_FOUND";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "USER_NOT_ELIGIBLE_FOR_ENROLLMENT";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "INVALID_COMPLETION_PERCENTAGE_ERROR";
+    String BATCH_SIZE_EXCEEDED = "BATCH_SIZE_EXCEEDED";
+    String BATCH_SIZE_NOT_DEFINED = "BATCH_SIZE_NOT_DEFINED";
   }
 }

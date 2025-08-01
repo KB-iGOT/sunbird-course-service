@@ -770,6 +770,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           updatedContent.put(JsonKey.STATUS, 2.asInstanceOf[AnyRef])
           updatedContent.put(JsonKey.PROGRESS, 100.asInstanceOf[AnyRef])
           updatedContent.put(JsonKey.LAST_COMPLETED_TIME, compareTime(existingCompletedTime, inputCompletedTime))
+          updatedContent.put(JsonKey.COMPLETION_PERCENTAGE, 100.asInstanceOf[AnyRef])
         }
       } else {
         updatedContent.put(JsonKey.STATUS, existingStatus.asInstanceOf[AnyRef])
