@@ -891,6 +891,12 @@ public enum ResponseCode {
   preEnrolmentResourceNotCompleted(
           ResponseMessage.Key.PRE_ENROLLMENT_RESOURCE_NOT_COMPLETED,
           ResponseMessage.Message.PRE_ENROLLMENT_RESOURCE_NOT_COMPLETED),
+  batchSizeExceeded(
+          ResponseMessage.Key.BATCH_SIZE_EXCEEDED,
+          ResponseMessage.Message.BATCH_SIZE_EXCEEDED_VALUE),
+  batchSizeNotDefined(
+          ResponseMessage.Key.BATCH_SIZE_NOT_DEFINED,
+          ResponseMessage.Message.BATCH_SIZE_NOT_DEFINED_VALUE),
 
   OK(200),
   CLIENT_ERROR(400),
