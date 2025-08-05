@@ -161,7 +161,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
     } else {
-      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS, primaryKey, null);
+      Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, tableName, primaryKey, null);
       userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
       if (courseIdList != null && !courseIdList.isEmpty() && userCoursesList != null) {
         List<Map<String, Object>> filteredList = new ArrayList<>();
