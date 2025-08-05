@@ -906,7 +906,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
     val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
     logger.info(request.asInstanceOf[Request].getRequestContext, "CourseEnrolmentActor Request for enroll recieved, UserId : " + userId + ", courseId : " + courseId +", batchId : "+batchId)
-    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES)
+    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES, JsonKey.LANGUAGE)
     val contentData = getContentReadAPIData(courseId, fieldList, request)
     if (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
