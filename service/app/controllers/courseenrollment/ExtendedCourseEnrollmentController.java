@@ -152,4 +152,25 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 getAllRequestHeaders(httpRequest),
                 httpRequest);
     }
+
+    public CompletionStage<Result> blendedProgramEnrollCourseV2(Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolBlendedProgramV2",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String courseId = req.getRequest().containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                    String userId = (String) req.getRequest().get(JsonKey.USER_ID);
+                    String batchId = (String) req.getRequest().get(JsonKey.BATCH_ID);
+                    req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
+                    logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved via Blended Program admin enroll, UserId : "+  userId +", courseId : "+courseId+ ", batchId:"+batchId);
+                    validator.validateEnrollCourse(req);
+                    //call validateEnrollmentCriteriaMethod validateEnrolmentCriteria
+                    validator.validateEnrolmentCriteria(req, false, false);
+
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
 }
