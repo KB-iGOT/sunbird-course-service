@@ -18,7 +18,7 @@ import org.sunbird.kafka.client.KafkaClient
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
-import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -52,6 +52,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val cassandraOperation = ServiceFactory.getInstance
   val jsonFields = Set[String]("lrcProgressDetails")
   private val mapper = new ObjectMapper
+  private val enrolmentDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB)
+  private val consumptionDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_CONTENT_DB)
+  private val assessmentAggregatorDBInfo = Util.dbInfoMap.get(JsonKey.ASSESSMENT_AGGREGATOR_DB)
+  val dateFormatter = ProjectUtil.getDateFormatter
+
+  dateFormatter.setTimeZone(
+    TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
 
   override def preStart { println("Starting ExtendedCourseEnrollmentActor") }
 
@@ -76,6 +83,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "enrolmentInfoStats" => enrolmentInfoStats(request)
       case "enrolV3Details" => enrolV3Details(request)
       case "enrolProgramV2" => enrollProgram(request)
+      case "enrolDetailsWithProgress" => enrolDetailsWithProgress(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -277,7 +285,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try{
-      val response = getEnrolmentList(request, userId, false)
+      val response = getEnrolmentList(request, userId, false, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -290,7 +298,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val response = getEnrolmentList(request, userId, false)
+      val response = getEnrolmentList(request, userId, false, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -332,7 +340,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try{
-      val response = getEnrolmentList(request, userId, true)
+      val response = getEnrolmentList(request, userId, true, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -341,7 +349,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean): Response = {
+  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean): Response = {
     logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
@@ -356,8 +364,31 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (CollectionUtils.isNotEmpty(activeEnrolments)) {
       val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
       val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
-      if (isDetailsRequired && !isMoreThanOneCourse) {
-        addBatchDetails(updatedEnrolmentList, request,"v3")
+      if (
+        isProgressEnabled &&
+          !updatedEnrolmentList.get(0).get(JsonKey.STATUS).equals(2)
+      ) {
+        val courseId = updatedEnrolmentList.get(0).get(JsonKey.COURSE_ID).asInstanceOf[String]
+        val recentLanguage = updatedEnrolmentList.get(0).get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
+        val batchId = updatedEnrolmentList.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
+        val langContentStatus = Option(updatedEnrolmentList.get(0).get("langContentStatus"))
+          .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
+          .getOrElse(new java.util.HashMap[String, AnyRef]())
+
+        if (
+          StringUtils.isNotBlank(recentLanguage) &&
+            langContentStatus != null &&
+            !langContentStatus.isEmpty &&
+            langContentStatus.containsKey(recentLanguage)
+        ) {
+          val contentIds = Option(langContentStatus.get(recentLanguage))
+            .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+            .getOrElse(new java.util.ArrayList[String]())
+
+          if (!contentIds.isEmpty) {
+            getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, updatedEnrolmentList)
+          }
+        }
       }
       allEnrolledCourses.addAll(updatedEnrolmentList)
     }
@@ -900,4 +931,144 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def getCacheBatchKey(batchId: String) = s"$batchId:active-participants-count"
 
+  def enrolDetailsWithProgress(request: Request): Unit = {
+    val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    try {
+      val response = getEnrolmentList(request, userId, true, true)
+      sender().tell(response, self)
+    } catch {
+      case e: Exception =>
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:" + e.getMessage, e)
+        throw e
+    }
+  }
+
+  def getConsumption(request: Request, userId: String, courseId: String, batchId: String, contentIds: java.util.List[String], language: String, enrolmentList: util.List[util.Map[String, AnyRef]]): Unit = {
+    val fields = request.getRequest.getOrDefault(JsonKey.FIELDS, new java.util.ArrayList[String]() {
+      {
+        add(JsonKey.PROGRESS)
+      }
+    }).asInstanceOf[java.util.List[String]]
+    val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
+    if (CollectionUtils.isNotEmpty(contentsConsumed)) {
+      val filteredContents = contentsConsumed.map(m => {
+        ProjectUtil.removeUnwantedFields(m, JsonKey.DATE_TIME, JsonKey.USER_ID, JsonKey.ADDED_BY, JsonKey.LAST_UPDATED_TIME, JsonKey.OLD_LAST_ACCESS_TIME, JsonKey.OLD_LAST_UPDATED_TIME, JsonKey.OLD_LAST_COMPLETED_TIME)
+        m.put(JsonKey.COLLECTION_ID, m.getOrDefault(JsonKey.COURSE_ID, ""))
+        jsonFields.foreach(field =>
+          if (m.get(field) != null)
+            m.put(field, mapper.readTree(m.get(field).asInstanceOf[String]))
+        )
+        val formattedMap = JsonUtil.convertWithDateFormat(m, classOf[util.Map[String, Object]], dateFormatter)
+        if (fields.contains(JsonKey.ASSESSMENT_SCORE))
+          formattedMap.putAll(mapAsJavaMap(Map(JsonKey.ASSESSMENT_SCORE -> getScore(userId, courseId, m.get("contentId").asInstanceOf[String], batchId, request.getRequestContext))))
+        formattedMap
+      }).asJava
+      enrolmentList.get(0).put("contentList", filteredContents)
+
+      enrolmentList.get(0).put(JsonKey.LANGUAGE_PROGRESS, getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
+    } else {
+      enrolmentList.get(0).put("contentList", new java.util.ArrayList[AnyRef]())
+    }
+  }
+
+  def getLanguageProgress(
+                           userId: String,
+                           courseId: String,
+                           batchId: String,
+                           requestContext: RequestContext
+                         ): Map[String, Double] = {
+
+    val filters = Map[String, AnyRef](
+      JsonKey.USER_ID_KEY -> userId,
+      JsonKey.COURSE_ID_KEY -> courseId,
+      JsonKey.BATCH_ID_KEY -> batchId
+    ).asJava
+
+    val result = cassandraOperation.getRecords(
+      requestContext,
+      enrolmentDBInfo.getKeySpace,
+      enrolmentDBInfo.getTableName,
+      filters,
+      null
+    )
+
+    val responseList = result.getResult
+      .getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]())
+      .asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+
+    if (responseList.isEmpty) return Map.empty
+
+    val langContentStatus = Option(responseList.get(0).get(JsonKey.LANG_CONTENT_STATUS))
+      .getOrElse(new java.util.HashMap[String, java.util.Map[String, Integer]]())
+      .asInstanceOf[java.util.Map[String, java.util.Map[String, Integer]]]
+
+    val langContentMap: Map[String, Map[String, Int]] = langContentStatus.asScala.map {
+      case (lang, contents) => (lang, contents.asScala.map { case (k, v) => (k, v.toInt) }.toMap)
+    }.toMap
+
+    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId)
+
+    val languageMap = Option(courseMetadata.get(JsonKey.LANGUAGE_MAP))
+      .map(_.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]].asScala)
+      .getOrElse(Map.empty)
+
+    languageMap.flatMap {
+      case (lang, langMeta) =>
+        val langCourseId = Option(langMeta.get(JsonKey.ID)).map(_.toString).getOrElse("")
+        val completedCount = langContentMap.getOrElse(lang, Map.empty).count(_._2 == 2)
+
+        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId)
+
+        val status = Option(langMeta.get(JsonKey.STATUS)).map(_.toString).getOrElse("")
+        if (JsonKey.LIVE.equalsIgnoreCase(status)) {
+          val leafNodesCount = Option(courseDetails.get(JsonKey.LEAF_NODES))
+            .map(_.asInstanceOf[java.util.List[String]].size())
+            .getOrElse(0)
+
+          if (leafNodesCount > 0) {
+            val percent = (completedCount.toDouble / leafNodesCount) * 100
+            Some(lang -> BigDecimal(percent).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
+          } else None
+        } else None
+    }.toMap
+  }
+
+  def getContentsConsumption(userId: String, courseId: String, contentIds: java.util.List[String], batchId: String, language: String, requestContext: RequestContext): java.util.List[java.util.Map[String, AnyRef]] = {
+    val filters = new java.util.HashMap[String, AnyRef]() {
+      {
+        put("userid", userId)
+        put("courseid", courseId)
+        put("batchid", batchId)
+        put("language", language)
+        if (CollectionUtils.isNotEmpty(contentIds))
+          put("contentid", contentIds)
+      }
+    }
+    val response = cassandraOperation.getRecords(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, filters, null)
+    response.getResult.getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+  }
+
+  def getScore(userId: String, courseId: String, contentId: String, batchId: String, requestContext: RequestContext): util.List[util.Map[String, AnyRef]] = {
+    val filters = new java.util.HashMap[String, AnyRef]() {
+      {
+        put("user_id", userId)
+        put("course_id", courseId)
+        put("batch_id", batchId)
+        put("content_id", contentId)
+      }
+    }
+    val fieldsToGet = new java.util.ArrayList[String]() {
+      {
+        add("attempt_id")
+        add("last_attempted_on")
+        add("total_max_score")
+        add("total_score")
+      }
+    }
+    val limit = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("assessment.attempts.limit")))
+      (ProjectUtil.getConfigValue("assessment.attempts.limit")).asInstanceOf[Integer] else 25.asInstanceOf[Integer]
+    val response = cassandraOperation.getRecordsWithLimit(requestContext, assessmentAggregatorDBInfo.getKeySpace, assessmentAggregatorDBInfo.getTableName, filters, fieldsToGet, limit)
+    response.getResult.getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+  }
 }

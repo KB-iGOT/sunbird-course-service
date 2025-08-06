@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 
 public class JsonUtil {
 
@@ -11,6 +12,7 @@ public class JsonUtil {
 	static {
 		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 	}
+	private static ObjectMapper mapperWithDateFormat = new ObjectMapper();
 
 	public static String serialize(Object obj) throws Exception {
 		return mapper.writeValueAsString(obj);
@@ -26,5 +28,10 @@ public class JsonUtil {
 
 	public static <T> T convert(Object value, Class<T> clazz) throws Exception {
 		return mapper.convertValue(value, clazz);
+	}
+
+	public static <T> T convertWithDateFormat(Object value, Class<T> clazz, SimpleDateFormat dateFormat) throws Exception {
+		mapperWithDateFormat.setDateFormat(dateFormat);
+		return mapperWithDateFormat.convertValue(value, clazz);
 	}
 }
