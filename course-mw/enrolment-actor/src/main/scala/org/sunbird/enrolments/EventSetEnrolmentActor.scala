@@ -124,9 +124,9 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
 
   def upsertEnrollment(userId: String, courseId: String, batchId: String, data: java.util.Map[String, AnyRef], isNew: Boolean, requestContext: RequestContext): Unit = {
     if (isNew) {
-      userCoursesDao.insertV2(requestContext, data)
+      userCoursesDao.insertExtendedEnrollmentV2(requestContext, data)
     } else {
-      userCoursesDao.updateV2(requestContext, userId, courseId, batchId, data)
+      userCoursesDao.updateExtendedEnrollV2(requestContext, userId, courseId, batchId, data)
     }
   }
 

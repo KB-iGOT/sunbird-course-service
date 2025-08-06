@@ -14,7 +14,7 @@ import org.sunbird.common.models.util._
 import org.sunbird.common.request.{Request, RequestContext}
 import org.sunbird.common.responsecode.ResponseCode
 import org.sunbird.helper.ServiceFactory
-import org.sunbird.kafka.client.KafkaClient
+import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
@@ -25,7 +25,7 @@ import org.sunbird.models.user.courses.UserCourses
 import org.sunbird.telemetry.util.TelemetryUtil
 
 import java.sql.Timestamp
-import java.text.SimpleDateFormat
+import java.text.{MessageFormat, SimpleDateFormat}
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime, LocalTime}
 import java.util
@@ -83,6 +83,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "enrolmentInfoStats" => enrolmentInfoStats(request)
       case "enrolV3Details" => enrolV3Details(request)
       case "enrolProgramV2" => enrollProgram(request)
+      case "enrolBlendedProgramV2" => enrollBlendedProgram(request)
+      case "bulkEnrolProgramV3" => bulkEnrolProgramV3(request)
       case "enrolDetailsWithProgress" => enrolDetailsWithProgress(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
@@ -141,6 +143,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
     } else {
       ContentCacheHandlerV2.getInstance().getContent(programId)
+    }
+    if (contentData == null || contentData.isEmpty) {
+      throw new ProjectCommonException(
+        ResponseCode.invalidCourseId.getErrorCode,
+        "Content not found for id: " + programId,
+        ResponseCode.RESOURCE_NOT_FOUND.getResponseCode
+      )
     }
     contentData
   }
@@ -933,6 +942,190 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   def getCacheBatchKey(batchId: String) = s"$batchId:active-participants-count"
+
+  def enrollBlendedProgram(request: Request): Unit = {
+    val courseId: String = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
+    val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
+    logger.info(request.asInstanceOf[Request].getRequestContext, "CourseEnrolmentActor Request for enroll recieved, UserId : " + userId + ", courseId : " + courseId +", batchId : "+batchId)
+    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES, JsonKey.LANGUAGE)
+    val contentData = getContentReadAPIData(courseId, fieldList, request)
+    if (!courseAllowedPrimaryCategories.contains(contentData.getOrDefault(JsonKey.PRIMARYCATEGORY, "").asInstanceOf[String]))
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
+
+    val languageListOpt = Option(contentData.get(JsonKey.LANGUAGE))
+    val courseLanguage = languageListOpt match {
+      case Some(langList: java.util.List[_]) if !langList.isEmpty =>
+        langList.get(0).toString.toLowerCase
+      case _ =>
+        throw new ProjectCommonException(
+          ResponseCode.invalidParameterValue.getErrorCode,
+          JsonKey.LANGUAGE_NOT_FOUND_IN_CONTENT,
+          ResponseCode.CLIENT_ERROR.getResponseCode
+        )
+    }
+    request.put(JsonKey.RECENT_LANGUAGE, courseLanguage)
+    val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
+    val enrolmentData: UserCourses = userCoursesDao.read(request.getRequestContext, userId, courseId, batchId)
+    val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
+    validateEnrolment(batchData, enrolmentData, true, true)
+    val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
+    val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext, courseLanguage)
+    val dateTimeFormat = ProjectUtil.getDateFormatter()
+    dateTimeFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
+    val enrolledDate = new SimpleDateFormat(Constants.SIMPLE_DATE_FORMAT).parse(request.get(JsonKey.ENROLLED_DATE).asInstanceOf[String])
+    val enrolledTimestamp = new java.sql.Timestamp(dateTimeFormat.parse(dateTimeFormat.format(enrolledDate)).getTime())
+    dataBatch.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
+    data.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
+    val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+    if (hasAccess) {
+      //Enrolling into children course if any
+      getCoursesForProgramAndEnrol(request, courseId, userId, batchId)
+      upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
+      logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
+      cacheUtil.delete(getCacheKey(userId))
+      sender().tell(successResponse(), self)
+      generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
+      notifyUser(userId, batchData, JsonKey.ADD)
+      val dataMap = new java.util.HashMap[String, AnyRef]
+      val requestMap = new java.util.HashMap[String, AnyRef]
+      requestMap.put(JsonKey.COURSE_ID,courseId)
+      requestMap.put(JsonKey.USER_ID,userId)
+      requestMap.put(JsonKey.BATCH_ID,batchId)
+      dataMap.put("edata",requestMap)
+      val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
+      InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+      cacheUtil.delete(getCacheBatchKey(batchId))
+    } else {
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
+    }
+  }
+
+  def bulkEnrolProgramV3(request: Request): Unit = {
+    val response: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
+    val status: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
+    val map: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
+    val resp: Response = new Response()
+    val programId: String = request.get(JsonKey.PROGRAM_ID).asInstanceOf[String]
+    val isAdminAPI: Boolean = request.get(JsonKey.IS_ADMIN_API).asInstanceOf[Boolean]
+    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES, JsonKey.LANGUAGE)
+    val contentData = getContentReadAPIData(programId, fieldList, request)
+
+    if (isAdminAPI && !adminAllowedPrimaryCategories.contains(contentData.getOrDefault(JsonKey.PRIMARYCATEGORY, "").asInstanceOf[String]))
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
+
+    if (!isAdminAPI && !programAllowedPrimaryCategories.contains(contentData.getOrDefault(JsonKey.PRIMARYCATEGORY, "").asInstanceOf[String]))
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
+
+    val languageListOpt = Option(contentData.get(JsonKey.LANGUAGE))
+    val courseLanguage = languageListOpt match {
+      case Some(langList: java.util.List[_]) if !langList.isEmpty =>
+        langList.get(0).toString.toLowerCase
+      case _ =>
+        throw new ProjectCommonException(
+          ResponseCode.invalidParameterValue.getErrorCode,
+          JsonKey.LANGUAGE_NOT_FOUND_IN_CONTENT,
+          ResponseCode.CLIENT_ERROR.getResponseCode
+        )
+    }
+    request.put(JsonKey.RECENT_LANGUAGE, courseLanguage)
+
+    val userIds = request.get(JsonKey.USERID_LIST).asInstanceOf[java.util.List[String]]
+    val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
+    val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
+    val enrolledUsers = Option(userCoursesDao.getBatchParticipants(request.getRequestContext, batchId, true))
+      .getOrElse(new java.util.ArrayList[Any]())
+
+    val batchAttributesOpt = Option(batchData.getBatchAttributes)
+    val maxBatchSizeStr = batchAttributesOpt
+      .flatMap(attrs => Option(attrs.get(JsonKey.CURRENT_BATCH_SIZE)))
+      .map(_.toString.trim)
+      .getOrElse("")
+
+    val courseCategory = Option(contentData.get(JsonKey.COURSECATEGORY))
+      .map(_.toString.trim)
+      .getOrElse("")
+
+    val isBlendedProgram = courseCategory.equalsIgnoreCase(JsonKey.BLENDED_PROGRAM)
+    val isMaxBatchSizeValid = maxBatchSizeStr.nonEmpty && maxBatchSizeStr.forall(_.isDigit)
+
+    if (isBlendedProgram && !isMaxBatchSizeValid) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.batchSizeNotDefined,
+        ResponseCode.batchSizeNotDefined.getErrorMessage
+      )
+    }
+
+    if (isMaxBatchSizeValid) {
+      val maxBatchSize = maxBatchSizeStr.toInt
+      val currentSize = enrolledUsers.size() + userIds.size()
+      if (currentSize > maxBatchSize) {
+        val remainingSlots = maxBatchSize - enrolledUsers.size()
+        ProjectCommonException.throwClientErrorException(
+          ResponseCode.batchSizeExceeded,
+          MessageFormat.format(
+            ResponseCode.batchSizeExceeded.getErrorMessage,
+            Integer.valueOf(remainingSlots)
+          )
+        )
+      }
+    }
+    for (userId <- userIds) {
+      try {
+        var enrolmentData: UserCourses = null
+        val enrolmentDataList: java.util.List[UserCourses] = userCoursesDao.extendedReadAllV2(request.getRequestContext, userId, programId)
+        if (null != enrolmentDataList) {
+          for (enrolment <- enrolmentDataList) {
+            if (enrolment.getBatchId.equals(batchId)) {
+              if (enrolment.isActive) {
+                ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourse);
+              } else {
+                enrolmentData = enrolment;
+              }
+            } else if (enrolment.isActive) {
+              ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch);
+            }
+          }
+        }
+        val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
+        val primaryCategory=contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
+        if(primaryCategory.equalsIgnoreCase(JsonKey.STANDALONE_ASSESSMENT)) {
+          validateEnrolmentV2(batchData, enrolmentData, true,primaryCategory)
+        }else{
+          validateEnrolment(batchData, enrolmentData, true)
+        }
+        getCoursesForProgramAndEnrol(request, programId, userId, batchId)
+        val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId, batchUserData)
+        val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, programId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext, courseLanguage)
+        upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
+        logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
+        cacheUtil.delete(getCacheKey(userId))
+        generatePreProcessorKafkaEvent(request, batchId, programId, userId)
+        generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
+        notifyUser(userId, batchData, JsonKey.ADD)
+        status.put(JsonKey.STATUS, JsonKey.SUCCESS)
+        response.put(userId, status)
+      } catch {
+        case e: ProjectCommonException =>
+          if (ResponseCode.userAlreadyEnrolledCourse.getErrorMessage.equals(e.getMessage)) {
+            map.put(JsonKey.STATUS, JsonKey.FAILED)
+            map.put(JsonKey.ERRORMSG, ResponseCode.userAlreadyEnrolledCourse.getErrorMessage)
+            response.put(userId, map)
+          } else {
+            map.put(JsonKey.STATUS, JsonKey.FAILED)
+            map.put(JsonKey.ERRORMSG, e.getMessage)
+            response.put(userId, status)
+          }
+        case e: Exception =>
+          map.put(JsonKey.STATUS, JsonKey.FAILED)
+          map.put(JsonKey.ERRORMSG, e.getMessage)
+          response.put(userId, status)
+      }
+      cacheUtil.delete(getCacheBatchKey(batchId))
+      resp.put(JsonKey.RESPONSE, response)
+    }
+    sender().tell(resp, self)
+  }
 
   def enrolDetailsWithProgress(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
