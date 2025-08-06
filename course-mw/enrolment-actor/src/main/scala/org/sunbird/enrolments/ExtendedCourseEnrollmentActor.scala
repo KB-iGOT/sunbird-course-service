@@ -52,6 +52,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val cassandraOperation = ServiceFactory.getInstance
   val jsonFields = Set[String]("lrcProgressDetails")
   private val mapper = new ObjectMapper
+  private val courseAllowedPrimaryCategories: java.util.List[String] =
+    java.util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*)
+  private val programAllowedPrimaryCategories: Set[String] =
+    getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(",").toSet
+
+  private val adminAllowedPrimaryCategories: Set[String] =
+    getConfigValue(JsonKey.ADMIN_PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(",").toSet
   private val enrolmentDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB)
   private val consumptionDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_CONTENT_DB)
   private val assessmentAggregatorDBInfo = Util.dbInfoMap.get(JsonKey.ASSESSMENT_AGGREGATOR_DB)
