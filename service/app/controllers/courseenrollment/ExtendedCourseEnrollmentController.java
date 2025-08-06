@@ -189,4 +189,20 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 getAllRequestHeaders(httpRequest),
                 httpRequest);
     }
+
+    public CompletionStage<Result> getEnrolledCoursesDetailsWithProgress(String uid, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolDetailsWithProgress",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollListRequestDetails(request);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
+                httpRequest);
+    }
 }

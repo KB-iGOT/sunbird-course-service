@@ -137,3 +137,4 @@ GET      /v2/user/enrol/summary/:uid	    @controllers.courseenrollment.ExtendedC
 POST     /v2/program/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollProgramV2(request: play.mvc.Http.Request)
 POST     /v2/blended/program/admin/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.blendedProgramEnrollCourseV2(request: play.mvc.Http.Request)
 POST     /v3/program/admin/bulkEnroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.adminBulkEnrollProgramV3(request: play.mvc.Http.Request)
+POST     /v3/user/enrol/courses/details/:uid	    @controllers.courseenrollment.ExtendedCourseEnrollmentController.getEnrolledCoursesDetailsWithProgress(uid:String, request: play.mvc.Http.Request)
