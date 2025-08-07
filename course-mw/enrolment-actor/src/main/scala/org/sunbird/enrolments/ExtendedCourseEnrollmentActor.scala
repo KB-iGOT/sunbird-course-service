@@ -382,29 +382,31 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
       if (isDetailsRequired && !isMoreThanOneCourse) {
         addBatchDetails(updatedEnrolmentList, request, "v3")
-        if (
-          isProgressEnabled &&
-            !updatedEnrolmentList.get(0).get(JsonKey.STATUS).equals(2)
-        ) {
-          val courseId = updatedEnrolmentList.get(0).get(JsonKey.COURSE_ID).asInstanceOf[String]
-          val recentLanguage = updatedEnrolmentList.get(0).get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
-          val batchId = updatedEnrolmentList.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
-          val langContentStatus = Option(updatedEnrolmentList.get(0).get("langContentStatus"))
-            .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
-            .getOrElse(new java.util.HashMap[String, AnyRef]())
-
+        for (enrolment <- updatedEnrolmentList.asScala) {
           if (
-            StringUtils.isNotBlank(recentLanguage) &&
-              langContentStatus != null &&
-              !langContentStatus.isEmpty &&
-              langContentStatus.containsKey(recentLanguage)
+            isProgressEnabled &&
+              !enrolment.get(JsonKey.STATUS).equals(2)
           ) {
-            val contentIds = Option(langContentStatus.get(recentLanguage))
-              .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
-              .getOrElse(new java.util.ArrayList[String]())
+            val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
+            val recentLanguage = enrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
+            val batchId = enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
+            val langContentStatus = Option(enrolment.get("langContentStatus"))
+              .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
+              .getOrElse(new java.util.HashMap[String, AnyRef]())
 
-            if (!contentIds.isEmpty) {
-              getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, updatedEnrolmentList)
+            if (
+              StringUtils.isNotBlank(recentLanguage) &&
+                langContentStatus != null &&
+                !langContentStatus.isEmpty &&
+                langContentStatus.containsKey(recentLanguage)
+            ) {
+              val contentIds = Option(langContentStatus.get(recentLanguage))
+                .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+                .getOrElse(new java.util.ArrayList[String]())
+
+              if (!contentIds.isEmpty) {
+                getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, updatedEnrolmentList)
+              }
             }
           }
         }
