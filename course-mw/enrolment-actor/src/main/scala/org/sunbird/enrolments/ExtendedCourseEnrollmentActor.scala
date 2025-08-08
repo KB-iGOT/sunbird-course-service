@@ -382,29 +382,31 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
       if (isDetailsRequired && !isMoreThanOneCourse) {
         addBatchDetails(updatedEnrolmentList, request, "v3")
-        if (
-          isProgressEnabled &&
-            !updatedEnrolmentList.get(0).get(JsonKey.STATUS).equals(2)
-        ) {
-          val courseId = updatedEnrolmentList.get(0).get(JsonKey.COURSE_ID).asInstanceOf[String]
-          val recentLanguage = updatedEnrolmentList.get(0).get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
-          val batchId = updatedEnrolmentList.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
-          val langContentStatus = Option(updatedEnrolmentList.get(0).get("langContentStatus"))
-            .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
-            .getOrElse(new java.util.HashMap[String, AnyRef]())
-
+        for (enrolment <- updatedEnrolmentList.asScala) {
           if (
-            StringUtils.isNotBlank(recentLanguage) &&
-              langContentStatus != null &&
-              !langContentStatus.isEmpty &&
-              langContentStatus.containsKey(recentLanguage)
+            isProgressEnabled &&
+              !enrolment.get(JsonKey.STATUS).equals(2)
           ) {
-            val contentIds = Option(langContentStatus.get(recentLanguage))
-              .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
-              .getOrElse(new java.util.ArrayList[String]())
+            val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
+            val recentLanguage = enrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
+            val batchId = enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
+            val langContentStatus = Option(enrolment.get("langContentStatus"))
+              .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
+              .getOrElse(new java.util.HashMap[String, AnyRef]())
 
-            if (!contentIds.isEmpty) {
-              getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, updatedEnrolmentList)
+            if (
+              StringUtils.isNotBlank(recentLanguage) &&
+                langContentStatus != null &&
+                !langContentStatus.isEmpty &&
+                langContentStatus.containsKey(recentLanguage)
+            ) {
+              val contentIds = Option(langContentStatus.get(recentLanguage))
+                .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+                .getOrElse(new java.util.ArrayList[String]())
+
+              if (!contentIds.isEmpty) {
+                getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, enrolment)
+              }
             }
           }
         }
@@ -1147,7 +1149,15 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getConsumption(request: Request, userId: String, courseId: String, batchId: String, contentIds: java.util.List[String], language: String, enrolmentList: util.List[util.Map[String, AnyRef]]): Unit = {
+  def getConsumption(
+                      request: Request,
+                      userId: String,
+                      courseId: String,
+                      batchId: String,
+                      contentIds: java.util.List[String],
+                      language: String,
+                      enrolment: java.util.Map[String, AnyRef]
+                    ): Unit = {
     val fields = request.getRequest.getOrDefault(JsonKey.FIELDS, new java.util.ArrayList[String]() {
       {
         add(JsonKey.PROGRESS)
@@ -1155,7 +1165,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }).asInstanceOf[java.util.List[String]]
     val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
     if (CollectionUtils.isNotEmpty(contentsConsumed)) {
-      val filteredContents = contentsConsumed.map(m => {
+      val filteredContents = contentsConsumed.map { m =>
         ProjectUtil.removeUnwantedFields(m, JsonKey.DATE_TIME, JsonKey.USER_ID, JsonKey.ADDED_BY, JsonKey.LAST_UPDATED_TIME, JsonKey.OLD_LAST_ACCESS_TIME, JsonKey.OLD_LAST_UPDATED_TIME, JsonKey.OLD_LAST_COMPLETED_TIME)
         m.put(JsonKey.COLLECTION_ID, m.getOrDefault(JsonKey.COURSE_ID, ""))
         jsonFields.foreach(field =>
@@ -1166,12 +1176,11 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         if (fields.contains(JsonKey.ASSESSMENT_SCORE))
           formattedMap.putAll(mapAsJavaMap(Map(JsonKey.ASSESSMENT_SCORE -> getScore(userId, courseId, m.get("contentId").asInstanceOf[String], batchId, request.getRequestContext))))
         formattedMap
-      }).asJava
-      enrolmentList.get(0).put("contentList", filteredContents)
-
-      enrolmentList.get(0).put(JsonKey.LANGUAGE_PROGRESS, getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
+      }.asJava
+      enrolment.put("contentList", filteredContents)
+      enrolment.put(JsonKey.LANGUAGE_PROGRESS, getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
     } else {
-      enrolmentList.get(0).put("contentList", new java.util.ArrayList[AnyRef]())
+      enrolment.put("contentList", new java.util.ArrayList[AnyRef]())
     }
   }
 
