@@ -198,9 +198,9 @@ public final class ContentUtil {
     try {
       if (CollectionUtils.isNotEmpty(fields)) {
         String fieldsStr = StringUtils.join(fields, ",");
-        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v4/read/" + eventId + "?fields=" + fieldsStr;
+        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + ProjectUtil.getConfigValue(JsonKey.CONTENT_READ) + eventId + "?fields=" + fieldsStr;
       } else {
-        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v4/read/" + eventId;
+        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + ProjectUtil.getConfigValue(JsonKey.CONTENT_READ) + eventId;
       }
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
       logger.info(null, "making call for event read ==" + baseContentreadUrl);

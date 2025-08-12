@@ -1268,6 +1268,7 @@ public final class JsonKey {
   public static final String EVENT_ENROLLED = "EVENT_ENROLLED";
   public static final String ALERT = "ALERT";
   public static final String RECORDS = "records";
+  public static final String CONTENT_READ = "content_read";
 
 
   private JsonKey() {}
