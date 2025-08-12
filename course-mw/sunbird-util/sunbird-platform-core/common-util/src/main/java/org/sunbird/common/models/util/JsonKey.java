@@ -1217,7 +1217,7 @@ public final class JsonKey {
   public static final String ACCESS_RULES = "accessRules";
   public static final String BASIC_PROFILE = "basicProfile";
   public static final String COLON = ":";
-  public static final String ACCESS_SETTINGS_DB = "access_settings_db";
+  public static final String ACCESS_SETTINGS_DB = "access_settings_db_v2";
   public static final String PROFILE_DETAILS = "profileDetails";
   public static final String PROFILE_STATUS = "profileStatus";
   public static final String PROFESSIONAL_DETAILS = "professionalDetails";
