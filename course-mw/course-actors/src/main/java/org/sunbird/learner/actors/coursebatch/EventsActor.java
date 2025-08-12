@@ -371,7 +371,7 @@ public class EventsActor extends BaseActor {
             sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());
             generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
             notifyUser(userId, batchData, JsonKey.ADD);
-            helperMethodService.sendNotificationToMDOLeader(eventId,userId,request.getRequestContext());
+            helperMethodService.sendNotificationToMDOs(eventId,userId,request.getRequestContext());
         } else {
             throw new ProjectCommonException(ResponseCode.accessDeniedToEnrolEvent.getErrorCode(), ResponseCode.accessDeniedToEnrolEvent.getErrorMessage(),ResponseCode.CLIENT_ERROR.getResponseCode());
         }

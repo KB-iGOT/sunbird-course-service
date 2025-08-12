@@ -1255,8 +1255,8 @@ public final class JsonKey {
   public static final String USER_ID_REQ = "user_id";
   public static final String FIRST_NAME_KEY = "first_name";
   public static final String USER_PREFIX = "user:";
-  public static final String NOTIFICATION_WRAPPER_API_HOST = "notification.wrapper.api.host";
-  public static final String NOTIFICATION_WRAPPER_API_ENDPOINT = "notification.wrapper.api.endpoint";
+  public static final String NOTIFICATION_WRAPPER_API_HOST = "notification_wrapper_api_host";
+  public static final String NOTIFICATION_WRAPPER_API_ENDPOINT = "notification_wrapper_api_endpoint";
   public static final String USER_ID_KEYS = "userIds";
   public static final String SUB_TYPE = "subType";
   public static final String SUB_CATEGORY = "subCategory";

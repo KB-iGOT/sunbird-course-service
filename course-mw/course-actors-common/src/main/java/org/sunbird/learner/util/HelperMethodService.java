@@ -105,11 +105,11 @@ public class HelperMethodService {
     }
 
 
-    public void sendNotificationToMDOLeader(String eventId, String userId, RequestContext requestContext) {
+    public void sendNotificationToMDOs(String eventId, String userId, RequestContext requestContext) {
         String firstName = fetchUserFirstName(userId, requestContext);
         Map<String, Object> response = ContentUtil.getEventContent(eventId, Arrays.asList(JsonKey.NAME, JsonKey.CREATED_BY, JsonKey.START_DATE, JsonKey.COURSE_CREATED_FOR));
         Map<String, Object> eventDetails = (Map<String, Object>) response.get(JsonKey.CONTENT);
-        List<String> filteredUserIdList = ContentUtil.fetchMdoLeaderList((List<String>) eventDetails.get(JsonKey.COURSE_CREATED_FOR), eventDetails.get(JsonKey.CREATED_BY).toString(), requestContext);
+        List<String> filteredUserIdList = ContentUtil.fetchMdoList((List<String>) eventDetails.get(JsonKey.COURSE_CREATED_FOR), eventDetails.get(JsonKey.CREATED_BY).toString(), requestContext);
         Map<String, Object> notificationData = Map.of(JsonKey.ID, eventId);
         if (CollectionUtils.isNotEmpty(filteredUserIdList)) {
             filteredUserIdList = filteredUserIdList.stream()

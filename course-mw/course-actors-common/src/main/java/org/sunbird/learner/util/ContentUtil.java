@@ -146,7 +146,7 @@ public final class ContentUtil {
   }
 
   public static Map<String, Object> getContent(String eventId) {
-    return getEventContent(eventId,new ArrayList<String>());
+    return getEventContent(eventId, new ArrayList<String>());
   }
 
   public static Map<String, Object> getContent(String courseId, List<String> fields,
@@ -191,7 +191,7 @@ public final class ContentUtil {
     return resMap;
   }
 
-  public static Map<String, Object> getEventContent(String eventId,List<String> fields) {
+  public static Map<String, Object> getEventContent(String eventId, List<String> fields) {
     Map<String, Object> resMap = new HashMap<>();
     Map<String, String> headers = new HashMap<>();
     String baseContentreadUrl = null;
@@ -616,7 +616,7 @@ public final class ContentUtil {
     return new AbstractMap.SimpleEntry<>(count, coursesMap);
   }
 
-  public static List<String> fetchMdoLeaderList(List<String> orgIds, String createdBy, RequestContext requestContext) {
+  public static List<String> fetchMdoList(List<String> orgIds, String createdBy, RequestContext requestContext) {
     logger.debug(requestContext, "Fetching MDO leader list for orgId: " + orgIds + " excluding createdBy: " + createdBy);
     List<String> mdoList = new ArrayList<>();
     try {
