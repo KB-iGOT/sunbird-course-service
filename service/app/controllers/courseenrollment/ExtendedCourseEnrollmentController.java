@@ -206,7 +206,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 httpRequest);
     }
 
-    public CompletionStage<Result> adminEnrollCourse(Http.Request httpRequest) {
+    public CompletionStage<Result> adminEnrollCourseV2(Http.Request httpRequest) {
         return handleRequest(extendedCourseEnrolmentActor, "enrollV2",
                 httpRequest.body().asJson(),
                 (request) -> {
