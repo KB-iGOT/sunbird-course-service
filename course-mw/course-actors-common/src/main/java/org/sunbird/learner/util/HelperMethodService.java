@@ -135,7 +135,7 @@ public class HelperMethodService {
         ObjectNode placeholders = objectMapper.createObjectNode();
         placeholders.put(JsonKey.EVENT_NAME, title);
         placeholders.put(JsonKey.USERNAME, userName);
-        placeholders.put(JsonKey.START_DATE, startDate);
+        placeholders.put(JsonKey.DATE_KEY, startDate);
 
         Map<String, Object> message = new HashMap<>();
         message.put(JsonKey.PLACE_HOLDERS, placeholders);
