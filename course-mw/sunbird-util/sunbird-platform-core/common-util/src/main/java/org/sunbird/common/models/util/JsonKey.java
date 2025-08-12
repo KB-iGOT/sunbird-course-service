@@ -1251,6 +1251,24 @@ public final class JsonKey {
   public static final String ERROR_MULTILINGUAL_BASE_LANG_NOT_FOUND = "Base language content not found or not live in languageMapV1 for multilingual course.";
   public static final String IS_BASE_LANGUAGE = "isBaseLang";
   public static final String LANGUAGE_NOT_FOUND_IN_CONTENT = "Language not found in content metadata.";
+  public static final String SUNBIRD_PRIVATE_SEARCH_USER_API = "sunbird_private_search_user_api";
+  public static final String USER_ID_REQ = "user_id";
+  public static final String FIRST_NAME_KEY = "first_name";
+  public static final String USER_PREFIX = "user:";
+  public static final String NOTIFICATION_WRAPPER_API_HOST = "notification_wrapper_api_host";
+  public static final String NOTIFICATION_WRAPPER_API_ENDPOINT = "notification_wrapper_api_endpoint";
+  public static final String USER_ID_KEYS = "userIds";
+  public static final String SUB_TYPE = "subType";
+  public static final String SUB_CATEGORY = "subCategory";
+  public static final String PLACE_HOLDERS = "placeholders";
+  public static final String EVENT_NAME = "eventName";
+  public static final String MDO_LEADER = "MDO_LEADER";
+  public static final String MDO_ADMIN = "MDO_ADMIN";
+  public static final String ORGANISATIONS_ROLES = "organisations.roles";
+  public static final String EVENT_ENROLLED = "EVENT_ENROLLED";
+  public static final String ALERT = "ALERT";
+  public static final String RECORDS = "records";
+  public static final String CONTENT_READ = "content_read";
 
 
   private JsonKey() {}
