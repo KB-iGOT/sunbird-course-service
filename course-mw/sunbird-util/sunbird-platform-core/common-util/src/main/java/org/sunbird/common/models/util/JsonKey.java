@@ -524,7 +524,7 @@ public final class JsonKey {
   public static final String SSO_USERNAME = "sso.username";
   public static final String STACKTRACE = "stacktrace";
   public static final String STANDALONE_MODE = "standalone";
-  public static final String START_DATE = "startDate";
+  public static final String START_DATE = "Date";
   public static final String START_TIME = "startTime";
   public static final String STATE = "state";
   public static final String STATUS = "status";
@@ -1261,7 +1261,7 @@ public final class JsonKey {
   public static final String SUB_TYPE = "subType";
   public static final String SUB_CATEGORY = "subCategory";
   public static final String PLACE_HOLDERS = "placeholders";
-  public static final String EVENT_NAME = "eventName";
+  public static final String EVENT_NAME = "title";
   public static final String MDO_LEADER = "MDO_LEADER";
   public static final String MDO_ADMIN = "MDO_ADMIN";
   public static final String ORGANISATIONS_ROLES = "organisations.roles";
