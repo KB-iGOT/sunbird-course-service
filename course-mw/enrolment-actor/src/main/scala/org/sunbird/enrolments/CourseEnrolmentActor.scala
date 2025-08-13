@@ -399,10 +399,10 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         }
         // END
         if(isNew) {
-            userCoursesDao.insertV2(requestContext, dataMap)
+            userCoursesDao.insertExtendedEnrollmentV2(requestContext, dataMap)
             batchUserDao.insertBatchLookupRecord(requestContext,dataBatchMap)
         } else {
-            userCoursesDao.updateV2(requestContext, userId, courseId, batchId, dataMap)
+            userCoursesDao.updateExtendedEnrollV2(requestContext, userId, courseId, batchId, dataMap)
             batchUserDao.updateBatchLookupRecord(requestContext, batchId, userId, dataBatchMap, dataMap)
         }
     }

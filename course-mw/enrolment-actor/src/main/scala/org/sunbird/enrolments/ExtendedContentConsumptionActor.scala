@@ -320,6 +320,11 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     val fields = request.getRequest.getOrDefault(JsonKey.FIELDS, new java.util.ArrayList[String](){{ add(JsonKey.PROGRESS) }}).asInstanceOf[java.util.List[String]]
     val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
     val response = new Response
+    val allLanguages: List[String] = {
+      val courseContent = ContentCacheHandlerV2.getInstance.getContent(courseId)
+      val langMap = if (courseContent != null) courseContent.get("languageMapV1").asInstanceOf[java.util.Map[String, Object]] else null
+      if (langMap != null) langMap.keySet().asScala.map(_.toLowerCase).toList else List.empty[String]
+    }
     if(CollectionUtils.isNotEmpty(contentsConsumed)) {
       val filteredContents = contentsConsumed.map(m => {
         ProjectUtil.removeUnwantedFields(m, JsonKey.DATE_TIME, JsonKey.USER_ID, JsonKey.ADDED_BY, JsonKey.LAST_UPDATED_TIME, JsonKey.OLD_LAST_ACCESS_TIME, JsonKey.OLD_LAST_UPDATED_TIME, JsonKey.OLD_LAST_COMPLETED_TIME)
@@ -334,9 +339,17 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         formattedMap
       }).asJava
       response.put(JsonKey.RESPONSE, filteredContents)
-
-      response.put(JsonKey.LANGUAGE_PROGRESS, getLanguageProgress(userId, courseId, batchId, request.getRequestContext).asJava)
+      val consumedProgress = getLanguageProgress(userId, courseId, batchId, request.getRequestContext)
+      val completeProgress = allLanguages.map(lang =>
+        lang -> consumedProgress.getOrElse(lang, 0.0)
+      ).toMap
+      response.put(JsonKey.LANGUAGE_PROGRESS, completeProgress.asJava)
     } else {
+      val consumedProgress = getLanguageProgress(userId, courseId, batchId, request.getRequestContext)
+      val completeProgress = allLanguages.map(lang =>
+        lang -> consumedProgress.getOrElse(lang, 0.0)
+      ).toMap
+      response.put(JsonKey.LANGUAGE_PROGRESS, completeProgress.asJava)
       response.put(JsonKey.RESPONSE, new java.util.ArrayList[AnyRef]())
     }
     sender().tell(response, self)
