@@ -205,4 +205,40 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 getAllRequestHeaders((httpRequest)),
                 httpRequest);
     }
+
+    public CompletionStage<Result> adminEnrollCourseV2(Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrollV2",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String courseId = req.getRequest().containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                    req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
+                    validator.validateEnrollCourse(req);
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> adminEnrollProgramV2(Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolProgramV2",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+                    String programId = req.getRequest().containsKey(JsonKey.PROGRAM_ID) ? JsonKey.PROGRAM_ID : JsonKey.COLLECTION_ID;
+                    req.getRequest().put(JsonKey.PROGRAM_ID, req.getRequest().get(programId));
+                    req.getRequest().put(JsonKey.IS_ADMIN_API, true);
+                    validator.validateEnrollProgram(req);
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
+
+    public CompletionStage<Result> openProgramEnrollV2(Http.Request httpRequest) {
+        return enrollProgramV2(httpRequest, true);
+    }
+
 }
