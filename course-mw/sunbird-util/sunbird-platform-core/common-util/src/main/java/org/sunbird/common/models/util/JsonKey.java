@@ -524,7 +524,7 @@ public final class JsonKey {
   public static final String SSO_USERNAME = "sso.username";
   public static final String STACKTRACE = "stacktrace";
   public static final String STANDALONE_MODE = "standalone";
-  public static final String START_DATE = "Date";
+  public static final String START_DATE = "startDate";
   public static final String START_TIME = "startTime";
   public static final String STATE = "state";
   public static final String STATUS = "status";

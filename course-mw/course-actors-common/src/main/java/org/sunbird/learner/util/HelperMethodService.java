@@ -106,6 +106,7 @@ public class HelperMethodService {
 
 
     public void sendNotificationToMDOs(String eventId, String userId, RequestContext requestContext) {
+        logger.debug(requestContext, "sendNotificationToMDOs called with eventId: " + eventId + ", userId: " + userId);
         String firstName = fetchUserFirstName(userId, requestContext);
         Map<String, Object> response = ContentUtil.getEventContent(eventId, Arrays.asList(JsonKey.NAME, JsonKey.CREATED_BY, JsonKey.START_DATE, JsonKey.COURSE_CREATED_FOR));
         Map<String, Object> eventDetails = (Map<String, Object>) response.get(JsonKey.CONTENT);
