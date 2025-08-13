@@ -141,4 +141,4 @@ POST     /v3/user/enrol/courses/details/:uid	    @controllers.courseenrollment.E
 POST     /v2/course/admin/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.adminEnrollCourseV2(request: play.mvc.Http.Request)
 POST     /v2/program/admin/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.adminEnrollProgramV2(request: play.mvc.Http.Request)
 POST     /v2/openprogram/enrol	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.openProgramEnrollV2(request: play.mvc.Http.Request)
-POST    /v2/event/enroll	    		    @controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollCourseWithLanguage(request: play.mvc.Http.Request)
+POST     /v3/event/enroll	    		    @controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollCourseWithLanguage(request: play.mvc.Http.Request)
