@@ -50,21 +50,21 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         String incomingLang = (String) request.getRequest().get(JsonKey.LANGUAGE);
 
         Map<String, Object> enrolmentData = fetchEnrolmentData(request);
-        String recentLang = (String) enrolmentData.get("recent_language");
+        String recentLang = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
 
         Map<String, Object> courseContent = fetchCourseContent(courseId);
-        Map<String, Object> languageMapV1 = (Map<String, Object>) courseContent.get("languageMapV1");
+        Map<String, Object> languageMapV1 = (Map<String, Object>) courseContent.get(JsonKey.LANGUAGE_MAP);
 
         if (StringUtils.isNotBlank(incomingLang)) {
             if (incomingLang.toLowerCase().equalsIgnoreCase(recentLang.toLowerCase()) && CollectionUtils.isEmpty(contentIds)) {
                 //String multiCourseId = languageMapV1.get(incomingLang.toLowerCase());
                 Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(incomingLang.toLowerCase());
-                String multiCourseId = (String) langEntry.get("id");
+                String multiCourseId = (String) langEntry.get(JsonKey.ID);
                 List<String> leafNodes = fetchLeafNodes(multiCourseId);
                 request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
             } else if (CollectionUtils.isEmpty(contentIds)) {
                 Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(incomingLang.toLowerCase());
-                String multiCourseId = (String) langEntry.get("id");
+                String multiCourseId = (String) langEntry.get(JsonKey.ID);
                 List<String> leafNodes = fetchLeafNodes(multiCourseId);
                 request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
             }
@@ -75,7 +75,7 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         if (StringUtils.isBlank(incomingLang)) {
             if (StringUtils.isNotBlank(recentLang)) {
                 Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(recentLang.toLowerCase());
-                String multiCourseId = (String) langEntry.get("id");
+                String multiCourseId = (String) langEntry.get(JsonKey.ID);
                 List<String> leafNodes = fetchLeafNodes(multiCourseId);
                 request.getRequest().put(JsonKey.LANGUAGE, recentLang.toLowerCase());
                 request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
@@ -92,7 +92,7 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
 
     private List<String> fetchLeafNodes(String courseId) {
         Map<String, Object> courseData = fetchCourseContent(courseId);
-        return (List<String>) courseData.getOrDefault("leafNodes", Collections.emptyList());
+        return (List<String>) courseData.getOrDefault(JsonKey.LEAF_NODES, Collections.emptyList());
     }
 
     public Map<String, Object> fetchCourseContent(String contentId) {
@@ -110,9 +110,9 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
 
         Map<String, Object> filters = new HashMap<>();
-        filters.put("userid", userId);
-        filters.put("courseid", courseId);
-        filters.put("batchid", batchId);
+        filters.put(JsonKey.USER_ID_KEY, userId);
+        filters.put(JsonKey.COURSE_ID_KEY, courseId);
+        filters.put(JsonKey.BATCH_ID_KEY, batchId);
 
         Response response = cassandraOperation.getRecords(
                 request.getRequestContext(),
@@ -140,7 +140,7 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
 
         String language = (String) request.getRequest().get(JsonKey.LANGUAGE);
         if (StringUtils.isBlank(language)) {
-            language = (String) enrolmentData.get("recent_language");
+            language = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
             request.getRequest().put(JsonKey.LANGUAGE, language);
         }
 
