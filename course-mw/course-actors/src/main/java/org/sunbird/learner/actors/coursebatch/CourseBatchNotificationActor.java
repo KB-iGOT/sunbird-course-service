@@ -168,7 +168,9 @@ public class CourseBatchNotificationActor extends BaseActor {
     Map<String, Object> request = new HashMap<>();
     Map<String, Object> requestMap = new HashMap<String, Object>();
     List<?> languageList = (List<?>) contentDetails.get(JsonKey.LANGUAGE);
-    String langValue = !languageList.isEmpty() ? languageList.get(0).toString() : "";
+    String langValue = (CollectionUtils.isNotEmpty(languageList) && languageList.get(0) != null)
+            ? languageList.get(0).toString()
+            : "";
     if (!recentLanguage.equalsIgnoreCase(langValue)) {
       Object langMapObj = contentDetails.get(JsonKey.LANGUAGE_MAP);
       if (langMapObj instanceof Map) {
@@ -176,22 +178,19 @@ public class CourseBatchNotificationActor extends BaseActor {
         Object recentLangObj = langMap.get(recentLanguage);
         if (recentLangObj instanceof Map) {
           Map<?, ?> recentLangMap = (Map<?, ?>) recentLangObj;
-          Object idObj = recentLangMap.get(JsonKey.ID);
-          if (idObj != null) {
-            String id = idObj.toString();
-            Map<String, Object> recentLangContentDetail = ContentUtil.getContent(id, Arrays.asList(JsonKey.APP_ICON, JsonKey.POSTER_IMAGE, JsonKey.NAME));
-            Map<String, Object> content = (Map<String, Object>) recentLangContentDetail.get(JsonKey.CONTENT);
-            requestMap.put(JsonKey.COURSE_LOGO_URL, content.get(JsonKey.APP_ICON));
-            if (content.containsKey(JsonKey.POSTER_IMAGE)) {
-              String posterImageUrl = (String) content.get(JsonKey.POSTER_IMAGE);
-              if (posterImageUrl.contains(staticHostUrl)) {
-                String[] posterImageUrlArr = posterImageUrl.split("/content/");
-                posterImageUrl = baseUrl + contentBucket + "/" + posterImageUrlArr[1];
-              }
-              requestMap.put(JsonKey.COURSE_POSTER_IMAGE, posterImageUrl);
+          String id = recentLangMap.get(JsonKey.ID).toString();
+          Map<String, Object> recentLangContentDetail = ContentUtil.getContent(id, Arrays.asList(JsonKey.APP_ICON, JsonKey.POSTER_IMAGE, JsonKey.NAME));
+          Map<String, Object> content = (Map<String, Object>) recentLangContentDetail.get(JsonKey.CONTENT);
+          requestMap.put(JsonKey.COURSE_LOGO_URL, content.get(JsonKey.APP_ICON));
+          if (content.containsKey(JsonKey.POSTER_IMAGE)) {
+            String posterImageUrl = (String) content.get(JsonKey.POSTER_IMAGE);
+            if (posterImageUrl.contains(staticHostUrl)) {
+              String[] posterImageUrlArr = posterImageUrl.split("/content/");
+              posterImageUrl = baseUrl + contentBucket + "/" + posterImageUrlArr[1];
             }
-            requestMap.put(JsonKey.COURSE_NAME, content.get(JsonKey.NAME));
+            requestMap.put(JsonKey.COURSE_POSTER_IMAGE, posterImageUrl);
           }
+          requestMap.put(JsonKey.COURSE_NAME, content.get(JsonKey.NAME));
         }
       }
     } else {
