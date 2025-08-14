@@ -1305,7 +1305,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
       cacheUtil.delete(getCacheKey(userId))
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-      notifyUser(userId, batchData, JsonKey.ADD)
+      notifyUser(userId, batchData, JsonKey.ADD , recentLanguage)
     } catch {
       case e: ProjectCommonException =>
         if (ResponseCode.userAlreadyEnrolledCourse.getErrorMessage.equals(e.getMessage))
