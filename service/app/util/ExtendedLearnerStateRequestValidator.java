@@ -45,37 +45,54 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
     }
 
     public void validateAndSetLanguage(Request request) {
+        String courseId = (String) request.getRequest().get(JsonKey.COURSE_ID);
         List<String> contentIds = (List<String>) request.getRequest().get(JsonKey.CONTENT_IDS);
-        String language = (String) request.getRequest().get(JsonKey.LANGUAGE);
+        String incomingLang = (String) request.getRequest().get(JsonKey.LANGUAGE);
 
-        if (CollectionUtils.isNotEmpty(contentIds)) {
-            String contentId = contentIds.get(0);
-            Map<String, Object> courseContent = fetchCourseContent(contentId);
+        Map<String, Object> enrolmentData = fetchEnrolmentData(request);
+        String recentLang = (String) enrolmentData.get("recent_language");
 
-            if (courseContent == null) {
-                throw new ProjectCommonException(
-                        ResponseCode.invalidCourseId.getErrorCode(),
-                        "Course content not found for contentId: " + contentId,
-                        ERROR_CODE
-                );
+        Map<String, Object> courseContent = fetchCourseContent(courseId);
+        Map<String, Object> languageMapV1 = (Map<String, Object>) courseContent.get("languageMapV1");
+
+        if (StringUtils.isNotBlank(incomingLang)) {
+            if (incomingLang.toLowerCase().equalsIgnoreCase(recentLang.toLowerCase()) && CollectionUtils.isEmpty(contentIds)) {
+                //String multiCourseId = languageMapV1.get(incomingLang.toLowerCase());
+                Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(incomingLang.toLowerCase());
+                String multiCourseId = (String) langEntry.get("id");
+                List<String> leafNodes = fetchLeafNodes(multiCourseId);
+                request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
+            } else if (CollectionUtils.isEmpty(contentIds)) {
+                Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(incomingLang.toLowerCase());
+                String multiCourseId = (String) langEntry.get("id");
+                List<String> leafNodes = fetchLeafNodes(multiCourseId);
+                request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
             }
-
-            if (StringUtils.isBlank(language)) {
-                List<String> contentLanguages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
-                if (CollectionUtils.isEmpty(contentLanguages)) {
-                    throw new ProjectCommonException(
-                            ResponseCode.languageRequired.getErrorCode(),
-                            "Language not provided and could not be inferred from content metadata.",
-                            ERROR_CODE
-                    );
-                }
-                language = contentLanguages.get(0).toLowerCase();
-                request.getRequest().put(JsonKey.LANGUAGE, language);
-            }
+            request.getRequest().put(JsonKey.LANGUAGE, incomingLang.toLowerCase());
             return;
         }
 
-        setContentIdsFromEnrolment(request);
+        if (StringUtils.isBlank(incomingLang)) {
+            if (StringUtils.isNotBlank(recentLang)) {
+                Map<String, Object> langEntry = (Map<String, Object>) languageMapV1.get(recentLang.toLowerCase());
+                String multiCourseId = (String) langEntry.get("id");
+                List<String> leafNodes = fetchLeafNodes(multiCourseId);
+                request.getRequest().put(JsonKey.LANGUAGE, recentLang.toLowerCase());
+                request.getRequest().put(JsonKey.CONTENT_IDS, leafNodes);
+                return;
+            } else {
+                throw new ProjectCommonException(
+                        ResponseCode.languageRequired.getErrorCode(),
+                        "Language is not provided and no recent_language found.",
+                        ERROR_CODE
+                );
+            }
+        }
+    }
+
+    private List<String> fetchLeafNodes(String courseId) {
+        Map<String, Object> courseData = fetchCourseContent(courseId);
+        return (List<String>) courseData.getOrDefault("leafNodes", Collections.emptyList());
     }
 
     public Map<String, Object> fetchCourseContent(String contentId) {
@@ -87,11 +104,7 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         }
     }
 
-    public void setContentIdsFromEnrolment(Request request) {
-        List<String> contentIdsReq = (List<String>) request.getRequest().get(JsonKey.CONTENT_IDS);
-        if (CollectionUtils.isNotEmpty(contentIdsReq)) {
-            return;
-        }
+    private Map<String, Object> fetchEnrolmentData(Request request) {
         String userId = (String) request.getRequest().get(JsonKey.USER_ID);
         String courseId = (String) request.getRequest().get(JsonKey.COURSE_ID);
         String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
@@ -115,7 +128,10 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         if (resultList.isEmpty()) {
             throw new ProjectCommonException(
                     ResponseCode.invalidRequestData.getErrorCode(),
-                    "Enrolment not found for user: " + userId + ", course: " + courseId + ", batch: " + batchId,
+                    String.format(
+                            "Enrolment not found for user: %s, course: %s, batch: %s",
+                            userId, courseId, batchId
+                    ),
                     ERROR_CODE
             );
         }
@@ -125,36 +141,10 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
         String language = (String) request.getRequest().get(JsonKey.LANGUAGE);
         if (StringUtils.isBlank(language)) {
             language = (String) enrolmentData.get("recent_language");
+            request.getRequest().put(JsonKey.LANGUAGE, language);
         }
 
-        if (StringUtils.isBlank(language)) {
-            throw new ProjectCommonException(
-                    ResponseCode.languageRequired.getErrorCode(),
-                    "Language is not provided and no recent_language found in enrolment.",
-                    ERROR_CODE
-            );
-        }
-
-        Map<String, Object> langContentStatusMap = (Map<String, Object>) enrolmentData.get("langContentStatus");
-        if (langContentStatusMap == null || !langContentStatusMap.containsKey(language)) {
-            throw new ProjectCommonException(
-                    ResponseCode.invalidRequestData.getErrorCode(),
-                    "No content mapping found for language: " + language,
-                    ERROR_CODE
-            );
-        }
-
-        Map<String, Object> contentStatusMap = (Map<String, Object>) langContentStatusMap.get(language);
-        if (contentStatusMap == null || contentStatusMap.isEmpty()) {
-            throw new ProjectCommonException(
-                    ResponseCode.invalidRequestData.getErrorCode(),
-                    "No content IDs found for language: " + language,
-                    ERROR_CODE
-            );
-        }
-
-        List<String> contentIds = new ArrayList<>(contentStatusMap.keySet());
-        request.getRequest().put(JsonKey.LANGUAGE, language.toLowerCase());
-        request.getRequest().put(JsonKey.CONTENT_IDS, contentIds);
+        return enrolmentData;
     }
+
 }
