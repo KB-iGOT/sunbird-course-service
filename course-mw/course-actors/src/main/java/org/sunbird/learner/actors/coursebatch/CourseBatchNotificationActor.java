@@ -5,6 +5,7 @@ import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.Constants;
 import org.sunbird.common.models.util.ActorOperations;
@@ -68,7 +69,9 @@ public class CourseBatchNotificationActor extends BaseActor {
 
     CourseBatch courseBatch = (CourseBatch) requestMap.get(JsonKey.COURSE_BATCH);
     String authToken = (String) request.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, "");
-    String recentLanguage = (String) requestMap.get(JsonKey.RECENT_LANGUAGE);
+    String recentLanguage = StringUtils.defaultString(
+            (String) requestMap.get(JsonKey.RECENT_LANGUAGE), ""
+    );
 
     String userId = (String) requestMap.get(JsonKey.USER_ID);
     logger.info(request.getRequestContext(), "CourseBatchNotificationActor:courseBatchNotification: userId = " + userId);
@@ -171,7 +174,7 @@ public class CourseBatchNotificationActor extends BaseActor {
     String langValue = (CollectionUtils.isNotEmpty(languageList) && languageList.get(0) != null)
             ? languageList.get(0).toString()
             : "";
-    if (!recentLanguage.equalsIgnoreCase(langValue)) {
+    if (StringUtils.isNotBlank(recentLanguage) && !recentLanguage.equalsIgnoreCase(langValue)) {
       Object langMapObj = contentDetails.get(JsonKey.LANGUAGE_MAP);
       if (langMapObj instanceof Map) {
         Map<?, ?> langMap = (Map<?, ?>) langMapObj;
