@@ -5,6 +5,7 @@ import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.Constants;
 import org.sunbird.common.models.util.ActorOperations;
@@ -68,6 +69,9 @@ public class CourseBatchNotificationActor extends BaseActor {
 
     CourseBatch courseBatch = (CourseBatch) requestMap.get(JsonKey.COURSE_BATCH);
     String authToken = (String) request.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, "");
+    String recentLanguage = StringUtils.defaultString(
+            (String) requestMap.get(JsonKey.RECENT_LANGUAGE), ""
+    );
 
     String userId = (String) requestMap.get(JsonKey.USER_ID);
     logger.info(request.getRequestContext(), "CourseBatchNotificationActor:courseBatchNotification: userId = " + userId);
@@ -83,6 +87,7 @@ public class CourseBatchNotificationActor extends BaseActor {
       String template = JsonKey.OPEN_BATCH_LEARNER_UNENROL;
       String subject = JsonKey.UNENROLL_FROM_COURSE_BATCH;
 
+
       String operationType = (String) requestMap.get(JsonKey.OPERATION_TYPE);
 
       if (operationType.equals(JsonKey.ADD)) {
@@ -91,7 +96,7 @@ public class CourseBatchNotificationActor extends BaseActor {
       }
 
       triggerEmailNotification( request.getRequestContext(), 
-          Arrays.asList(userId), courseBatch, subject, template, contentDetails, authToken);
+          Arrays.asList(userId), courseBatch, subject, template, contentDetails, authToken, recentLanguage);
 
     } else {
       logger.info(request.getRequestContext(), "CourseBatchNotificationActor:courseBatchNotification: Invite only batch");
@@ -104,13 +109,13 @@ public class CourseBatchNotificationActor extends BaseActor {
           courseBatch,
           JsonKey.COURSE_INVITATION,
           JsonKey.BATCH_MENTOR_ENROL,
-          contentDetails, authToken);
+          contentDetails, authToken, recentLanguage);
       triggerEmailNotification(
               request.getRequestContext(), removedMentors,
           courseBatch,
           JsonKey.UNENROLL_FROM_COURSE_BATCH,
           JsonKey.BATCH_MENTOR_UNENROL,
-          contentDetails, authToken);
+          contentDetails, authToken, recentLanguage);
 
       List<String> addedParticipants = (List<String>) requestMap.get(JsonKey.ADDED_PARTICIPANTS);
       List<String> removedParticipants =
@@ -121,13 +126,13 @@ public class CourseBatchNotificationActor extends BaseActor {
           courseBatch,
           JsonKey.COURSE_INVITATION,
           JsonKey.BATCH_LEARNER_ENROL,
-          contentDetails, authToken);
+          contentDetails, authToken, recentLanguage);
       triggerEmailNotification(
               request.getRequestContext(), removedParticipants,
           courseBatch,
           JsonKey.UNENROLL_FROM_COURSE_BATCH,
           JsonKey.BATCH_LEARNER_UNENROL,
-          contentDetails, authToken);
+          contentDetails, authToken,recentLanguage);
     }
   }
 
@@ -136,7 +141,7 @@ public class CourseBatchNotificationActor extends BaseActor {
           CourseBatch courseBatch,
           String subject,
           String template,
-          Map<String, Object> contentDetails, String authToken) throws Exception {
+          Map<String, Object> contentDetails, String authToken, String recentLanguage) throws Exception {
 
     logger.debug(requestContext, "CourseBatchNotificationActor:triggerEmailNotification: userIdList = "
             + userIdList);
@@ -145,7 +150,7 @@ public class CourseBatchNotificationActor extends BaseActor {
 
     for (String userId : userIdList) {
       Map<String, Object> requestMap =
-          createEmailRequest(userId, courseBatch, contentDetails, subject, template);
+          createEmailRequest(userId, courseBatch, contentDetails, subject, template, recentLanguage);
 
       logger.info(requestContext, "CourseBatchNotificationActor:triggerEmailNotification: requestMap = " + requestMap);
       sendMail(requestContext, requestMap, authToken);
@@ -158,33 +163,63 @@ public class CourseBatchNotificationActor extends BaseActor {
       CourseBatch courseBatch,
       Map<String, Object> contentDetails,
       String subject,
-      String template) throws Exception {
+      String template,
+      String recentLanguage) throws Exception {
     Map<String, Object> courseBatchObject = JsonUtil.convert(courseBatch, Map.class);
 
     logger.info(null,"Course Batch Details in email Request: " + courseBatchObject + ": contentDetails: " + contentDetails);
     Map<String, Object> request = new HashMap<>();
     Map<String, Object> requestMap = new HashMap<String, Object>();
+    List<?> languageList = (List<?>) contentDetails.get(JsonKey.LANGUAGE);
+    String langValue = (CollectionUtils.isNotEmpty(languageList) && languageList.get(0) != null)
+            ? languageList.get(0).toString()
+            : "";
+    if (StringUtils.isNotBlank(recentLanguage) && !recentLanguage.equalsIgnoreCase(langValue)) {
+      Object langMapObj = contentDetails.get(JsonKey.LANGUAGE_MAP);
+      if (langMapObj instanceof Map) {
+        Map<?, ?> langMap = (Map<?, ?>) langMapObj;
+        Object recentLangObj = langMap.get(recentLanguage);
+        if (recentLangObj instanceof Map) {
+          Map<?, ?> recentLangMap = (Map<?, ?>) recentLangObj;
+          String id = recentLangMap.get(JsonKey.ID).toString();
+          Map<String, Object> recentLangContentDetail = ContentUtil.getContent(id, Arrays.asList(JsonKey.APP_ICON, JsonKey.POSTER_IMAGE, JsonKey.NAME));
+          Map<String, Object> content = (Map<String, Object>) recentLangContentDetail.get(JsonKey.CONTENT);
+          requestMap.put(JsonKey.COURSE_LOGO_URL, content.get(JsonKey.APP_ICON));
+          if (content.containsKey(JsonKey.POSTER_IMAGE)) {
+            String posterImageUrl = (String) content.get(JsonKey.POSTER_IMAGE);
+            if (posterImageUrl.contains(staticHostUrl)) {
+              String[] posterImageUrlArr = posterImageUrl.split("/content/");
+              posterImageUrl = baseUrl + contentBucket + "/" + posterImageUrlArr[1];
+            }
+            requestMap.put(JsonKey.COURSE_POSTER_IMAGE, posterImageUrl);
+          }
+          requestMap.put(JsonKey.COURSE_NAME, content.get(JsonKey.NAME));
+        }
+      }
+    } else {
+      requestMap.put(JsonKey.COURSE_LOGO_URL, contentDetails.get(JsonKey.APP_ICON));
+      if (contentDetails.containsKey(JsonKey.POSTER_IMAGE)) {
+        String posterImageUrl = (String) contentDetails.get(JsonKey.POSTER_IMAGE);
+        if (posterImageUrl.contains(staticHostUrl)) {
+          String[] posterImageUrlArr = posterImageUrl.split("/content/");
+          posterImageUrl = baseUrl + contentBucket + "/" + posterImageUrlArr[1];
+        }
+        requestMap.put(JsonKey.COURSE_POSTER_IMAGE, posterImageUrl);
+      }
+      requestMap.put(JsonKey.COURSE_NAME, contentDetails.get(JsonKey.NAME));
+    }
 
     requestMap.put(JsonKey.SUBJECT, subject);
     requestMap.put(JsonKey.EMAIL_TEMPLATE_TYPE, template);
     requestMap.put(JsonKey.BODY, "Notification mail Body");
     requestMap.put(JsonKey.ORG_NAME, courseBatchObject.get(JsonKey.ORG_NAME));
-    requestMap.put(JsonKey.COURSE_LOGO_URL, contentDetails.get(JsonKey.APP_ICON));
-    if (contentDetails.containsKey(JsonKey.POSTER_IMAGE)) {
-      String posterImageUrl = (String) contentDetails.get(JsonKey.POSTER_IMAGE);
-      if (posterImageUrl.contains(staticHostUrl)) {
-        String[] posterImageUrlArr = posterImageUrl.split("/content/");
-        posterImageUrl = baseUrl + contentBucket + "/" + posterImageUrlArr[1];
-      }
-      requestMap.put(JsonKey.COURSE_POSTER_IMAGE, posterImageUrl);
-    }
-    requestMap.put(JsonKey.PROVIDER_NAME, contentDetails.get(JsonKey.SOURCE));
     requestMap.put(JsonKey.PROFILE_UPDATE_LINK, baseUrl + profileUpdateUrl);
+    requestMap.put(JsonKey.PROVIDER_NAME, contentDetails.get(JsonKey.SOURCE));
     requestMap.put(JsonKey.START_DATE, courseBatchObject.get(JsonKey.START_DATE));
     requestMap.put(JsonKey.END_DATE, courseBatchObject.get(JsonKey.END_DATE));
     requestMap.put(JsonKey.COURSE_ID, courseBatchObject.get(JsonKey.COURSE_ID));
     requestMap.put(JsonKey.BATCH_NAME, courseBatch.getName());
-    requestMap.put(JsonKey.COURSE_NAME, contentDetails.get(JsonKey.NAME));
+
     requestMap.put(JsonKey.MEETING_LINK, meetingLinkUrl);
     requestMap.put(
         JsonKey.COURSE_BATCH_URL,
