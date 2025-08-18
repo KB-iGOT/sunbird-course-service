@@ -138,7 +138,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
       // Telemetry and notification
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-      notifyUser(userId, batchData, JsonKey.ADD)
+      val recentLanguage = data.getOrDefault(JsonKey.RECENT_LANGUAGE, "").asInstanceOf[String]
+      notifyUser(userId, batchData, JsonKey.ADD, recentLanguage)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
     }
@@ -285,7 +286,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     TelemetryUtil.telemetryProcessingCall(request, targetedObject, correlationObject, contextMap, "enrol")
   }
 
-  def notifyUser(userId: String, batchData: CourseBatch, operationType: String): Unit = {
+  def notifyUser(userId: String, batchData: CourseBatch, operationType: String, recentLanguage: String): Unit = {
     val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED))
     if (isNotifyUser) {
       val request = new Request()
@@ -293,6 +294,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       request.put(JsonKey.USER_ID, userId)
       request.put(JsonKey.COURSE_BATCH, batchData)
       request.put(JsonKey.OPERATION_TYPE, operationType)
+      request.put(JsonKey.RECENT_LANGUAGE, recentLanguage)
       courseBatchNotificationActorRef.tell(request, getSelf())
     }
   }
@@ -713,10 +715,16 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def updateProgressData(enrolments: java.util.List[java.util.Map[String, AnyRef]], requestContext: RequestContext): util.List[java.util.Map[String, AnyRef]] = {
     enrolments.map { enrolment =>
-      val leafNodesCount: Int = enrolment.getOrDefault("leafNodesCount", 0.asInstanceOf[AnyRef]).asInstanceOf[Int]
-      val progress: Int = enrolment.getOrDefault("progress", 0.asInstanceOf[AnyRef]).asInstanceOf[Int]
-      enrolment.put("status", getCompletionStatus(progress, leafNodesCount).asInstanceOf[AnyRef])
-      enrolment.put("completionPercentage", getCompletionPerc(progress, leafNodesCount).asInstanceOf[AnyRef])
+      val statusObj: Int = enrolment.getOrDefault("status", 0.asInstanceOf[AnyRef]).asInstanceOf[Int]
+      if (statusObj.equals(2)) {
+        enrolment.put("status", 2.asInstanceOf[AnyRef])
+        enrolment.put("completionPercentage", 100.asInstanceOf[AnyRef])
+      } else {
+        val leafNodesCount: Int = enrolment.getOrDefault("leafNodesCount", 0.asInstanceOf[AnyRef]).asInstanceOf[Int]
+        val progress: Int = enrolment.getOrDefault("progress", 0.asInstanceOf[AnyRef]).asInstanceOf[Int]
+        enrolment.put("status", getCompletionStatus(progress, leafNodesCount).asInstanceOf[AnyRef])
+        enrolment.put("completionPercentage", getCompletionPerc(progress, leafNodesCount).asInstanceOf[AnyRef])
+      }
 
       jsonFields.foreach { field =>
         if (enrolment.containsKey(field) && null != enrolment.get(field)) {
@@ -832,7 +840,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     generatePreProcessorKafkaEvent(request,batchId, programId, userId)
     sender().tell(successResponse(), self)
     generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-    notifyUser(userId, batchData, JsonKey.ADD)
+
+    notifyUser(userId, batchData, JsonKey.ADD, recentLanguage)
     cacheUtil.delete(getCacheBatchKey(batchId))
   }
 
@@ -988,7 +997,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       cacheUtil.delete(getCacheKey(userId))
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-      notifyUser(userId, batchData, JsonKey.ADD)
+      notifyUser(userId, batchData, JsonKey.ADD, courseLanguage)
       val dataMap = new java.util.HashMap[String, AnyRef]
       val requestMap = new java.util.HashMap[String, AnyRef]
       requestMap.put(JsonKey.COURSE_ID,courseId)
@@ -1104,7 +1113,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         cacheUtil.delete(getCacheKey(userId))
         generatePreProcessorKafkaEvent(request, batchId, programId, userId)
         generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-        notifyUser(userId, batchData, JsonKey.ADD)
+        notifyUser(userId, batchData, JsonKey.ADD, courseLanguage)
         status.put(JsonKey.STATUS, JsonKey.SUCCESS)
         response.put(userId, status)
       } catch {
@@ -1296,7 +1305,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
       cacheUtil.delete(getCacheKey(userId))
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-      notifyUser(userId, batchData, JsonKey.ADD)
+      notifyUser(userId, batchData, JsonKey.ADD , recentLanguage)
     } catch {
       case e: ProjectCommonException =>
         if (ResponseCode.userAlreadyEnrolledCourse.getErrorMessage.equals(e.getMessage))
