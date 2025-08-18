@@ -86,44 +86,54 @@ public class ExtendedRequestValidator {
                             ERROR_CODE);
                 }
 
-                String courseIdKey = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
-                map.put(JsonKey.COURSE_ID, map.get(courseIdKey));
-                String courseId = (String) map.get(JsonKey.COURSE_ID);
+                map.put(JsonKey.COURSE_ID, map.containsKey(JsonKey.COURSE_ID)
+                        ? map.get(JsonKey.COURSE_ID)
+                        : map.get(JsonKey.COLLECTION_ID));
 
-                if (StringUtils.isBlank(courseId)) {
+                if (StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
                     throw new ProjectCommonException(
                             ResponseCode.courseIdRequired.getErrorCode(),
                             ResponseCode.courseIdRequiredError.getErrorMessage(),
                             ERROR_CODE);
-                } else if (isProgramConsumptionAccepted(courseId, contentId)) {
+                }
+                Map<String, Object> courseDetails = getCourseContent((String) map.get(JsonKey.COURSE_ID));
+                if (isProgramConsumptionAccepted((String) courseDetails.get(JsonKey.COURSECATEGORY), contentId,  (Boolean) courseDetails.get("cumulativeTracking"))) {
                     throw new ProjectCommonException(
                             ResponseCode.invalidProgramId.getErrorCode(),
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
                 }
-
-                Map<String, Object> courseDetails = getCourseContent(courseId);
-                String category = (String) courseDetails.get(JsonKey.COURSECATEGORY);
-                if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, category)) {
+                if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, (String) courseDetails.get(JsonKey.COURSECATEGORY))) {
                     throw new ProjectCommonException(
                             ResponseCode.languageRequired.getErrorCode(),
                             JsonKey.MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR,
                             ERROR_CODE);
                 }
 
-                Map<String, Object> courseContent = getCourseContent(courseId);
-                List<String> allowedLanguages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
+                Map<String, Object> languageMapV1 = (Map<String, Object>) courseDetails.get(JsonKey.LANGUAGE_MAP);
 
                 String incomingLanguage = (String) map.get(JsonKey.LANGUAGE);
-                if (StringUtils.isBlank(incomingLanguage)) {
-                    Map<String, Object> enrolmentData = fetchEnrolmentData((String) contentRequestDto.getRequest().get(JsonKey.USER_ID),courseId, (String) map.get(JsonKey.BATCH_ID), contentRequestDto);
-                    String recentLanguage = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
+                Map<String, Object> enrolmentData = fetchEnrolmentData(
+                        (String) contentRequestDto.getRequest().get(JsonKey.USER_ID),
+                        (String) map.get(JsonKey.COURSE_ID),
+                        (String) map.get(JsonKey.BATCH_ID),
+                        contentRequestDto
+                );
+                String recentLanguage = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
 
-                    if (StringUtils.isNotBlank(recentLanguage)) {
-                        incomingLanguage = recentLanguage;
-                    } else if (CollectionUtils.isNotEmpty(allowedLanguages)) {
-                        incomingLanguage = allowedLanguages.get(0);
+                if (StringUtils.isBlank(incomingLanguage)) {
+                    if (StringUtils.isBlank(recentLanguage)) {
+                        throw new ProjectCommonException(
+                                ResponseCode.languageRequired.getErrorCode(),
+                                ResponseCode.languageRequired.getErrorMessage(),
+                                ERROR_CODE
+                        );
                     } else {
+                        incomingLanguage = recentLanguage.toLowerCase();
+                    }
+                } else {
+                    incomingLanguage = incomingLanguage.toLowerCase();
+                    if (!languageMapV1.containsKey(incomingLanguage)) {
                         throw new ProjectCommonException(
                                 ResponseCode.languageRequired.getErrorCode(),
                                 ResponseCode.languageRequired.getErrorMessage(),
@@ -131,7 +141,7 @@ public class ExtendedRequestValidator {
                         );
                     }
                 }
-                map.put(JsonKey.LANGUAGE, incomingLanguage.toLowerCase());
+                map.put(JsonKey.LANGUAGE, incomingLanguage);
             }
         }
         List<Map<String, Object>> assessmentData =
@@ -218,12 +228,9 @@ public class ExtendedRequestValidator {
         }
     }
 
-    public static Boolean isProgramConsumptionAccepted(String courseId, String contentId) {
+    public static Boolean isProgramConsumptionAccepted(String courseCategory, String contentId, Boolean cumulativeTracking) {
         Boolean isProgram = false;
         try {
-            Map<String, Object> courseContent = getCourseContent(courseId);
-            String courseCategory = (String) courseContent.get("courseCategory");
-            Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
             if (StringUtils.isBlank(courseCategory)) {
                 throw new ProjectCommonException(
                         ResponseCode.invalidCourseCategory.getErrorCode(),
