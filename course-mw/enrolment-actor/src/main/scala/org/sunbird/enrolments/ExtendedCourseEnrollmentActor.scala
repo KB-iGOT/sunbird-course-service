@@ -139,6 +139,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       // Telemetry and notification
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
       val recentLanguage = data.getOrDefault(JsonKey.RECENT_LANGUAGE, "").asInstanceOf[String]
+      logger.info(null,"ExtendedCourseEnrolmentActor :: enroll :: recentLanguage = " + recentLanguage )
       notifyUser(userId, batchData, JsonKey.ADD, recentLanguage)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)

@@ -175,6 +175,7 @@ public class CourseBatchNotificationActor extends BaseActor {
             ? languageList.get(0).toString()
             : "";
     if (StringUtils.isNotBlank(recentLanguage) && !recentLanguage.equalsIgnoreCase(langValue)) {
+      logger.info(null,"CourseBatchNotificationActor:createEmailRequest: recentLanguage = " + recentLanguage);
       Object langMapObj = contentDetails.get(JsonKey.LANGUAGE_MAP);
       if (langMapObj instanceof Map) {
         Map<?, ?> langMap = (Map<?, ?>) langMapObj;
