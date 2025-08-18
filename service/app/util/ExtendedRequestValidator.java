@@ -4,22 +4,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.Constants;
 import org.sunbird.common.exception.ProjectCommonException;
+import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerUtil;
 import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.responsecode.ResponseCode;
+import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.util.ContentCacheHandlerV2;
+import org.sunbird.learner.util.ExtendedUtil;
 
 import java.util.*;
+
+import static org.sunbird.common.request.orgvalidator.BaseOrgRequestValidator.ERROR_CODE;
 
 public class ExtendedRequestValidator {
 
     private static final int ERROR_CODE = ResponseCode.CLIENT_ERROR.getResponseCode();
     public static LoggerUtil logger = new LoggerUtil(RequestValidator.class);
     private static ObjectMapper mapper = new ObjectMapper();
+    private static CassandraOperation cassandraOperation =  ServiceFactory.getInstance();
+    private static final ExtendedUtil.DbInfo enrolmentDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB);
 
 
     /**
@@ -71,44 +79,50 @@ public class ExtendedRequestValidator {
                                 ResponseCode.contentStatusRequired.getErrorMessage(),
                                 ERROR_CODE);
                     }
-
                 } else {
                     throw new ProjectCommonException(
                             ResponseCode.contentIdRequired.getErrorCode(),
                             ResponseCode.contentIdRequiredError.getErrorMessage(),
                             ERROR_CODE);
                 }
-                String courseId = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
-                map.put(JsonKey.COURSE_ID, map.get(courseId));
-                if (StringUtils.isBlank((String) map.get(JsonKey.COURSE_ID))) {
+
+                String courseIdKey = map.containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                map.put(JsonKey.COURSE_ID, map.get(courseIdKey));
+                String courseId = (String) map.get(JsonKey.COURSE_ID);
+
+                if (StringUtils.isBlank(courseId)) {
                     throw new ProjectCommonException(
                             ResponseCode.courseIdRequired.getErrorCode(),
                             ResponseCode.courseIdRequiredError.getErrorMessage(),
                             ERROR_CODE);
-                } else if (isProgramConsumptionAccepted((String) map.get(JsonKey.COURSE_ID), contentId)){
+                } else if (isProgramConsumptionAccepted(courseId, contentId)) {
                     throw new ProjectCommonException(
                             ResponseCode.invalidProgramId.getErrorCode(),
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
                 }
 
-                Map<String, Object> courseDetails = getCourseContent(StringUtils.isNotBlank((String) map.get(JsonKey.COURSE_ID))
-                        ? (String) map.get(JsonKey.COURSE_ID)
-                        : (String) map.get(JsonKey.COLLECTION_ID));
+                Map<String, Object> courseDetails = getCourseContent(courseId);
                 String category = (String) courseDetails.get(JsonKey.COURSECATEGORY);
-                if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, category))
-                {
-                        throw new ProjectCommonException(
-                                ResponseCode.languageRequired.getErrorCode(),
-                               JsonKey.MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR,
-                                ERROR_CODE);
+                if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, category)) {
+                    throw new ProjectCommonException(
+                            ResponseCode.languageRequired.getErrorCode(),
+                            JsonKey.MULTILINGUAL_COURSE_PROGRESS_UPDATE_ERROR,
+                            ERROR_CODE);
                 }
-                Map<String, Object> courseContent = getCourseContent(contentId);
+
+                Map<String, Object> courseContent = getCourseContent(courseId);
                 List<String> allowedLanguages = (List<String>) courseContent.get(JsonKey.LANGUAGE);
+
                 String incomingLanguage = (String) map.get(JsonKey.LANGUAGE);
                 if (StringUtils.isBlank(incomingLanguage)) {
-                    if (CollectionUtils.isNotEmpty(allowedLanguages)) {
-                        map.put(JsonKey.LANGUAGE, allowedLanguages.get(0).toLowerCase());
+                    Map<String, Object> enrolmentData = fetchEnrolmentData((String) contentRequestDto.getRequest().get(JsonKey.USER_ID),courseId, (String) map.get(JsonKey.BATCH_ID), contentRequestDto);
+                    String recentLanguage = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
+
+                    if (StringUtils.isNotBlank(recentLanguage)) {
+                        incomingLanguage = recentLanguage;
+                    } else if (CollectionUtils.isNotEmpty(allowedLanguages)) {
+                        incomingLanguage = allowedLanguages.get(0);
                     } else {
                         throw new ProjectCommonException(
                                 ResponseCode.languageRequired.getErrorCode(),
@@ -116,21 +130,8 @@ public class ExtendedRequestValidator {
                                 ERROR_CODE
                         );
                     }
-                } else {
-                    boolean match = CollectionUtils.isNotEmpty(allowedLanguages) &&
-                            allowedLanguages.stream()
-                                    .map(String::toLowerCase)
-                                    .anyMatch(lang -> lang.equals(incomingLanguage.toLowerCase()));
-                    if (!match) {
-                        throw new ProjectCommonException(
-                                ResponseCode.languageRequired.getErrorCode(),
-                                ResponseCode.languageRequired.getErrorMessage(),
-                                ERROR_CODE
-                        );
-                    }
-                    map.put(JsonKey.LANGUAGE, incomingLanguage.toLowerCase());
                 }
-
+                map.put(JsonKey.LANGUAGE, incomingLanguage.toLowerCase());
             }
         }
         List<Map<String, Object>> assessmentData =
@@ -267,5 +268,45 @@ public class ExtendedRequestValidator {
         String categoriesList = ProjectUtil.getConfigValue(JsonKey.PROGRAM_CATEGORIES);
         Set<String> programCategories = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
         return programCategories.contains(category);
+    }
+
+    private static Map<String, Object> fetchEnrolmentData(String userId, String courseId, String batchId, Request request) {
+
+        Map<String, Object> filters = new HashMap<>();
+        filters.put(JsonKey.USER_ID_KEY, userId);
+        filters.put(JsonKey.COURSE_ID_KEY, courseId);
+        filters.put(JsonKey.BATCH_ID_KEY, batchId);
+
+        Response response = cassandraOperation.getRecords(
+                request.getRequestContext(),
+                enrolmentDBInfo.getKeySpace(),
+                enrolmentDBInfo.getTableName(),
+                filters,
+                null
+        );
+
+        List<Map<String, Object>> resultList = (List<Map<String, Object>>)
+                response.getResult().getOrDefault(JsonKey.RESPONSE, new ArrayList<>());
+
+        if (resultList.isEmpty()) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidRequestData.getErrorCode(),
+                    String.format(
+                            "Enrolment not found for user: %s, course: %s, batch: %s",
+                            userId, courseId, batchId
+                    ),
+                    ERROR_CODE
+            );
+        }
+
+        Map<String, Object> enrolmentData = resultList.get(0);
+
+        String language = (String) request.getRequest().get(JsonKey.LANGUAGE);
+        if (StringUtils.isBlank(language)) {
+            language = (String) enrolmentData.get(JsonKey.RECENT_LANGUAGE);
+            request.getRequest().put(JsonKey.LANGUAGE, language);
+        }
+
+        return enrolmentData;
     }
 }
