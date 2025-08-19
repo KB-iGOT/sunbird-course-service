@@ -133,12 +133,14 @@ public class ExtendedRequestValidator {
                     }
                 } else {
                     incomingLanguage = incomingLanguage.toLowerCase();
-                    if (!languageMapV1.containsKey(incomingLanguage)) {
-                        throw new ProjectCommonException(
-                                ResponseCode.languageRequired.getErrorCode(),
-                                ResponseCode.languageRequired.getErrorMessage(),
-                                ERROR_CODE
-                        );
+                    if (MapUtils.isNotEmpty(languageMapV1)) {
+                        if (!languageMapV1.containsKey(incomingLanguage)) {
+                            throw new ProjectCommonException(
+                                    ResponseCode.languageRequired.getErrorCode(),
+                                    ResponseCode.languageRequired.getErrorMessage(),
+                                    ERROR_CODE
+                            );
+                        }
                     }
                 }
                 map.put(JsonKey.LANGUAGE, incomingLanguage);
