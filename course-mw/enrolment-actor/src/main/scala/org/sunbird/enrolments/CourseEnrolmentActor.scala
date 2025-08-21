@@ -285,39 +285,6 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         new ObjectMapper().writeValueAsString(searchRequest)
     }
 
-//    def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request,version:String): util.List[util.Map[String, AnyRef]] = {
-//        val batchIds:java.util.List[String] = enrolmentList.map(e => e.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]).distinct.filter(id => StringUtils.isNotBlank(id)).toList.asJava
-//        val batchDetails = new java.util.ArrayList[java.util.Map[String, AnyRef]]();
-//        val searchIdentifierMaxSize = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SEARCH_IDENTIFIER_MAX_SIZE));
-//        if(JsonKey.VERSION_2.equalsIgnoreCase(version) &&
-//          JsonKey.TRUE.equalsIgnoreCase(ProjectUtil.getConfigValue(JsonKey.ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED))){
-//            logger.info(request.getRequestContext, "Retrieving batch details from the local cache");
-//            for (i <- 0 to batchIds.size()-1) {
-//                batchDetails.add(getBatchFrmLocalCache(batchIds.get(i)))
-//            }
-//        }
-//        else if (batchIds.size() > searchIdentifierMaxSize) {
-//            for (i <- 0 to batchIds.size() by searchIdentifierMaxSize) {
-//                val batchIdsSubList: java.util.List[String] = batchIds.subList(i, Math.min(batchIds.size(), i + searchIdentifierMaxSize));
-//                batchDetails.addAll(searchBatchDetails(batchIdsSubList, request))
-//            }
-//        } else {
-//           batchDetails.addAll(searchBatchDetails(batchIds, request))
-//        }
-//        if(CollectionUtils.isNotEmpty(batchDetails)){
-//            val batchMap = batchDetails.map(b => b.get(JsonKey.BATCH_ID).asInstanceOf[String] -> b).toMap
-//            enrolmentList.map(enrolment => {
-//                enrolment.put(JsonKey.BATCH, batchMap.getOrElse(enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String], new java.util.HashMap[String, AnyRef]()))
-//                //To Do : A temporary change to support updation of completed course remove in next release
-//                //                if (enrolment.get("progress").asInstanceOf[Integer] < enrolment.get("leafNodesCount").asInstanceOf[Integer]) {
-//                //                    enrolment.put("status", 1.asInstanceOf[Integer])
-//                //                    enrolment.put("completedOn", null)
-//                //                }
-//                enrolment
-//            }).toList.asJava
-//        } else
-//            enrolmentList
-//    }
 def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request, version: String): util.List[util.Map[String, AnyRef]] = {
 
     val batchIds: java.util.List[String] = enrolmentList
