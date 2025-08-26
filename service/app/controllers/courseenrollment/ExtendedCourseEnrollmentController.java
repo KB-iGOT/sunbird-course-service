@@ -166,7 +166,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     logger.info( ((Request) request).getRequestContext(), " CourseEnrollmentController : Request for enroll recieved via Blended Program admin enroll, UserId : "+  userId +", courseId : "+courseId+ ", batchId:"+batchId);
                     validator.validateEnrollCourse(req);
                     //call validateEnrollmentCriteriaMethod validateEnrolmentCriteria
-                    validator.validateEnrolmentCriteria(req, false, false);
+                    validator.validateEnrolmentCriteria(req, true, true);
 
                     return null;
                 },
