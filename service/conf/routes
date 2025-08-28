@@ -142,3 +142,5 @@ POST     /v2/course/admin/enroll	    		@controllers.courseenrollment.ExtendedCou
 POST     /v2/program/admin/enroll	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.adminEnrollProgramV2(request: play.mvc.Http.Request)
 POST     /v2/openprogram/enrol	    		@controllers.courseenrollment.ExtendedCourseEnrollmentController.openProgramEnrollV2(request: play.mvc.Http.Request)
 POST     /v3/event/enroll	    		    @controllers.courseenrollment.ExtendedCourseEnrollmentController.enrollCourseWithLanguage(request: play.mvc.Http.Request)
+
+POST     /v1/course/batch/delete				@controllers.coursemanagement.CourseBatchController.deleteBatch(request: play.mvc.Http.Request)

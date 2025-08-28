@@ -381,4 +381,15 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             ResponseCode.mandatoryParamsMissing,
             JsonKey.USER_ID);
   }
+
+  public void validateDeleteCourseBatchRequest(Request request) {
+    validateParam(
+            (String) request.getRequest().get(JsonKey.COURSE_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.COURSE_ID + "/" + JsonKey.COLLECTION_ID);
+    validateParam(
+            (String) request.getRequest().get(JsonKey.BATCH_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.BATCH_ID);
+  }
 }

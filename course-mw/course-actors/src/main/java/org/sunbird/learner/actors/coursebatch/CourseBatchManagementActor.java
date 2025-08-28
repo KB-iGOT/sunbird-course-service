@@ -101,6 +101,9 @@ public class CourseBatchManagementActor extends BaseActor {
       case "updateStartBatchesStatus":
         updateStartBatchesStatus(request);
         break;
+      case "deleteBatch":
+        deleteCourseBatch(request);
+        break;
       default:
         onReceiveUnsupportedOperation(request.getOperation());
         break;
@@ -322,6 +325,20 @@ public class CourseBatchManagementActor extends BaseActor {
         (Map<String, Object>) ElasticSearchHelper.getResponseFromFuture(resultF);
     if (result.containsKey(JsonKey.COURSE_ID))
       result.put(JsonKey.COLLECTION_ID, result.getOrDefault(JsonKey.COURSE_ID, ""));
+
+      if (MapUtils.isNotEmpty(result) && result.containsKey(JsonKey.STATUS)) {
+          Object statusObj = result.get(JsonKey.STATUS);
+          if (statusObj != null) {
+              int status = Integer.parseInt(statusObj.toString());
+              if (status == ProjectUtil.Status.DELETED.getValue()) {
+                  ProjectCommonException.throwClientErrorException(
+                          ResponseCode.resourceNotFound,   // or define a new code e.g. ResponseCode.batchDeleted
+                          "This batch has been deleted and cannot be fetched."
+                  );
+              }
+          }
+      }
+
     Response response = new Response();
     response.put(JsonKey.RESPONSE, result);
     sender().tell(response, self());
@@ -837,4 +854,78 @@ public class CourseBatchManagementActor extends BaseActor {
             PropertiesCache.getInstance()
                     .getProperty(JsonKey.SUNBIRD_BATCH_UPDATE_NOTIFICATIONS_ENABLED));
   }
+
+    private void deleteCourseBatch(Request actorMessage) throws Exception {
+        Map<String, Object> request = actorMessage.getRequest();
+
+        String courseId = (String) request.get(JsonKey.COURSE_ID);
+        String batchId =
+                request.containsKey(JsonKey.BATCH_ID)
+                        ? (String) request.get(JsonKey.BATCH_ID)
+                        : (String) request.get(JsonKey.ID);
+
+        CourseBatch batchDetails =
+                courseBatchDao.readById(courseId, batchId, actorMessage.getRequestContext());
+        if (batchDetails == null) {
+            ProjectCommonException.throwClientErrorException(
+                    ResponseCode.resourceNotFound,
+                    "Batch not found with ID: " + batchId);
+        }
+        if (batchDetails.getStatus() == ProjectUtil.Status.DELETED.getValue()) {
+            ProjectCommonException.throwClientErrorException(
+                    ResponseCode.CLIENT_ERROR,
+                    "Batch is already deleted: " + batchId);
+        }
+        Date now = ProjectUtil.getTimeStamp();
+        if (batchDetails.getStartDate() != null && batchDetails.getStartDate().before(now)) {
+            ProjectCommonException.throwClientErrorException(
+                    ResponseCode.CLIENT_ERROR,
+                    "Cannot delete batch. Already started on: " + batchDetails.getStartDate());
+        }
+        batchDetails.setStatus(ProjectUtil.Status.DELETED.getValue());
+        batchDetails.setUpdatedDate(ProjectUtil.getTimeStamp());
+        Map<String, String> headers =
+                (Map<String, String>) actorMessage.getContext().get(JsonKey.HEADER);
+        Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(), courseId, headers);
+        String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
+        if (!JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+            ProjectCommonException.throwClientErrorException(
+                    ResponseCode.invalidRequestData,
+                    "You are trying to delete the batch of primaryCategory: " + primaryCategory +
+                            ", which is not allowed."
+            );
+        }
+
+        Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(batchDetails, dateFormat);
+        Response result =
+                courseBatchDao.update(actorMessage.getRequestContext(), courseId, batchId, courseBatchMap);
+
+        // Sync to ES
+        CourseBatch updatedCourseObject = mapESFieldsToObject(batchDetails);
+        Map<String, Object> esCourseMap = CourseBatchUtil.esCourseMapping(updatedCourseObject, dateFormat);
+        CourseBatchUtil.syncCourseBatchForeground(actorMessage.getRequestContext(), batchId, esCourseMap);
+        updateCollectionAfterBatchDelete(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+        result.put(JsonKey.MESSAGE, "Batch deleted successfully");
+        sender().tell(result, self());
+    }
+
+    private void updateCollectionAfterBatchDelete(RequestContext requestContext, Map<String, Object> courseBatch, Map<String, Object> contentDetails) {
+        List<Map<String, Object>> batches = (List<Map<String, Object>>) contentDetails.getOrDefault("batches", new ArrayList<>());
+        String batchIdToDelete = (String) courseBatch.getOrDefault(JsonKey.BATCH_ID, "");
+        List<Map<String, Object>> updatedBatches = batches.stream()
+                .filter(batch -> !StringUtils.equalsIgnoreCase(batchIdToDelete, (String) batch.get("batchId")))
+                .collect(Collectors.toList());
+
+        ProjectLogger.log("Batch removed from collection: " + batchIdToDelete, LoggerEnum.INFO.name());
+
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("batches", updatedBatches);
+
+        ContentUtil.updateCollection(
+                requestContext,
+                (String) courseBatch.getOrDefault(JsonKey.COURSE_ID, ""),
+                requestMap
+        );
+    }
+
 }

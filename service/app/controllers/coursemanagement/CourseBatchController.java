@@ -132,4 +132,19 @@ public class CourseBatchController extends BaseController {
                 null,
                 httpRequest);
     }
+
+    public CompletionStage<Result> deleteBatch(Http.Request httpRequest) {
+        return handleRequest(
+                courseBatchActorRef,
+                ActorOperations.DELETE_BATCH.getValue(),
+                httpRequest.body().asJson(),
+                (request) -> {
+                    Request req = (Request) request;
+                    String courseId = req.getRequest().containsKey(JsonKey.COURSE_ID) ? JsonKey.COURSE_ID : JsonKey.COLLECTION_ID;
+                    req.getRequest().put(JsonKey.COURSE_ID, req.getRequest().get(courseId));
+                    new CourseBatchRequestValidator().validateDeleteCourseBatchRequest(req);
+                    return null;
+                },
+                httpRequest);
+    }
 }
