@@ -1132,12 +1132,23 @@ public final class RequestValidator {
         } else if (cumulativeTracking) {
           Map<String, Object> resourceContent =  getCourseContent(contentId);
           String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
-          if (isCategoryAllowed(contextCategory)) {
+          String primaryCategory = (String) resourceContent.get(JsonKey.PRIMARYCATEGORY);
+          boolean allowed = false;
+          if (StringUtils.isNotBlank(contextCategory)) {
+            allowed = isCategoryAllowed(contextCategory);
+          } else if (StringUtils.isNotBlank(primaryCategory)) {
+            allowed = isPrimaryCategoryAllowed(primaryCategory);
+          }
+          if (allowed) {
             isProgram = false;
           } else {
             isProgram = true;
           }
-          logger.info(null, "ContextCategory is details Id: " + contentId + ", category: " + contextCategory + ", isProgram: " + isProgram);
+          logger.info(null,
+                  "Category check for contentId: " + contentId +
+                          ", contextCategory=" + contextCategory +
+                          ", primaryCategory=" + primaryCategory +
+                          ", isProgram=" + isProgram);
         }
       }
     } catch (Exception e) {
@@ -1160,6 +1171,12 @@ public final class RequestValidator {
     String categoriesList = ProjectUtil.getConfigValue(JsonKey.ALLOWED_RESOURCES_FOR_PROGRAM_STATUS_UPDATE);
     Set<String> allowedCategoryList = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
     return allowedCategoryList.contains(category);
+  }
+
+  private static boolean isPrimaryCategoryAllowed(String category) {
+    String categoriesList = ProjectUtil.getConfigValue(JsonKey.ALLOWED_PRIMARY_CATEGORIES);
+    Set<String> allowed = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+    return allowed.contains(category);
   }
 
 }
