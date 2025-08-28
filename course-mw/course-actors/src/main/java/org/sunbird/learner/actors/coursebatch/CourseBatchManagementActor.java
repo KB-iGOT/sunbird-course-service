@@ -326,7 +326,7 @@ public class CourseBatchManagementActor extends BaseActor {
     if (result.containsKey(JsonKey.COURSE_ID))
       result.put(JsonKey.COLLECTION_ID, result.getOrDefault(JsonKey.COURSE_ID, ""));
 
-      if (result != null && result.containsKey(JsonKey.STATUS)) {
+      if (MapUtils.isNotEmpty(result) && result.containsKey(JsonKey.STATUS)) {
           Object statusObj = result.get(JsonKey.STATUS);
           if (statusObj != null) {
               int status = Integer.parseInt(statusObj.toString());
