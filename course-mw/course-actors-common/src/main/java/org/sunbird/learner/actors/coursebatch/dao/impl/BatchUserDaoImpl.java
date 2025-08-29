@@ -15,10 +15,8 @@ import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.common.models.util.LoggerUtil;
 
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.sql.Timestamp;
+import java.util.*;
 
 public class BatchUserDaoImpl implements BatchUserDao{
     protected LoggerUtil logger = new LoggerUtil(this.getClass()); 
@@ -55,6 +53,14 @@ public class BatchUserDaoImpl implements BatchUserDao{
                 batchUser.setBatchId((String) userDetail.get("batchId"));
                 batchUser.setUserId((String) userDetail.get("userId"));
                 batchUser.setActive((Boolean) userDetail.get("active"));
+                Object enrolledDateObj = userDetail.get("enrolledDate");
+                if (enrolledDateObj instanceof Date) {
+                    batchUser.setEnrolledDate(new Timestamp(((Date) enrolledDateObj).getTime()));
+                } else if (enrolledDateObj instanceof Long) {
+                    batchUser.setEnrolledDate(new Timestamp((Long) enrolledDateObj));
+                } else {
+                    batchUser.setEnrolledDate(null); // or handle default
+                }
                 batchUsers.add(batchUser);
             }
             return batchUsers;
