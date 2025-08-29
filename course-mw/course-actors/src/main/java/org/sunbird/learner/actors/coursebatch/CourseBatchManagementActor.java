@@ -14,6 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.json.JSONObject;
 import org.sunbird.actor.base.BaseActor;
+import org.sunbird.common.CassandraUtil;
 import org.sunbird.common.Constants;
 import org.sunbird.common.ElasticSearchHelper;
 import org.sunbird.common.exception.ProjectCommonException;
@@ -27,14 +28,19 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.util.JsonUtil;
 import org.sunbird.dto.SearchDTO;
+import org.sunbird.learner.actors.coursebatch.dao.BatchUserDao;
 import org.sunbird.learner.actors.coursebatch.dao.CourseBatchDao;
+import org.sunbird.learner.actors.coursebatch.dao.UserCoursesDao;
+import org.sunbird.learner.actors.coursebatch.dao.impl.BatchUserDaoImpl;
 import org.sunbird.learner.actors.coursebatch.dao.impl.CourseBatchDaoImpl;
+import org.sunbird.learner.actors.coursebatch.dao.impl.UserCoursesDaoImpl;
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.util.ContentSearchUtil;
 import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.learner.util.CourseBatchUtil;
 import org.sunbird.learner.util.Util;
+import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.telemetry.util.TelemetryUtil;
 import org.sunbird.userorg.UserOrgService;
@@ -74,6 +80,8 @@ public class CourseBatchManagementActor extends BaseActor {
   private String dateFormat = "yyyy-MM-dd";
   private List<String> validCourseStatus = Arrays.asList("Live", "Unlisted");
   private String timeZone = ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE);
+  private BatchUserDao batchUserDao = new BatchUserDaoImpl();
+  private UserCoursesDao userCoursesDao = new UserCoursesDaoImpl();
 
   @Inject
   @Named("course-batch-notification-actor")
@@ -905,6 +913,7 @@ public class CourseBatchManagementActor extends BaseActor {
         Map<String, Object> esCourseMap = CourseBatchUtil.esCourseMapping(updatedCourseObject, dateFormat);
         CourseBatchUtil.syncCourseBatchForeground(actorMessage.getRequestContext(), batchId, esCourseMap);
         updateCollectionAfterBatchDelete(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+        unenrollUsersFromBatch(actorMessage.getRequestContext(), courseId, batchId);
         result.put(JsonKey.MESSAGE, "Batch deleted successfully");
         sender().tell(result, self());
     }
@@ -926,6 +935,82 @@ public class CourseBatchManagementActor extends BaseActor {
                 (String) courseBatch.getOrDefault(JsonKey.COURSE_ID, ""),
                 requestMap
         );
+    }
+
+    private void unenrollUsersFromBatch(RequestContext ctx, String courseId, String batchId) throws Exception {
+        // Get all users from enrollment_batch_lookup for the batch
+        RequestContext requestContext = ctx;
+        List<BatchUser> batchUsers = batchUserDao.readById(ctx, batchId);
+
+        if (CollectionUtils.isEmpty(batchUsers)) {
+            ProjectLogger.log("No users enrolled for batch: " + batchId, LoggerEnum.INFO.name());
+            return;
+        }
+
+        for (BatchUser batchUser : batchUsers) {
+            String userId = batchUser.getUserId();
+            Map<String, Object> data = new HashMap<>();
+            data.put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.INACTIVE.getValue());
+
+            Map<String, Object> dataBatch = createBatchUserMapping(batchId, userId, batchUser, false);
+
+            upsertEnrollment(userId, courseId, batchId, data, dataBatch, false, requestContext);
+
+            ProjectLogger.log("Unenrolled user: " + userId + " from batch: " + batchId, LoggerEnum.INFO.name());
+        }
+    }
+
+    public static Map<String, Object> createBatchUserMapping(String batchId, String userId, BatchUser batchUserData, boolean isActive) {
+        Map<String, Object> map = new HashMap<>();
+
+        map.put(JsonKey.BATCH_ID, batchId);
+        map.put(JsonKey.USER_ID, userId);
+        map.put(JsonKey.ACTIVE, isActive
+                ? ProjectUtil.ActiveStatus.ACTIVE.getValue()
+                : ProjectUtil.ActiveStatus.INACTIVE.getValue());
+
+        map.put(JsonKey.COURSE_ENROLL_DATE,
+                batchUserData == null ? ProjectUtil.getTimeStamp() : batchUserData.getEnrolledDate());
+
+        return map;
+    }
+
+    public void upsertEnrollment(
+            String userId,
+            String courseId,
+            String batchId,
+            Map<String, Object> data,
+            Map<String, Object> dataBatch,
+            boolean isNew,
+            RequestContext requestContext) throws Exception {
+
+        Map<String, Object> dataMap = CassandraUtil.changeCassandraColumnMapping(data);
+        Map<String, Object> dataBatchMap = CassandraUtil.changeCassandraColumnMapping(dataBatch);
+
+        try {
+            Object activeStatus = dataMap.get(JsonKey.ACTIVE);
+            logger.info(requestContext,
+                    "upsertEnrollment :: IsNew :: " + isNew +
+                            " ActiveStatus :: " + activeStatus +
+                            " DataMap is :: " + dataMap +
+                            " DataBatchMap:: " + dataBatchMap);
+
+            if (activeStatus == null) {
+                throw new Exception("Active Value is null in upsertEnrollment");
+            }
+        } catch (Exception e) {
+            logger.error(requestContext,
+                    "Exception in upsertEnrollment list : user ::" + userId +
+                            "| Exception is:" + e.getMessage(), e);
+            throw e;
+        }
+        if (isNew) {
+            userCoursesDao.insertExtendedEnrollmentV2(requestContext, dataMap);
+            batchUserDao.insertBatchLookupRecord(requestContext, dataBatchMap);
+        } else {
+            userCoursesDao.updateExtendedEnrollV2(requestContext, userId, courseId, batchId, dataMap);
+            batchUserDao.updateBatchLookupRecord(requestContext, batchId, userId, dataBatchMap, dataMap);
+        }
     }
 
 }
