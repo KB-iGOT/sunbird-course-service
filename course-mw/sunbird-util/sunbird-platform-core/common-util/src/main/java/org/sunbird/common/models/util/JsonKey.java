@@ -1272,7 +1272,7 @@ public final class JsonKey {
   public static final String RECORDS = "records";
   public static final String CONTENT_READ = "content_read";
   public static final String DATE_KEY = "Date";
-    public static final String LEARNING_RESOURCE = "Learning Resource";
+  public static final String LEARNING_RESOURCE = "Learning Resource";
 
   private JsonKey() {}
 }
