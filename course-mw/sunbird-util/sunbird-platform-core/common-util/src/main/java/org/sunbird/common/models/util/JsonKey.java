@@ -1254,5 +1254,6 @@ public final class JsonKey {
   public static final String ALLOWED_PRIMARY_CATEGORIES = "status_update_allowed_primary_category";
   public static final String LEARNING_RESOURCE = "Learning Resource";
 
+
   private JsonKey() {}
 }
