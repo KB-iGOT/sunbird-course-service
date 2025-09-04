@@ -98,7 +98,8 @@ public class ProjectUtil {
   /** @author Amit Kumar */
   public enum Status {
     ACTIVE(1),
-    INACTIVE(0);
+    INACTIVE(0),
+    DELETED(3);
 
     private int value;
 
