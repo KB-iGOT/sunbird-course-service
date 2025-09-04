@@ -1252,7 +1252,8 @@ public final class JsonKey {
   public static final String IS_BASE_LANGUAGE = "isBaseLang";
   public static final String LANGUAGE_NOT_FOUND_IN_CONTENT = "Language not found in content metadata.";
   public static final String ALLOWED_PRIMARY_CATEGORIES = "status_update_allowed_primary_category";
-  public static final String LEARNING_RESOURCES = "Learning Resources";
+  public static final String LEARNING_RESOURCE = "Learning Resource";
+
 
   private JsonKey() {}
 }
