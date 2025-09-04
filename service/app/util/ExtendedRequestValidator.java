@@ -253,7 +253,11 @@ public class ExtendedRequestValidator {
                     if (StringUtils.isNotBlank(contextCategory)) {
                         allowed = isCategoryAllowed(contextCategory);
                     } else if (StringUtils.isNotBlank(primaryCategory)) {
-                        allowed = isPrimaryCategoryAllowed(primaryCategory);
+                        if (JsonKey.BLENDED_PROGRAM.equalsIgnoreCase(courseCategory) && JsonKey.LEARNING_RESOURCES.equalsIgnoreCase(primaryCategory)) {
+                            allowed = true;
+                        } else {
+                            allowed = isPrimaryCategoryAllowed(primaryCategory);
+                        }
                     }
                     if (allowed) {
                         isProgram = false;
