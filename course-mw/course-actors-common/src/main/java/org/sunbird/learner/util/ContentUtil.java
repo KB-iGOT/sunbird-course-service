@@ -4,6 +4,7 @@ package org.sunbird.learner.util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 import javax.ws.rs.core.MediaType;
 
 import com.mashape.unirest.http.exceptions.UnirestException;
@@ -145,7 +146,7 @@ public final class ContentUtil {
   }
 
   public static Map<String, Object> getContent(String eventId) {
-    return getEventContent(eventId);
+    return getEventContent(eventId, new ArrayList<String>());
   }
 
   public static Map<String, Object> getContent(String courseId, List<String> fields,
@@ -190,13 +191,19 @@ public final class ContentUtil {
     return resMap;
   }
 
-  public static Map<String, Object> getEventContent(String eventId) {
+  public static Map<String, Object> getEventContent(String eventId, List<String> fields) {
     Map<String, Object> resMap = new HashMap<>();
     Map<String, String> headers = new HashMap<>();
+    String baseContentreadUrl = null;
     try {
-      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v4/read/" + eventId;
+      if (CollectionUtils.isNotEmpty(fields)) {
+        String fieldsStr = StringUtils.join(fields, ",");
+        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + ProjectUtil.getConfigValue(JsonKey.CONTENT_READ) + eventId + "?fields=" + fieldsStr;
+      } else {
+        baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + ProjectUtil.getConfigValue(JsonKey.CONTENT_READ) + eventId;
+      }
       headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
-      logger.info(null, "making call for content read ==" + baseContentreadUrl);
+      logger.info(null, "making call for event read ==" + baseContentreadUrl);
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
       logger.info(null, "Content read response", null, new HashMap<>() {
         {
@@ -607,5 +614,59 @@ public final class ContentUtil {
       logger.error(null, "Issue while fetching the data " + e.getMessage(), e);
     }
     return new AbstractMap.SimpleEntry<>(count, coursesMap);
+  }
+
+  public static List<String> fetchMdoList(List<String> orgIds, String createdBy, RequestContext requestContext) {
+    logger.debug(requestContext, "Fetching MDO leader list for orgId: " + orgIds + " excluding createdBy: " + createdBy);
+    List<String> mdoList = new ArrayList<>();
+    try {
+      Map<String, Object> filters = new HashMap<>();
+      filters.put(JsonKey.ROOT_ORG_ID, orgIds);
+      filters.put(JsonKey.STATUS, 1);
+      filters.put(JsonKey.ORGANISATIONS_ROLES, Arrays.asList(JsonKey.MDO_LEADER, JsonKey.MDO_ADMIN));
+
+      Map<String, Object> requestMap = Map.of(JsonKey.FILTERS, filters);
+
+      Map<String, Object> requestPayload = new HashMap<>();
+      requestPayload.put(JsonKey.REQUEST, requestMap);
+      String requestJson = JsonUtil.serialize(requestPayload);
+
+      Map<String, String> headers = new HashMap<>();
+      headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+
+      String searchUrl = ProjectUtil.getConfigValue(JsonKey.SUNBIRD_USER_ORG_API_BASE_URL) + ProjectUtil.getConfigValue(JsonKey.SUNBIRD_PRIVATE_SEARCH_USER_API);
+
+      String responseJson = HttpUtil.sendPostRequest(searchUrl, requestJson, headers);
+
+      // Parse response JSON
+      Map<String, Object> searchResponse = JsonUtil.deserialize(responseJson, Map.class);
+
+      if (searchResponse != null && searchResponse.containsKey(JsonKey.RESULT)) {
+        Map<String, Object> resultMap = (Map<String, Object>) searchResponse.get(JsonKey.RESULT);
+        Map<String, Object> responseMap = (Map<String, Object>) resultMap.get(JsonKey.RESPONSE);
+
+        List<Map<String, Object>> users = (List<Map<String, Object>>) responseMap.get(JsonKey.CONTENT);
+        if (users != null) {
+          for (Map<String, Object> user : users) {
+            String userId = (String) user.get(JsonKey.IDENTIFIER);
+
+            List<Map<String, Object>> orgs = (List<Map<String, Object>>) user.get(JsonKey.ORGANISATIONS);
+            if (orgs != null) {
+              for (Map<String, Object> org : orgs) {
+                List<String> roles = (List<String>) org.get(JsonKey.ROLES);
+                if (roles.contains(JsonKey.MDO_ADMIN)) {
+                  if (userId.equals(createdBy)) mdoList.add(userId);
+                }
+                if (roles.contains(JsonKey.MDO_LEADER)) mdoList.add(userId);
+              }
+            }
+          }
+        }
+      }
+      mdoList = mdoList.stream().distinct().collect(Collectors.toList());
+    } catch (Exception e) {
+      logger.error(requestContext, "Error fetching MDO leader list: " + e.getMessage(), e);
+    }
+    return mdoList;
   }
 }
