@@ -23,6 +23,7 @@ import org.sunbird.learner.actors.eventbatch.impl.EventBatchDaoImpl;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.learner.util.EventBatchUtil;
+import org.sunbird.learner.util.HelperMethodService;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.event.batch.EventBatch;
@@ -56,6 +57,7 @@ public class EventsActor extends BaseActor {
     private UserEventsDao userEventsDao = new UserEventsDaoImpl();
     private BatchUserDao batchUserDao = new BatchUserDaoImpl();
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private HelperMethodService helperMethodService = new HelperMethodService();
 
     @Inject
     @Named("course-batch-notification-actor")
@@ -369,6 +371,7 @@ public class EventsActor extends BaseActor {
             sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());
             generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
             notifyUser(userId, batchData, JsonKey.ADD);
+            helperMethodService.sendNotificationToMDOs(eventId,userId,request.getRequestContext());
         } else {
             throw new ProjectCommonException(ResponseCode.accessDeniedToEnrolEvent.getErrorCode(), ResponseCode.accessDeniedToEnrolEvent.getErrorMessage(),ResponseCode.CLIENT_ERROR.getResponseCode());
         }
