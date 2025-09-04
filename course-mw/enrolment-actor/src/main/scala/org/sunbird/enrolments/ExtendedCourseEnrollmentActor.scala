@@ -940,7 +940,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
     for (courseId <- courseBatchMap.keySet()) {
       // Enroll in course with courseId, userId and batchId.
-      enrollProgramCourses(request, courseId, courseBatchMap.get(courseId).asInstanceOf[CourseBatch])
+      enrollProgramCourses(request, courseId, courseBatchMap.get(courseId).asInstanceOf[CourseBatch], userId)
     }
   }
 
@@ -1290,9 +1290,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     response.getResult.getOrDefault(JsonKey.RESPONSE, new java.util.ArrayList[java.util.Map[String, AnyRef]]).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
   }
 
-  def enrollProgramCourses(request: Request,courseId: String,batchData:CourseBatch): Boolean = {
+  def enrollProgramCourses(request: Request,courseId: String,batchData:CourseBatch, userId: String): Boolean = {
     try {
-      val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
       val recentLanguage: String = request.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
       val batchId: String = batchData.getBatchId.asInstanceOf[String]
       var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)

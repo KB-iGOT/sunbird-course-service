@@ -1252,6 +1252,7 @@ public final class JsonKey {
   public static final String IS_BASE_LANGUAGE = "isBaseLang";
   public static final String LANGUAGE_NOT_FOUND_IN_CONTENT = "Language not found in content metadata.";
   public static final String ALLOWED_PRIMARY_CATEGORIES = "status_update_allowed_primary_category";
+  public static final String LEARNING_RESOURCES = "Learning Resources";
   public static final String SUNBIRD_PRIVATE_SEARCH_USER_API = "sunbird_private_search_user_api";
   public static final String USER_ID_REQ = "user_id";
   public static final String FIRST_NAME_KEY = "first_name";
@@ -1271,7 +1272,6 @@ public final class JsonKey {
   public static final String RECORDS = "records";
   public static final String CONTENT_READ = "content_read";
   public static final String DATE_KEY = "Date";
-
 
   private JsonKey() {}
 }
