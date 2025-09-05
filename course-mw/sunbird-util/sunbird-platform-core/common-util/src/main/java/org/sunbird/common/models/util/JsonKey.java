@@ -1253,6 +1253,7 @@ public final class JsonKey {
   public static final String LANGUAGE_NOT_FOUND_IN_CONTENT = "Language not found in content metadata.";
   public static final String ALLOWED_PRIMARY_CATEGORIES = "status_update_allowed_primary_category";
   public static final String LEARNING_RESOURCE = "Learning Resource";
+  public static final String BLENDED_PROGRAM_ALLOWED_PRIMARY_CATEGORIES = "blended_program_allowed_primary_categories";
 
 
   private JsonKey() {}

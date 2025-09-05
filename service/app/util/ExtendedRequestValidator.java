@@ -253,7 +253,8 @@ public class ExtendedRequestValidator {
                     if (StringUtils.isNotBlank(contextCategory)) {
                         allowed = isCategoryAllowed(contextCategory);
                     } else if (StringUtils.isNotBlank(primaryCategory)) {
-                        if (JsonKey.BLENDED_PROGRAM.equalsIgnoreCase(courseCategory) && JsonKey.LEARNING_RESOURCE.equalsIgnoreCase(primaryCategory)) {
+                        if (JsonKey.BLENDED_PROGRAM.equalsIgnoreCase(courseCategory)
+                                && isPrimaryCategoryAllowedForBlendedProgram(primaryCategory)) {
                             allowed = true;
                         } else {
                             allowed = isPrimaryCategoryAllowed(primaryCategory);
@@ -336,6 +337,12 @@ public class ExtendedRequestValidator {
 
     private static boolean isPrimaryCategoryAllowed(String category) {
         String categoriesList = ProjectUtil.getConfigValue(JsonKey.ALLOWED_PRIMARY_CATEGORIES);
+        Set<String> allowed = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
+        return allowed.contains(category);
+    }
+
+    private static boolean isPrimaryCategoryAllowedForBlendedProgram(String category) {
+        String categoriesList = ProjectUtil.getConfigValue(JsonKey.BLENDED_PROGRAM_ALLOWED_PRIMARY_CATEGORIES);
         Set<String> allowed = new HashSet<>(Arrays.asList(categoriesList.split(",\\s*")));
         return allowed.contains(category);
     }
