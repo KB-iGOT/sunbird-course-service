@@ -3,13 +3,24 @@ package org.sunbird.common.models.util.fcm;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import com.mashape.unirest.http.HttpMethod;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpHeaders;
 import org.json.JSONObject;
+import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.HttpUtil;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerEnum;
 import org.sunbird.common.models.util.ProjectLogger;
 import org.sunbird.common.models.util.PropertiesCache;
+import org.sunbird.common.request.RequestContext;
+import org.sunbird.common.util.JsonUtil;
+
+import javax.ws.rs.core.MediaType;
+
+import static org.sunbird.common.models.util.JsonKey.RESPONSE;
+import static org.sunbird.common.models.util.ProjectUtil.getConfigValue;
 
 /** @author Manzarul */
 public class Notification {
@@ -58,4 +69,19 @@ public class Notification {
     }
     return response;
   }
+
+    public static void sendNotificationAsync(Map<String, Object> requestMap) {
+        ProjectLogger.log("Notification: sendNotificationAsync ready");
+        try {
+            String response = null;
+            Map<String, String> headers = new HashMap<>();
+            headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+            String url = getConfigValue(JsonKey.NOTIFICATION_SERVICE_BASE_URL) + getConfigValue(JsonKey.NOTIFICATION_ASYNC_ENDPOINT);
+            HttpUtil.sendPostRequest(url, JsonUtil.serialize(requestMap), headers);
+            ProjectLogger.log("Notification:sendNotificationAsync Email sent successfully");
+        } catch (Exception e) {
+            ProjectLogger.log("Notification:sendNotificationAsync: Exception occurred with error message = "
+                    + e.getMessage(), e);
+        }
+    }
 }

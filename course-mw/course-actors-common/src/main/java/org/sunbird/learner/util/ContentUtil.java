@@ -12,6 +12,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
+import org.sunbird.common.Constants;
 import org.sunbird.common.ElasticSearchHelper;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.factory.EsClientFactory;
@@ -669,4 +670,52 @@ public final class ContentUtil {
     }
     return mdoList;
   }
+
+    public static List<String> getUserEmails(List<String> userIds, RequestContext requestContext) {
+        List<String> emailResponseList = new ArrayList<>();
+        try {
+            logger.info(requestContext, "getUserEmails called with userIds: " + userIds);
+            Map<String, Object> filters = new HashMap<>();
+            filters.put(JsonKey.USER_ID, userIds);
+            List<String> userFields = Arrays.asList(JsonKey.USER_ID, JsonKey.PROFILE_DETAILS);
+            Map<String, Object> req = new HashMap<>();
+            req.put(JsonKey.FILTERS, filters);
+            req.put(JsonKey.FIELDS, userFields);
+            Map<String, Object> requestObject = new HashMap<>();
+            requestObject.put(JsonKey.REQUEST, req);
+
+            Map<String, String> headersValue = new HashMap<>();
+            headersValue.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+
+            String url = ProjectUtil.getConfigValue(JsonKey.SUNBIRD_USER_ORG_API_BASE_URL)
+                    + PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_PRIVATE_SEARCH_USER_API);
+
+            String requestJson = JsonUtil.serialize(requestObject);
+            String responseJson = HttpUtil.sendPostRequest(url, requestJson, headersValue);
+
+            Map<String, Object> searchProfileApiResp = mapper.readValue(responseJson, Map.class);
+
+            if (searchProfileApiResp != null
+                    && JsonKey.OK.equalsIgnoreCase((String) searchProfileApiResp.get(JsonKey.RESPONSE_CODE))) {
+                Map<String, Object> result = (Map<String, Object>) searchProfileApiResp.get(JsonKey.RESULT);
+                Map<String, Object> resp = (Map<String, Object>) result.get(JsonKey.RESPONSE);
+                List<Map<String, Object>> contents = (List<Map<String, Object>>) resp.get(JsonKey.CONTENT);
+                for (Map<String, Object> content : contents) {
+                    Map<String, Object> profileDetails = (Map<String, Object>) content.get(JsonKey.PROFILE_DETAILS);
+                    if (profileDetails != null) {
+                        Map<String, Object> personalDetails = (Map<String, Object>) profileDetails.get(JsonKey.PERSONAL_DETAILS);
+                        if (personalDetails != null) {
+                            String email = (String) personalDetails.get(JsonKey.PRIMARY_EMAIL);
+                            if (email != null) {
+                                emailResponseList.add(email);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error(requestContext, "Error fetching user emails: " + e.getMessage(), e);
+        }
+        return emailResponseList;
+    }
 }

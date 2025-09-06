@@ -1273,6 +1273,10 @@ public final class JsonKey {
   public static final String RECORDS = "records";
   public static final String CONTENT_READ = "content_read";
   public static final String DATE_KEY = "Date";
+  public static final String NOTIFICATION_SERVICE_BASE_URL = "notification_service_base_url";
+  public static final String NOTIFICATION_ASYNC_ENDPOINT = "notification_async_endpoint";
+  public static final String PRIMARY_EMAIL = "primaryEmail";
+  public static final String PERSONAL_DETAILS = "personalDetails";
 
 
   private JsonKey() {}
