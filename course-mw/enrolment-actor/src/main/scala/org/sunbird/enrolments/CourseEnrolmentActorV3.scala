@@ -421,32 +421,18 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     ContentCacheHandlerV2.getInstance().getExternalContent(courseId)
   }
 
-  def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request, version: String): util.List[util.Map[String, AnyRef]] = {
-
-    val batchIds: java.util.List[String] = enrolmentList
-      .map(e => e.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String])
-      .distinct
-      .filter(id => StringUtils.isNotBlank(id))
-      .toList
-      .asJava
-
-    val batchDetails = new java.util.ArrayList[java.util.Map[String, AnyRef]]()
-    val searchIdentifierMaxSize = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SEARCH_IDENTIFIER_MAX_SIZE))
-
+  def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request,version:String): util.List[util.Map[String, AnyRef]] = {
+    val batchIds:java.util.List[String] = enrolmentList.map(e => e.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]).distinct.filter(id => StringUtils.isNotBlank(id)).toList.asJava
+    val batchDetails = new java.util.ArrayList[java.util.Map[String, AnyRef]]();
+    val searchIdentifierMaxSize = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SEARCH_IDENTIFIER_MAX_SIZE));
     if (JsonKey.VERSION_3.equalsIgnoreCase(version) &&
-      JsonKey.TRUE.equalsIgnoreCase(ProjectUtil.getConfigValue(JsonKey.ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED))) {
-
-      logger.info(request.getRequestContext, "Retrieving batch details from the local cache")
-
-      for (enrolment <- enrolmentList.asScala) {
-        val batchId = enrolment.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]
-        val courseId = enrolment.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
-        if (StringUtils.isNotBlank(batchId) && StringUtils.isNotBlank(courseId)) {
-          batchDetails.add(getBatchFrmLocalCacheV2(batchId, courseId))
-        }
+      JsonKey.TRUE.equalsIgnoreCase(ProjectUtil.getConfigValue(JsonKey.ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED))){
+      logger.info(request.getRequestContext, "Retrieving batch details from the local cache");
+      for (i <- 0 to batchIds.size()-1) {
+        batchDetails.add(getBatchFrmLocalCache(batchIds.get(i)))
       }
-
-    } else if (batchIds.size() > searchIdentifierMaxSize) {
+    }
+    else if (batchIds.size() > searchIdentifierMaxSize) {
       for (i <- 0 to batchIds.size() by searchIdentifierMaxSize) {
         val batchIdsSubList: java.util.List[String] = batchIds.subList(i, Math.min(batchIds.size(), i + searchIdentifierMaxSize));
         batchDetails.addAll(searchBatchDetails(batchIdsSubList, request))
@@ -454,8 +440,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     } else {
       batchDetails.addAll(searchBatchDetails(batchIds, request))
     }
-
-    if (CollectionUtils.isNotEmpty(batchDetails)) {
+    if(CollectionUtils.isNotEmpty(batchDetails)){
       val batchMap = batchDetails.map(b => b.get(JsonKey.BATCH_ID).asInstanceOf[String] -> b).toMap
       enrolmentList.map(enrolment => {
         enrolment.put(JsonKey.BATCH, batchMap.getOrElse(enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String], new java.util.HashMap[String, AnyRef]()))
@@ -484,21 +469,6 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
     if (batch == null || batch.size() < 1)
       batch = BatchCacheHandler.getBatch(batchId)
     batch
-  }
-
-  def getBatchFrmLocalCacheV2(batchId: String, courseId: String): java.util.Map[String, AnyRef] = {
-    try {
-      val batch = BatchCacheHandlerV2.getInstance().getContent(batchId, courseId)
-      if (batch != null && !batch.isEmpty) {
-        batch.asInstanceOf[java.util.Map[String, AnyRef]]
-      } else {
-        null
-      }
-    } catch {
-      case ex: Exception =>
-        logger.error(null, s"getBatchFrmLocalCacheV2: Exception while retrieving batch for batchId: $batchId and courseId: $courseId", ex)
-        null
-    }
   }
 
   private def enrichCourseIdFromProgram(request: Request, courseIdList:  java.util.List[String]) = {

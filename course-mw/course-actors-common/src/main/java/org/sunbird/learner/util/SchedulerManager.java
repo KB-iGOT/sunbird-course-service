@@ -23,7 +23,7 @@ public class SchedulerManager {
     service.scheduleWithFixedDelay(new PageCacheLoaderService(), 0, PAGE_DATA_TTL, TimeUnit.HOURS);
     //Let's try to load at the run time from Redis -- these schedules are causing heavy load on ES.
     //service.scheduleWithFixedDelay(new ContentCacheHandler(), 0, 15, TimeUnit.MINUTES);
-    service.scheduleWithFixedDelay(new BatchCacheHandler(), 0, 15, TimeUnit.MINUTES);
+    //service.scheduleWithFixedDelay(new BatchCacheHandler(), 0, 15, TimeUnit.MINUTES);
 
     logger.info(null, 
         "SchedulerManager:schedule: Started scheduler job for cache refresh.");

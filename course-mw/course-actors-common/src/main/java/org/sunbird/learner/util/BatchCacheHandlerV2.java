@@ -20,18 +20,23 @@ import java.util.Map;
 public class BatchCacheHandlerV2 {
 
     private static BatchCacheHandlerV2 instance;
-    long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_TTL_MINUTES"));
-    long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_MAX_SIZE"));
 
-    private Cache<String, Map<String, Object>> batchCache = Caffeine.newBuilder()
-            .maximumSize(maxSize)
-            .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
-            .recordStats()
-            .build();
 
     private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
     private LoggerUtil logger = new LoggerUtil(BatchCacheHandlerV2.class);
     private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
+    private Cache<String, Map<String, Object>> batchCache;
+
+    private BatchCacheHandlerV2() {
+        long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_TTL_MINUTES"));
+        long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_MAX_SIZE"));
+
+       batchCache  = Caffeine.newBuilder()
+                .maximumSize(maxSize)
+                .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
+                .recordStats()
+                .build();
+    }
 
     public static BatchCacheHandlerV2 getInstance() {
         if (instance == null) {

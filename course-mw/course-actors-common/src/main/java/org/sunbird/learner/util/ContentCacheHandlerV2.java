@@ -17,14 +17,17 @@ public class ContentCacheHandlerV2 {
     private LoggerUtil logger = new LoggerUtil(ContentCacheHandlerV2.class);
     private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
 
-    long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("CONTENT_CACHE_TTL_MINUTES"));
-    long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("CONTENT_CACHE_MAX_SIZE"));
+    private final Cache<String, Map<String, Object>> contentCache;
+    private ContentCacheHandlerV2() {
+        long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("CONTENT_CACHE_TTL_MINUTES"));
+        long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("CONTENT_CACHE_MAX_SIZE"));
 
-    private final Cache<String, Map<String, Object>>  contentCache = Caffeine.newBuilder()
+        contentCache = Caffeine.newBuilder()
                 .maximumSize(maxSize)
                 .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
                 .recordStats()
                 .build();
+    }
 
 
     public static ContentCacheHandlerV2 getInstance() {
