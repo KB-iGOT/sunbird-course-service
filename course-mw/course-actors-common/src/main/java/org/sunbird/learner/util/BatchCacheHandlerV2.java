@@ -21,9 +21,10 @@ public class BatchCacheHandlerV2 {
 
     private static BatchCacheHandlerV2 instance;
     long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_TTL_MINUTES"));
+    long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_MAX_SIZE"));
 
-    private Cache<String, Map<String, Object>> contentCache = Caffeine.newBuilder()
-            .maximumSize(100_000)
+    private Cache<String, Map<String, Object>> batchCache = Caffeine.newBuilder()
+            .maximumSize(maxSize)
             .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
             .recordStats()
             .build();
@@ -44,7 +45,7 @@ public class BatchCacheHandlerV2 {
     }
 
     public Map<String, Object> getContent(String batchId, String courseId) throws Exception {
-        Map<String, Object> content = contentCache.getIfPresent(batchId);
+        Map<String, Object> content = batchCache.getIfPresent(batchId);
         if (content != null) {
             return content;
         }
@@ -58,7 +59,7 @@ public class BatchCacheHandlerV2 {
 
         if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
             content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
-            contentCache.put(batchId, content);
+            batchCache.put(batchId, content);
             return content;
         } else {
             logger.info(null, "BatchCacheHandlerV2:getContent: Content not found in Redis for id: " + batchId);
@@ -84,7 +85,8 @@ public class BatchCacheHandlerV2 {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> fetchedContent = (Map<String, Object>) responseList.get(0);
                         if (fetchedContent != null && !fetchedContent.isEmpty()) {
-                            contentCache.put(batchId, fetchedContent);
+                            batchCache.put(batchId, fetchedContent);
+                            redisCacheUtil.set(batchId, mapper.writeValueAsString(fetchedContent), Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL)));
                             return fetchedContent;
                         } else {
                             logger.info(null, "BatchCacheHandlerV2:getContent: Empty content for batchId: " + batchId);
