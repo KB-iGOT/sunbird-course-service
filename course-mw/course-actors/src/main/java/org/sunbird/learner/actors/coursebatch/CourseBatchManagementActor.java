@@ -41,10 +41,7 @@ import org.sunbird.learner.actors.coursebatch.dao.impl.CourseBatchDaoImpl;
 import org.sunbird.learner.actors.coursebatch.dao.impl.UserCoursesDaoImpl;
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService;
 import org.sunbird.learner.constants.CourseJsonKey;
-import org.sunbird.learner.util.ContentSearchUtil;
-import org.sunbird.learner.util.ContentUtil;
-import org.sunbird.learner.util.CourseBatchUtil;
-import org.sunbird.learner.util.Util;
+import org.sunbird.learner.util.*;
 import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.telemetry.util.TelemetryUtil;
@@ -81,6 +78,7 @@ public class CourseBatchManagementActor extends BaseActor {
   private BatchUserDao batchUserDao = new BatchUserDaoImpl();
   private UserCoursesDao userCoursesDao = new UserCoursesDaoImpl();
   private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
+  private HelperMethodService helperMethodService = new HelperMethodService();
 
   @Inject
   @Named("course-batch-notification-actor")
@@ -959,7 +957,7 @@ public class CourseBatchManagementActor extends BaseActor {
             ProjectLogger.log("Unenrolled user: " + userId + " from batch: " + batchId, LoggerEnum.INFO.name());
             userIds.add(userId);
         }
-        notifyUserUnenrollment(requestContext, userIds, contentDetails, batchDetails);
+        notifyUserUnenrollment(requestContext, userIds, contentDetails, batchDetails, courseId);
     }
 
     public static Map<String, Object> createBatchUserMapping(String batchId, String userId, BatchUser batchUserData, boolean isActive) {
@@ -1015,7 +1013,7 @@ public class CourseBatchManagementActor extends BaseActor {
         }
     }
 
-    private void notifyUserUnenrollment(RequestContext requestContext, List<String> userIds, Map<String, Object> contentDetails, CourseBatch batchDetails) {
+    private void notifyUserUnenrollment(RequestContext requestContext, List<String> userIds, Map<String, Object> contentDetails, CourseBatch batchDetails, String courseId) {
         List<String> emailsIds = ContentUtil.getUserEmails(userIds, requestContext);
         if (CollectionUtils.isNotEmpty(emailsIds)) {
             Map<String, Object> params = new HashMap<>();
@@ -1053,6 +1051,14 @@ public class CourseBatchManagementActor extends BaseActor {
             notificationMap.put(Constants.NOTIFICATIONS, Collections.singletonList(notificationRequest));
             req.put(Constants.REQUEST, notificationMap);
             Notification.sendNotificationAsync(req);
+
+            Map<String, Object> message = new HashMap<>();
+            Map<String, Object> data = new HashMap<>();
+            data.put(JsonKey.COURSE_ID, courseId);
+            message.put(JsonKey.DATA, data);
+            message.put(JsonKey.PLACE_HOLDERS, params);
+
+            helperMethodService.sendNotification(JsonKey.DELETED_BATCH, JsonKey.ALERT, userIds, message);
         } else {
             logger.info(requestContext, "No emails found for users");
         }

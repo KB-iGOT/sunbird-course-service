@@ -1277,6 +1277,7 @@ public final class JsonKey {
   public static final String NOTIFICATION_ASYNC_ENDPOINT = "notification_async_endpoint";
   public static final String PRIMARY_EMAIL = "primaryEmail";
   public static final String PERSONAL_DETAILS = "personalDetails";
+  public static final String DELETED_BATCH = "DELETED_BATCH";
 
 
   private JsonKey() {}
