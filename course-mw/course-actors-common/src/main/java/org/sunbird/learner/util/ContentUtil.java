@@ -695,19 +695,23 @@ public final class ContentUtil {
 
             Map<String, Object> searchProfileApiResp = mapper.readValue(responseJson, Map.class);
 
-            if (searchProfileApiResp != null
+            if (MapUtils.isNotEmpty(searchProfileApiResp)
                     && JsonKey.OK.equalsIgnoreCase((String) searchProfileApiResp.get(JsonKey.RESPONSE_CODE))) {
                 Map<String, Object> result = (Map<String, Object>) searchProfileApiResp.get(JsonKey.RESULT);
-                Map<String, Object> resp = (Map<String, Object>) result.get(JsonKey.RESPONSE);
-                List<Map<String, Object>> contents = (List<Map<String, Object>>) resp.get(JsonKey.CONTENT);
-                for (Map<String, Object> content : contents) {
-                    Map<String, Object> profileDetails = (Map<String, Object>) content.get(JsonKey.PROFILE_DETAILS);
-                    if (profileDetails != null) {
-                        Map<String, Object> personalDetails = (Map<String, Object>) profileDetails.get(JsonKey.PERSONAL_DETAILS);
-                        if (personalDetails != null) {
-                            String email = (String) personalDetails.get(JsonKey.PRIMARY_EMAIL);
-                            if (email != null) {
-                                emailResponseList.add(email);
+                if (MapUtils.isNotEmpty(result)) {
+                    Map<String, Object> resp = (Map<String, Object>) result.get(JsonKey.RESPONSE);
+                    if (MapUtils.isNotEmpty(resp)) {
+                        List<Map<String, Object>> contents = (List<Map<String, Object>>) resp.get(JsonKey.CONTENT);
+                        for (Map<String, Object> content : contents) {
+                            Map<String, Object> profileDetails = (Map<String, Object>) content.get(JsonKey.PROFILE_DETAILS);
+                            if (MapUtils.isNotEmpty(profileDetails)) {
+                                Map<String, Object> personalDetails = (Map<String, Object>) profileDetails.get(JsonKey.PERSONAL_DETAILS);
+                                if (MapUtils.isNotEmpty(personalDetails)) {
+                                    String email = (String) personalDetails.get(JsonKey.PRIMARY_EMAIL);
+                                    if (StringUtils.isNotBlank(email)) {
+                                        emailResponseList.add(email);
+                                    }
+                                }
                             }
                         }
                     }

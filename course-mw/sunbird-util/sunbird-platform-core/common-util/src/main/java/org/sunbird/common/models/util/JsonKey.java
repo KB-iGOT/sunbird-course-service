@@ -1278,6 +1278,7 @@ public final class JsonKey {
   public static final String PRIMARY_EMAIL = "primaryEmail";
   public static final String PERSONAL_DETAILS = "personalDetails";
   public static final String DELETED_BATCH = "DELETED_BATCH";
+  public static final String CONTENT_READ_REQUIRED_FIELDS = "content_read_required_fields";
 
 
   private JsonKey() {}
