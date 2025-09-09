@@ -51,7 +51,8 @@ public class ProjectUtil {
     "sso.properties",
     "userencryption.properties",
     "profilecompleteness.properties",
-    "mailTemplates.properties"
+    "mailTemplates.properties",
+    "server.properties"
   };
   public static PropertiesCache propertiesCache;
   private static Pattern pattern;

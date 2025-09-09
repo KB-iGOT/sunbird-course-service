@@ -22,7 +22,8 @@ public class PropertiesCache {
     "sso.properties",
     "userencryption.properties",
     "profilecompleteness.properties",
-    "mailTemplates.properties"
+    "mailTemplates.properties",
+    "server.properties"
   };
   private final Properties configProp = new Properties();
   public final Map<String, Float> attributePercentageMap = new ConcurrentHashMap<>();
