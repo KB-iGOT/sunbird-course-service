@@ -910,9 +910,12 @@ public class CourseBatchManagementActor extends BaseActor {
         Map<String, Object> esCourseMap = CourseBatchUtil.esCourseMapping(updatedCourseObject, dateFormat);
         CourseBatchUtil.syncCourseBatchForeground(actorMessage.getRequestContext(), batchId, esCourseMap);
         updateCollectionAfterBatchDelete(actorMessage.getRequestContext(), esCourseMap, contentDetails);
-        unenrollUsersFromBatch(actorMessage.getRequestContext(), courseId, batchId,contentDetails,batchDetails);
+        List<String> userIds = unenrollUsersFromBatch(actorMessage.getRequestContext(), courseId, batchId,contentDetails,batchDetails);
         result.put(JsonKey.MESSAGE, "Batch deleted successfully");
         sender().tell(result, self());
+        if(CollectionUtils.isNotEmpty(userIds)) {
+            notifyUserUnenrollment(actorMessage.getRequestContext(), userIds, contentDetails, batchDetails, courseId);
+        }
     }
 
     private void updateCollectionAfterBatchDelete(RequestContext requestContext, Map<String, Object> courseBatch, Map<String, Object> contentDetails) {
@@ -934,14 +937,14 @@ public class CourseBatchManagementActor extends BaseActor {
         );
     }
 
-    private void unenrollUsersFromBatch(RequestContext ctx, String courseId, String batchId, Map<String, Object> contentDetails,CourseBatch batchDetails) throws Exception {
+    private List<String> unenrollUsersFromBatch(RequestContext ctx, String courseId, String batchId, Map<String, Object> contentDetails,CourseBatch batchDetails) throws Exception {
         // Get all users from enrollment_batch_lookup for the batch
         RequestContext requestContext = ctx;
         List<BatchUser> batchUsers = batchUserDao.readById(ctx, batchId);
 
         if (CollectionUtils.isEmpty(batchUsers)) {
             ProjectLogger.log("No users enrolled for batch: " + batchId, LoggerEnum.INFO.name());
-            return;
+            return new ArrayList<>();
         }
         List<String> userIds = new ArrayList<>();
 
@@ -957,7 +960,7 @@ public class CourseBatchManagementActor extends BaseActor {
             ProjectLogger.log("Unenrolled user: " + userId + " from batch: " + batchId, LoggerEnum.INFO.name());
             userIds.add(userId);
         }
-        notifyUserUnenrollment(requestContext, userIds, contentDetails, batchDetails, courseId);
+        return userIds;
     }
 
     public static Map<String, Object> createBatchUserMapping(String batchId, String userId, BatchUser batchUserData, boolean isActive) {
@@ -1027,10 +1030,10 @@ public class CourseBatchManagementActor extends BaseActor {
 
 
             template.put(Constants.DATA, constructEmailTemplate(Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE, params, requestContext));
-            template.put(Constants.ID, Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE); //ProjectUtil.getConfigValue(""));
+            template.put(Constants.ID, Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE);
             template.put(Constants.PARAMS, params);
             template.put(Constants.TYPE, Constants.EMAIL);
-            usermap.put(Constants.ID, requestContext.getActorId());//requestContext.get(Constants.USER_ID) put pc userid
+            usermap.put(Constants.ID, requestContext.getActorId());
             usermap.put(Constants.TYPE, Constants.USER);
             action.put(Constants.TYPE, Constants.EMAIL);
             action.put(Constants.CATEGORY, Constants.EMAIL);

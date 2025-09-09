@@ -77,6 +77,7 @@ public class Notification {
             Map<String, String> headers = new HashMap<>();
             headers.put(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
             String url = getConfigValue(JsonKey.NOTIFICATION_SERVICE_BASE_URL) + getConfigValue(JsonKey.NOTIFICATION_ASYNC_ENDPOINT);
+            ProjectLogger.log("Notification:sendNotificationAsync URL = " + url + "with request = " + requestMap);
             HttpUtil.sendPostRequest(url, JsonUtil.serialize(requestMap), headers);
             ProjectLogger.log("Notification:sendNotificationAsync Email sent successfully");
         } catch (Exception e) {
