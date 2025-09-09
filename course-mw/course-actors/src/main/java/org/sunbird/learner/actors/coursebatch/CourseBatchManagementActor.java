@@ -649,7 +649,7 @@ public class CourseBatchManagementActor extends BaseActor {
   }
 
   private Map<String, Object> getContentDetails(RequestContext requestContext, String courseId, Map<String, String> headers) {
-      Map<String, Object> ekStepContent = ContentUtil.getContent(courseId, Arrays.asList(JsonKey.CONTENT_READ_REQUIRED_FIELDS.split(",")));
+      Map<String, Object> ekStepContent = ContentUtil.getContent(courseId, Arrays.asList(ProjectUtil.getConfigValue(JsonKey.CONTENT_READ_REQUIRED_FIELDS).split(",")));
     logger.info(requestContext, "CourseBatchManagementActor:getEkStepContent: courseId: " + courseId, null,
             ekStepContent);
     String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
