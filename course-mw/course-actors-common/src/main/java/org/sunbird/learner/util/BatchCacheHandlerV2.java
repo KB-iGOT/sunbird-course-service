@@ -21,8 +21,6 @@ public class BatchCacheHandlerV2 {
 
     private static BatchCacheHandlerV2 instance;
 
-
-    private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
     private LoggerUtil logger = new LoggerUtil(BatchCacheHandlerV2.class);
     private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
     private Cache<String, Map<String, Object>> batchCache;
