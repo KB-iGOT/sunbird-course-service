@@ -55,57 +55,44 @@ public class BatchCacheHandlerV2 {
             return content;
         }
 
-        logger.info(null, "BatchCacheHandlerV2:getContent: Reading content from Redis for id: " + batchId);
+        logger.info(null, "BatchCacheHandlerV2:getContent: Cache miss. Fetching from Cassandra for id: " + batchId);
 
-        int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
-        String cacheResponse = redisCacheUtil.getUsingIndex(batchId, null, ttl, 0);
+        Map<String, Object> primaryKey = new HashMap<>();
+        primaryKey.put(JsonKey.COURSE_ID, courseId);
+        primaryKey.put(JsonKey.BATCH_ID, batchId);
 
-        ObjectMapper mapper = new ObjectMapper();
+        Response response = cassandraOperation.getRecordByIdentifier(
+                null,
+                "sunbird_courses",
+                "course_batch",
+                primaryKey,
+                null
+        );
 
-        if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
-            content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
-            batchCache.put(batchId, content);
-            return content;
-        } else {
-            logger.info(null, "BatchCacheHandlerV2:getContent: Content not found in Redis for id: " + batchId);
+        if (response != null && response.getResult() != null) {
+            Object resultObj = response.getResult().get("response");
 
-            Map<String, Object> primaryKey = new HashMap<>();
-            primaryKey.put(JsonKey.COURSE_ID, courseId);
-            primaryKey.put(JsonKey.BATCH_ID, batchId);
-
-            Response response = cassandraOperation.getRecordByIdentifier(
-                    null,
-                    "sunbird_courses",
-                    "course_batch",
-                    primaryKey,
-                    null
-            );
-
-            if (response != null && response.getResult() != null) {
-                Object resultObj = response.getResult().get("response");
-
-                if (resultObj instanceof List) {
-                    List<?> responseList = (List<?>) resultObj;
-                    if (!responseList.isEmpty() && responseList.get(0) instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> fetchedContent = (Map<String, Object>) responseList.get(0);
-                        if (fetchedContent != null && !fetchedContent.isEmpty()) {
-                            batchCache.put(batchId, fetchedContent);
-                            redisCacheUtil.set(batchId, mapper.writeValueAsString(fetchedContent), Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL)));
-                            return fetchedContent;
-                        } else {
-                            logger.info(null, "BatchCacheHandlerV2:getContent: Empty content for batchId: " + batchId);
-                        }
+            if (resultObj instanceof List) {
+                List<?> responseList = (List<?>) resultObj;
+                if (!responseList.isEmpty() && responseList.get(0) instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> fetchedContent = (Map<String, Object>) responseList.get(0);
+                    if (fetchedContent != null && !fetchedContent.isEmpty()) {
+                        batchCache.put(batchId, fetchedContent);
+                        return fetchedContent;
                     } else {
-                        logger.info(null, "BatchCacheHandlerV2:getContent: Unexpected response format for batchId: " + batchId);
+                        logger.info(null, "BatchCacheHandlerV2:getContent: Empty content for batchId: " + batchId);
                     }
                 } else {
-                    logger.info(null, "BatchCacheHandlerV2:getContent: Response object is not a list for batchId: " + batchId);
+                    logger.info(null, "BatchCacheHandlerV2:getContent: Unexpected response format for batchId: " + batchId);
                 }
             } else {
-                logger.info(null, "BatchCacheHandlerV2:getContent: Null response or result from Cassandra for batchId: " + batchId);
+                logger.info(null, "BatchCacheHandlerV2:getContent: Response object is not a list for batchId: " + batchId);
             }
+        } else {
+            logger.info(null, "BatchCacheHandlerV2:getContent: Null response or result from Cassandra for batchId: " + batchId);
         }
+
         return null;
     }
 }
