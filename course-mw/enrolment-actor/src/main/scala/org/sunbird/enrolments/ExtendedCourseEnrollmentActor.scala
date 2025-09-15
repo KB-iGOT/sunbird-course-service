@@ -18,7 +18,7 @@ import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
-import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -638,18 +638,32 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     ContentCacheHandlerV2.getInstance().getExternalContent(courseId)
   }
 
-  def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request,version:String): util.List[util.Map[String, AnyRef]] = {
-    val batchIds:java.util.List[String] = enrolmentList.map(e => e.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]).distinct.filter(id => StringUtils.isNotBlank(id)).toList.asJava
-    val batchDetails = new java.util.ArrayList[java.util.Map[String, AnyRef]]();
-    val searchIdentifierMaxSize = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SEARCH_IDENTIFIER_MAX_SIZE));
+  def addBatchDetails(enrolmentList: util.List[util.Map[String, AnyRef]], request: Request, version: String): util.List[util.Map[String, AnyRef]] = {
+
+    val batchIds: java.util.List[String] = enrolmentList
+      .map(e => e.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String])
+      .distinct
+      .filter(id => StringUtils.isNotBlank(id))
+      .toList
+      .asJava
+
+    val batchDetails = new java.util.ArrayList[java.util.Map[String, AnyRef]]()
+    val searchIdentifierMaxSize = Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SEARCH_IDENTIFIER_MAX_SIZE))
+
     if (JsonKey.VERSION_3.equalsIgnoreCase(version) &&
-      JsonKey.TRUE.equalsIgnoreCase(ProjectUtil.getConfigValue(JsonKey.ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED))){
-      logger.info(request.getRequestContext, "Retrieving batch details from the local cache");
-      for (i <- 0 to batchIds.size()-1) {
-        batchDetails.add(getBatchFrmLocalCache(batchIds.get(i)))
+      JsonKey.TRUE.equalsIgnoreCase(ProjectUtil.getConfigValue(JsonKey.ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED))) {
+
+      logger.info(request.getRequestContext, "Retrieving batch details from the local cache")
+
+      for (enrolment <- enrolmentList.asScala) {
+        val batchId = enrolment.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]
+        val courseId = enrolment.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+        if (StringUtils.isNotBlank(batchId) && StringUtils.isNotBlank(courseId)) {
+          batchDetails.add(getBatchFrmLocalCacheV2(batchId, courseId))
+        }
       }
-    }
-    else if (batchIds.size() > searchIdentifierMaxSize) {
+
+    } else if (batchIds.size() > searchIdentifierMaxSize) {
       for (i <- 0 to batchIds.size() by searchIdentifierMaxSize) {
         val batchIdsSubList: java.util.List[String] = batchIds.subList(i, Math.min(batchIds.size(), i + searchIdentifierMaxSize));
         batchDetails.addAll(searchBatchDetails(batchIdsSubList, request))
@@ -657,7 +671,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     } else {
       batchDetails.addAll(searchBatchDetails(batchIds, request))
     }
-    if(CollectionUtils.isNotEmpty(batchDetails)){
+    if (CollectionUtils.isNotEmpty(batchDetails)) {
       val batchMap = batchDetails.map(b => b.get(JsonKey.BATCH_ID).asInstanceOf[String] -> b).toMap
       enrolmentList.map(enrolment => {
         enrolment.put(JsonKey.BATCH, batchMap.getOrElse(enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String], new java.util.HashMap[String, AnyRef]()))
@@ -678,14 +692,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     } else {
       new java.util.ArrayList[util.Map[String, AnyRef]]()
     }
-  }
-
-  def getBatchFrmLocalCache(batchId: String): java.util.Map[String, AnyRef] = {
-    val batchesMap = BatchCacheHandler.getBatchMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
-    var batch = batchesMap.get(batchId)
-    if (batch == null || batch.size() < 1)
-      batch = BatchCacheHandler.getBatch(batchId)
-    batch
   }
 
   private def enrichCourseIdFromProgram(request: Request, courseIdList:  java.util.List[String]) = {
@@ -740,7 +746,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
       // New logic: update contentStatus if recentLanguage is present and contentStatus is null
       val recentLanguage = enrolment.get("recent_language")
-      val contentStatus = enrolment.get("contentstatus")
+      val contentStatus = enrolment.get("contentStatus")
       val languageMapV1 = enrolment.get("langContentStatus").asInstanceOf[java.util.Map[String, AnyRef]]
 
       if (recentLanguage != null && (contentStatus == null || StringUtils.isBlank(contentStatus.toString)) && languageMapV1 != null) {
@@ -1327,4 +1333,20 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
     false;
   }
+
+  def getBatchFrmLocalCacheV2(batchId: String, courseId: String): java.util.Map[String, AnyRef] = {
+    try {
+      val batch = BatchCacheHandlerV2.getInstance().getContent(batchId, courseId)
+      if (batch != null && !batch.isEmpty) {
+        batch.asInstanceOf[java.util.Map[String, AnyRef]]
+      } else {
+        null
+      }
+    } catch {
+      case ex: Exception =>
+        logger.error(null, s"getBatchFrmLocalCacheV2: Exception while retrieving batch for batchId: $batchId and courseId: $courseId", ex)
+        null
+    }
+  }
+
 }
