@@ -18,7 +18,7 @@ import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
-import org.sunbird.learner.util.{BatchCacheHandler, BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -692,14 +692,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     } else {
       new java.util.ArrayList[util.Map[String, AnyRef]]()
     }
-  }
-
-  def getBatchFrmLocalCache(batchId: String): java.util.Map[String, AnyRef] = {
-    val batchesMap = BatchCacheHandler.getBatchMap.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]]
-    var batch = batchesMap.get(batchId)
-    if (batch == null || batch.size() < 1)
-      batch = BatchCacheHandler.getBatch(batchId)
-    batch
   }
 
   private def enrichCourseIdFromProgram(request: Request, courseIdList:  java.util.List[String]) = {
