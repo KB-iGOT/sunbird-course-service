@@ -143,9 +143,9 @@ public class CourseBatchManagementActor extends BaseActor {
     validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
     courseBatch.setBatchId(courseBatchId);
     Map<String, Object> batchAttributes = courseBatch.getBatchAttributes();
-      if (MapUtils.isNotEmpty(batchAttributes)) {
-          processInstructors(actorMessage.getRequestContext(), batchAttributes, courseBatch, false);
-      }
+    if (MapUtils.isNotEmpty(batchAttributes)) {
+        processInstructors(actorMessage.getRequestContext(), batchAttributes, courseBatch, false);
+    }
     String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
     if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
       if (MapUtils.isEmpty(courseBatch.getBatchAttributes()) || 
@@ -1118,16 +1118,13 @@ public class CourseBatchManagementActor extends BaseActor {
         if (instructors.isEmpty()) {
             return;
         }
-        if (isUpdateFlow) {
-            Date today = new Date();
-            if (courseBatch.getStartDate() != null && !today.before(courseBatch.getStartDate())) {
-                throw new ProjectCommonException(
-                        ResponseCode.invalidParameterValue.getErrorCode(),
-                        "Instructors cannot be added/updated after the batch start date: "
-                                + courseBatch.getStartDate(),
-                        ResponseCode.CLIENT_ERROR.getResponseCode()
-                );
-            }
+        if (isUpdateFlow && courseBatch.getStartDate() != null && !new Date().before(courseBatch.getStartDate())) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidParameterValue.getErrorCode(),
+                    "Instructors cannot be added/updated after the batch start date: "
+                            + courseBatch.getStartDate(),
+                    ResponseCode.CLIENT_ERROR.getResponseCode()
+            );
         }
         List<String> validUserIds = new ArrayList<>();
         for (Object obj : instructors) {
