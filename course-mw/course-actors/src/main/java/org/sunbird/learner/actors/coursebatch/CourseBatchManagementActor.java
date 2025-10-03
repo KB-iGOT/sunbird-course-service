@@ -143,7 +143,9 @@ public class CourseBatchManagementActor extends BaseActor {
     validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
     courseBatch.setBatchId(courseBatchId);
     Map<String, Object> batchAttributes = courseBatch.getBatchAttributes();
-    processInstructors(actorMessage.getRequestContext(), batchAttributes, courseBatch, false);
+      if (MapUtils.isNotEmpty(batchAttributes)) {
+          processInstructors(actorMessage.getRequestContext(), batchAttributes, courseBatch, false);
+      }
     String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
     if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
       if (MapUtils.isEmpty(courseBatch.getBatchAttributes()) || 
@@ -1109,7 +1111,7 @@ public class CourseBatchManagementActor extends BaseActor {
                                     Map<String, Object> batchAttributes,
                                     CourseBatch courseBatch,
                                     boolean isUpdateFlow) {
-        if (batchAttributes == null || !(batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID) instanceof List)) {
+        if (MapUtils.isEmpty(batchAttributes) || !(batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID) instanceof List)) {
             return;
         }
         List<?> instructors = (List<?>) batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID);
@@ -1142,7 +1144,9 @@ public class CourseBatchManagementActor extends BaseActor {
 
     private void userExists(String instructorUserId, RequestContext requestContext) {
         Response response = userDao.read(instructorUserId, requestContext);
-        if (response == null || response.getResult() == null || response.getResult().isEmpty()) {
+        if (response == null
+                || response.getResponseCode() != ResponseCode.OK
+                || MapUtils.isEmpty(response.getResult())) {
             throw new ProjectCommonException(
                     ResponseCode.invalidParameterValue.getErrorCode(),
                     "InstructorUserId " + instructorUserId + " not found",
