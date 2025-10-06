@@ -1118,6 +1118,24 @@ public class CourseBatchManagementActor extends BaseActor {
         if (instructors.isEmpty()) {
             return;
         }
+        Set<String> uniqueInstructorIds = instructors.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (isUpdateFlow && MapUtils.isNotEmpty(courseBatch.getBatchAttributes())) {
+            Object existingIdsObj = courseBatch.getBatchAttributes().get(JsonKey.INSTRUCTORS_USER_ID);
+            if (existingIdsObj instanceof List) {
+                List<String> existingIds = ((List<?>) existingIdsObj).stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(Collectors.toList());
+
+                // Remove existing instructor IDs from new list
+                existingIds.forEach(uniqueInstructorIds::remove);
+            }
+        }
+
         if (isUpdateFlow && courseBatch.getStartDate() != null && !new Date().before(courseBatch.getStartDate())) {
             throw new ProjectCommonException(
                     ResponseCode.invalidParameterValue.getErrorCode(),
@@ -1127,23 +1145,26 @@ public class CourseBatchManagementActor extends BaseActor {
             );
         }
         List<String> validUserIds = new ArrayList<>();
-        for (Object obj : instructors) {
-            if (obj instanceof String) {
-                String instructorUserId = (String) obj;
-                userExists(instructorUserId, requestContext);
-                validUserIds.add(instructorUserId);
-            }
+        for (String instructorUserId : uniqueInstructorIds) {
+            userExists(instructorUserId, requestContext);
+            validUserIds.add(instructorUserId);
         }
         if (!validUserIds.isEmpty()) {
             batchAttributes.put(JsonKey.INSTRUCTORS_USER_ID, validUserIds);
+        } else {
+            batchAttributes.remove(JsonKey.INSTRUCTORS_USER_ID);
         }
     }
 
     private void userExists(String instructorUserId, RequestContext requestContext) {
         Response response = userDao.read(instructorUserId, requestContext);
-        if (response == null
-                || response.getResponseCode() != ResponseCode.OK
-                || MapUtils.isEmpty(response.getResult())) {
+
+        boolean isInvalid = (response == null)
+                || (response.getResponseCode() != ResponseCode.OK)
+                || MapUtils.isEmpty(response.getResult())
+                || isEmptyUserResponse(response.getResult());
+
+        if (isInvalid) {
             throw new ProjectCommonException(
                     ResponseCode.invalidParameterValue.getErrorCode(),
                     "InstructorUserId " + instructorUserId + " not found",
@@ -1151,4 +1172,15 @@ public class CourseBatchManagementActor extends BaseActor {
             );
         }
     }
+
+    @SuppressWarnings("unchecked")
+    private boolean isEmptyUserResponse(Map<String, Object> result) {
+        Object res = result.get("response");
+        if (res instanceof List) {
+            List<?> responseList = (List<?>) res;
+            return responseList.isEmpty() || responseList.size() == 0;
+        }
+        return true;
+    }
+
 }
