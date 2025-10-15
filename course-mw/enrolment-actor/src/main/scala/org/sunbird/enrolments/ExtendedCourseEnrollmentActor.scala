@@ -307,7 +307,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
         throw e
     }
   }
@@ -341,7 +341,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(resp, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list : user ::" + userId + "| Exception is:" + e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
@@ -370,7 +370,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(resp, self)
     }catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
         throw e
     }
   }
@@ -383,62 +383,68 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : user ::" + userId + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
         throw e
     }
   }
 
   def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean): Response = {
-    logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
+    try {
+      logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
-    val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
-    var isMoreThanOneCourse: Boolean = false
-    if (request.get(Constants.COURSE_ID) != null) {
-      val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
-      if (courseIdListFromRequest.size() > 1) {
-        isMoreThanOneCourse = true
+      val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+      var isMoreThanOneCourse: Boolean = false
+      if (request.get(Constants.COURSE_ID) != null) {
+        val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
+        if (courseIdListFromRequest.size() > 1) {
+          isMoreThanOneCourse = true
+        }
       }
-    }
-    val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
-    if (CollectionUtils.isNotEmpty(activeEnrolments)) {
-      val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
-      val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
-      if (isDetailsRequired && !isMoreThanOneCourse) {
-        addBatchDetails(updatedEnrolmentList, request, "v3")
-        for (enrolment <- updatedEnrolmentList.asScala) {
-          if (
-            isProgressEnabled &&
-              !enrolment.get(JsonKey.STATUS).equals(2)
-          ) {
-            val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
-            val recentLanguage = enrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
-            val batchId = enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
-            val langContentStatus = Option(enrolment.get("langContentStatus"))
-              .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
-              .getOrElse(new java.util.HashMap[String, AnyRef]())
-
+      val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
+      if (CollectionUtils.isNotEmpty(activeEnrolments)) {
+        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
+        val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
+        if (isDetailsRequired && !isMoreThanOneCourse) {
+          addBatchDetails(updatedEnrolmentList, request, "v3")
+          for (enrolment <- updatedEnrolmentList.asScala) {
             if (
-              StringUtils.isNotBlank(recentLanguage) &&
-                langContentStatus != null &&
-                !langContentStatus.isEmpty &&
-                langContentStatus.containsKey(recentLanguage)
+              isProgressEnabled &&
+                !enrolment.get(JsonKey.STATUS).equals(2)
             ) {
-              val contentIds = Option(langContentStatus.get(recentLanguage))
-                .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
-                .getOrElse(new java.util.ArrayList[String]())
+              val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
+              val recentLanguage = enrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
+              val batchId = enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
+              val langContentStatus = Option(enrolment.get("langContentStatus"))
+                .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
+                .getOrElse(new java.util.HashMap[String, AnyRef]())
 
-              if (!contentIds.isEmpty) {
-                getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, enrolment)
+              if (
+                StringUtils.isNotBlank(recentLanguage) &&
+                  langContentStatus != null &&
+                  !langContentStatus.isEmpty &&
+                  langContentStatus.containsKey(recentLanguage)
+              ) {
+                val contentIds = Option(langContentStatus.get(recentLanguage))
+                  .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+                  .getOrElse(new java.util.ArrayList[String]())
+
+                if (!contentIds.isEmpty) {
+                  getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, enrolment)
+                }
               }
             }
           }
         }
+        allEnrolledCourses.addAll(updatedEnrolmentList)
       }
-      allEnrolledCourses.addAll(updatedEnrolmentList)
+      val resp: Response = new Response()
+      resp.put(JsonKey.COURSES, allEnrolledCourses)
+      resp
+    } catch {
+      case e: Exception =>
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
+        throw e
     }
-    val resp: Response = new Response()
-    resp.put(JsonKey.COURSES, allEnrolledCourses)
-    resp
   }
 
   def getActiveEnrollments(userId: String, request: Request): java.util.List[java.util.Map[String, AnyRef]] = {
