@@ -451,7 +451,7 @@ public final class ContentUtil {
         for (String item : fields) {
           apiFields.add(item);
         }
-        if (org.apache.commons.lang.StringUtils.isNotBlank(apiFields.toString())) {
+        if (StringUtils.isNotBlank(apiFields.toString())) {
           baseContentReadUrl = baseContentReadUrl + "?fields=" + apiFields;
         }
       }

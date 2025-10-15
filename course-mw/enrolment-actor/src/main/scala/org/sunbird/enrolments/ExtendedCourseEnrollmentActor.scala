@@ -634,7 +634,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         enrolment.put(JsonKey.CONTENT_ID, enrolment.get(JsonKey.COURSE_ID))
         enrolment.put(JsonKey.COLLECTION_ID, enrolment.get(JsonKey.COURSE_ID))
       }
-      enrolment.put(JsonKey.CONTENT, courseContent)
+      val filteredCourseContent = new java.util.HashMap[String, AnyRef]()
+      val configuredFields = ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS).split(",");
+      configuredFields.foreach { field =>
+        if (courseContent.containsKey(field)) {
+          filteredCourseContent.put(field, courseContent.get(field))
+        }
+      }
+      enrolment.put(JsonKey.CONTENT, filteredCourseContent)
       enrolment
     }).toList.asJava
   }

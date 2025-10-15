@@ -1274,6 +1274,7 @@ public final class JsonKey {
   public static final String CONTENT_READ = "content_read";
   public static final String DATE_KEY = "Date";
   public static final String BATCH_ATTRIBUTES = "batchAttributes";
+  public static final String COURSE_CONTENT_ALLOWED_FIELDS = "course_content_allowed_fields";
 
   private JsonKey() {}
 }
