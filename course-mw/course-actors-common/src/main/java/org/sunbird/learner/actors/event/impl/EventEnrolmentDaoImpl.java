@@ -290,105 +290,110 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         logger.info(
                 request.getRequestContext(),
                 "EventEnrolmentDaoImpl:getEnrolmentListV2: UserId = " + userId);
-        List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
-        Response res =
-                cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                        request.getRequestContext(),
-                        JsonKey.KEYSPACE_SUNBIRD_COURSES,
-                        JsonKey.TABLE_USER_EVENT_ENROLMENTS,
-                        JsonKey.USER_ID_KEY,
-                        userId,
-                        null);
-        String status =
-                request.get(JsonKey.STATUS) != null ? (String) request.get(JsonKey.STATUS) : null;
-        int limit = request.get(JsonKey.LIMIT) != null ? (int) request.get(JsonKey.LIMIT) : -1;
-        if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
-            userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
-            if (CollectionUtils.isNotEmpty(userEnrollmentList)) {
-                if (StringUtils.isNotEmpty(status) && statusMap.get(status) != null) {
-                    if (statusMap.get(status) == 1) {
+        try {
+            List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
+            Response res =
+                    cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                            request.getRequestContext(),
+                            JsonKey.KEYSPACE_SUNBIRD_COURSES,
+                            JsonKey.TABLE_USER_EVENT_ENROLMENTS,
+                            JsonKey.USER_ID_KEY,
+                            userId,
+                            null);
+            String status =
+                    request.get(JsonKey.STATUS) != null ? (String) request.get(JsonKey.STATUS) : null;
+            int limit = request.get(JsonKey.LIMIT) != null ? (int) request.get(JsonKey.LIMIT) : -1;
+            if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
+                userEnrollmentList = ((List<Map<String, Object>>) res.get(JsonKey.RESPONSE));
+                if (CollectionUtils.isNotEmpty(userEnrollmentList)) {
+                    if (StringUtils.isNotEmpty(status) && statusMap.get(status) != null) {
+                        if (statusMap.get(status) == 1) {
+                            userEnrollmentList =
+                                    userEnrollmentList
+                                            .stream()
+                                            .filter(enrolment -> (int) enrolment.get(JsonKey.STATUS) != 2)
+                                            .collect(Collectors.toList());
+                        } else {
+                            userEnrollmentList =
+                                    userEnrollmentList
+                                            .stream()
+                                            .filter(
+                                                    enrolment -> (int) enrolment.get(JsonKey.STATUS) == statusMap.get(status))
+                                            .collect(Collectors.toList());
+                        }
+                    }
+                    if (limit > -1 && limit != 0) {
+                        int maximumAllowedLimitForEnrolList =
+                                Integer.parseInt(
+                                        ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
+                        if (maximumAllowedLimitForEnrolList < limit) {
+                            limit = maximumAllowedLimitForEnrolList;
+                        }
                         userEnrollmentList =
                                 userEnrollmentList
                                         .stream()
-                                        .filter(enrolment -> (int) enrolment.get(JsonKey.STATUS) != 2)
+                                        .sorted(
+                                                Comparator.comparing(
+                                                                enrolment ->
+                                                                        (Date)
+                                                                                ((Map<String, Object>) enrolment)
+                                                                                        .get(JsonKey.LAST_CONTENT_ACCESS_TIME),
+                                                                Comparator.nullsLast(Comparator.naturalOrder())) // Null values last
+                                                        .reversed())
                                         .collect(Collectors.toList());
-                    } else {
-                        userEnrollmentList =
-                                userEnrollmentList
-                                        .stream()
-                                        .filter(
-                                                enrolment -> (int) enrolment.get(JsonKey.STATUS) == statusMap.get(status))
-                                        .collect(Collectors.toList());
+                        if (CollectionUtils.isNotEmpty(userEnrollmentList) && userEnrollmentList.size() > limit)
+                            userEnrollmentList = userEnrollmentList.subList(0, limit);
                     }
                 }
-                if (limit > -1 && limit != 0) {
-                    int maximumAllowedLimitForEnrolList =
-                            Integer.parseInt(
-                                    ProjectUtil.getConfigValue(JsonKey.MAXIMUM_LIMIT_ALLOWED_FOR_ENROL_LIST));
-                    if (maximumAllowedLimitForEnrolList < limit) {
-                        limit = maximumAllowedLimitForEnrolList;
-                    }
-                    userEnrollmentList =
-                            userEnrollmentList
-                                    .stream()
-                                    .sorted(
-                                            Comparator.comparing(
-                                                            enrolment ->
-                                                                    (Date)
-                                                                            ((Map<String, Object>) enrolment)
-                                                                                    .get(JsonKey.LAST_CONTENT_ACCESS_TIME),
-                                                            Comparator.nullsLast(Comparator.naturalOrder())) // Null values last
-                                                    .reversed())
-                                    .collect(Collectors.toList());
-                    if (CollectionUtils.isNotEmpty(userEnrollmentList) && userEnrollmentList.size() > limit)
-                        userEnrollmentList = userEnrollmentList.subList(0, limit);
-                }
-            }
-            String requestedEventType = (String) request.get("eventType");
-            for (Map<String, Object> enrollment : userEnrollmentList) {
-                String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
-                String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
-                String userid = (String) enrollment.get(JsonKey.USER_ID);
-                String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
-                Map<String, Object> contentDetails =
-                        getEventDetails(request.getRequestContext(), contentId);
-                String actualEventType = null;
-                boolean calendarEventEnabled = (boolean) request.get("calendarEventEnabled");
-                LocalTime endTime = LocalTime.of(0, 1);
-                if (MapUtils.isNotEmpty(contentDetails)) {
-                    if (calendarEventEnabled) {
-                        String endDateStr = (String) request.get("eventEndDate");
-                        processCalendarEvent(
-                                request,
-                                enrollment,
-                                contentId,
-                                contextId,
-                                userid,
-                                batchId,
-                                contentDetails,
-                                actualEventType,
-                                requestedEventType,
-                                endDateStr);
-                    } else {
-                        actualEventType = determineEventType(endTime, contentDetails);
-                        addEventDetailsToEnrollment(
-                                request,
-                                enrollment,
-                                contentId,
-                                contextId,
-                                userid,
-                                batchId,
-                                contentDetails,
-                                actualEventType,
-                                requestedEventType,
-                                false);
+                String requestedEventType = (String) request.get("eventType");
+                for (Map<String, Object> enrollment : userEnrollmentList) {
+                    String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
+                    String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
+                    String userid = (String) enrollment.get(JsonKey.USER_ID);
+                    String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
+                    Map<String, Object> contentDetails =
+                            getEventDetails(request.getRequestContext(), contentId);
+                    String actualEventType = null;
+                    boolean calendarEventEnabled = (boolean) request.get("calendarEventEnabled");
+                    LocalTime endTime = LocalTime.of(0, 1);
+                    if (MapUtils.isNotEmpty(contentDetails)) {
+                        if (calendarEventEnabled) {
+                            String endDateStr = (String) request.get("eventEndDate");
+                            processCalendarEvent(
+                                    request,
+                                    enrollment,
+                                    contentId,
+                                    contextId,
+                                    userid,
+                                    batchId,
+                                    contentDetails,
+                                    actualEventType,
+                                    requestedEventType,
+                                    endDateStr);
+                        } else {
+                            actualEventType = determineEventType(endTime, contentDetails);
+                            addEventDetailsToEnrollment(
+                                    request,
+                                    enrollment,
+                                    contentId,
+                                    contextId,
+                                    userid,
+                                    batchId,
+                                    contentDetails,
+                                    actualEventType,
+                                    requestedEventType,
+                                    false);
+                        }
                     }
                 }
             }
+            return userEnrollmentList.stream()
+                    .filter(enrollment -> enrollment.containsKey("event"))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
         }
-        return userEnrollmentList.stream()
-                .filter(enrollment -> enrollment.containsKey("event"))
-                .collect(Collectors.toList());
     }
 
     private void processCalendarEvent(
