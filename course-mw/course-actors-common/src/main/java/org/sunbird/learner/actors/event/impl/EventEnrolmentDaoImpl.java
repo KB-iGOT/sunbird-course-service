@@ -290,7 +290,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         logger.info(
                 request.getRequestContext(),
                 "EventEnrolmentDaoImpl:getEnrolmentListV2: UserId = " + userId);
-        try{
+        try {
             List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
             Response res =
                     cassandraOperation.getRecordsByPropertiesWithoutFiltering(

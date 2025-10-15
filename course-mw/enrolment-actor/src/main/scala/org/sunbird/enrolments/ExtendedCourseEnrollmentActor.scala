@@ -301,13 +301,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def list(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
-    try{
+    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    try {
       val response = getEnrolmentList(request, userId, false, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
@@ -368,22 +368,22 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       resp.put(JsonKey.USER_COURSE_ENROLMENT_INFO, userCourseEnrolmentInfo)
       resp.put(JsonKey.USER_COURSE_EXTERNAL_ENROLMENT_INFO, externalCourseInfo)
       sender().tell(resp, self)
-    }catch {
+    } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
 
   def enrolV3Details(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext,"ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
-    try{
+    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    try {
       val response = getEnrolmentList(request, userId, true, false)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:"+e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
