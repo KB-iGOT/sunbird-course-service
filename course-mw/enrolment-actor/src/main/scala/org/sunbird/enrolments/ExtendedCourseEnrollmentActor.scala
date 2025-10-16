@@ -303,7 +303,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val response = getEnrolmentList(request, userId, false, false)
+      val response = getEnrolmentList(request, userId, false, false, null)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -319,7 +319,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     isRetiredCoursesIncludedInEnrolList = true
-    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, true)
+    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, true,null)
     val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
     if (CollectionUtils.isNotEmpty(updatedEnrolmentList)) {
       allEnrolledCourses.addAll(updatedEnrolmentList)
@@ -353,7 +353,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     isRetiredCoursesIncludedInEnrolList = true
-    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
+    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false, null)
     if (CollectionUtils.isNotEmpty(enrolmentList)) {
       allEnrolledCourses.addAll(enrolmentList)
     }
@@ -379,7 +379,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val response = getEnrolmentList(request, userId, true, false)
+      val response = getEnrolmentList(request, userId, true, false, null)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -388,7 +388,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean): Response = {
+  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean,contentAttributes: util.List[String]): Response = {
     try {
       logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
@@ -402,7 +402,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
       val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
       if (CollectionUtils.isNotEmpty(activeEnrolments)) {
-        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
+        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired, contentAttributes)
         val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
         if (isDetailsRequired && !isMoreThanOneCourse) {
           addBatchDetails(updatedEnrolmentList, request, "v3")
@@ -623,7 +623,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails
   }
 
-  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
+  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean,contentAttributes: util.List[String]): java.util.List[java.util.Map[String, AnyRef]] = {
     activeEnrolments.filter(enrolment => isCourseEligible(enrolment)).map(enrolment => {
       val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
       enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
@@ -634,8 +634,18 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         enrolment.put(JsonKey.CONTENT_ID, enrolment.get(JsonKey.COURSE_ID))
         enrolment.put(JsonKey.COLLECTION_ID, enrolment.get(JsonKey.COURSE_ID))
       }
+      val configuredFields: java.util.List[String] =
+        if (CollectionUtils.isNotEmpty(contentAttributes)) {
+          contentAttributes
+        } else {
+          ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS)
+            .split(",")
+            .map(_.trim)
+            .filter(_.nonEmpty)
+            .toList
+            .asJava
+        }
       val filteredCourseContent = new java.util.HashMap[String, AnyRef]()
-      val configuredFields = ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS).split(",");
       configuredFields.foreach { field =>
         if (courseContent.containsKey(field)) {
           filteredCourseContent.put(field, courseContent.get(field))
@@ -1197,9 +1207,27 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def enrolDetailsWithProgress(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    val urlQueryString = request.getContext.get(JsonKey.URL).asInstanceOf[String]
+    val paramMap = new util.HashMap[String, java.util.List[String]]()
+    if (urlQueryString.contains("?")) {
+      val queryString = urlQueryString.split("\\?", 2)(1)
+      val params = queryString.split("&")
+
+      for (p <- params) {
+        val parts = p.split("=", 2)
+        if (parts.length == 2) {
+          val key = parts(0)
+          val valueParts = parts(1).split(",")
+          val values = new util.ArrayList[String]()
+          valueParts.foreach(values.add)
+          paramMap.put(key, values)
+        }
+      }
+    }
+    val contentAttributes = paramMap.get(JsonKey.CONTENT_ATTRIBUTES);
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val response = getEnrolmentList(request, userId, true, true)
+      val response = getEnrolmentList(request, userId, true, true,contentAttributes)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
