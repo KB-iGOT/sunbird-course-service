@@ -319,7 +319,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     isRetiredCoursesIncludedInEnrolList = true
-    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, true)
+    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, true, parseContentAttributesFromUrl(request))
     val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
     if (CollectionUtils.isNotEmpty(updatedEnrolmentList)) {
       allEnrolledCourses.addAll(updatedEnrolmentList)
@@ -353,7 +353,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
     isRetiredCoursesIncludedInEnrolList = true
-    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false)
+    val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, false, parseContentAttributesFromUrl(request))
     if (CollectionUtils.isNotEmpty(enrolmentList)) {
       allEnrolledCourses.addAll(enrolmentList)
     }
@@ -402,7 +402,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
       val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
       if (CollectionUtils.isNotEmpty(activeEnrolments)) {
-        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired)
+        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired, parseContentAttributesFromUrl(request))
         val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
         if (isDetailsRequired && !isMoreThanOneCourse) {
           addBatchDetails(updatedEnrolmentList, request, "v3")
@@ -618,7 +618,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails
   }
 
-  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
+  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean, contentAttributes: util.List[String]): java.util.List[java.util.Map[String, AnyRef]] = {
     activeEnrolments.filter(enrolment => isCourseEligible(enrolment)).map(enrolment => {
       val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
       enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
@@ -629,7 +629,24 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         enrolment.put(JsonKey.CONTENT_ID, enrolment.get(JsonKey.COURSE_ID))
         enrolment.put(JsonKey.COLLECTION_ID, enrolment.get(JsonKey.COURSE_ID))
       }
-      enrolment.put(JsonKey.CONTENT, courseContent)
+      val configuredFields: java.util.List[String] =
+        if (CollectionUtils.isNotEmpty(contentAttributes)) {
+          contentAttributes
+        } else {
+          ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS)
+            .split(",")
+            .map(_.trim)
+            .filter(_.nonEmpty)
+            .toList
+            .asJava
+        }
+      val filteredCourseContent = new java.util.HashMap[String, AnyRef]()
+      configuredFields.foreach { field =>
+        if (courseContent.containsKey(field)) {
+          filteredCourseContent.put(field, courseContent.get(field))
+        }
+      }
+      enrolment.put(JsonKey.CONTENT, filteredCourseContent)
       enrolment
     }).toList.asJava
   }
@@ -1384,4 +1401,28 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
+  private def parseContentAttributesFromUrl(request: Request): java.util.List[String] = {
+    val urlObj = request.getContext.get(JsonKey.URL)
+    val urlQueryString = if (urlObj != null) urlObj.asInstanceOf[String] else ""
+    val contentAttributes = new util.ArrayList[String]()
+
+    if (StringUtils.isNotBlank(urlQueryString) && urlQueryString.contains("?")) {
+      val queryString = urlQueryString.split("\\?", 2)(1)
+      if (StringUtils.isNotBlank(queryString)) {
+        val params = queryString.split("&")
+
+        for (p <- params if StringUtils.isNotBlank(p)) {
+          val parts = p.split("=", 2)
+          if (parts.length == 2 && parts(0) == JsonKey.CONTENT_ATTRIBUTES) {
+            val valueParts = parts(1).split(",")
+            valueParts.foreach { v =>
+              val trimmed = Option(v).map(_.trim).getOrElse("")
+              if (trimmed.nonEmpty) contentAttributes.add(trimmed)
+            }
+          }
+        }
+      }
+    }
+    contentAttributes
+  }
 }

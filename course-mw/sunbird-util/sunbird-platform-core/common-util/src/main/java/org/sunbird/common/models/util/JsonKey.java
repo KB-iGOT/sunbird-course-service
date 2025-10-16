@@ -1282,6 +1282,8 @@ public final class JsonKey {
   public static final String CONTENT_READ_REQUIRED_FIELDS = "content_read_required_fields";
   public static final String INSTRUCTORS_USER_ID = "instructorsUserId";
   public static final String BATCH_ATTRIBUTES = "batchAttributes";
+  public static final String COURSE_CONTENT_ALLOWED_FIELDS = "course_content_allowed_fields";
+  public static final String CONTENT_ATTRIBUTES = "contentAttributes";
 
   private JsonKey() {}
 }
