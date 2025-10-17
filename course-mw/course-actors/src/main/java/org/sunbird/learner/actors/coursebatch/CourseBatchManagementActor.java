@@ -314,11 +314,11 @@ public class CourseBatchManagementActor extends BaseActor {
     if (request.containsKey(JsonKey.MENTORS))
       courseBatch.setMentors((List<String>) request.get(JsonKey.MENTORS));
 
-    Object batchAttrObj = request.get(CourseJsonKey.BATCH_ATTRIBUTES);
-    if (batchAttrObj instanceof Map && MapUtils.isNotEmpty((Map<?, ?>) batchAttrObj)) {
+      Object batchAttrObj = request.get(CourseJsonKey.BATCH_ATTRIBUTES);
+      if (batchAttrObj instanceof Map && MapUtils.isNotEmpty((Map<?, ?>) batchAttrObj)) {
           Map<String, Object> batchAttributes = (Map<String, Object>) batchAttrObj;
-          courseBatch.setBatchAttributes(batchAttributes);
           processInstructors(requestContext, batchAttributes, courseBatch, true);
+          courseBatch.setBatchAttributes(batchAttributes);
       }
     updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall);
 
