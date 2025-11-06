@@ -109,4 +109,7 @@ public interface Constants {
   public static final String DELETE_BATCH_MAIL_SUBJECT = "Update: Removal from Blended Program Batch";
   public static final String BATCH_DELETE_USER_NOTIFY_TEMPLATE = "batchDeleteUserNotify";
   public static final String PROGRAM = "program";
+  public static final String INSTRUCTOR_ADD_BATCH_NOTIFY_TEMPLATE = "instructorAddBatchNotify";
+  public static final String PROGRAM_NAME = "programName";
+  public static final String INSTRUCTOR_ADD_BATCH_MAIL_SUBJECT = "You have been added as an Instructor to a blended program";
 }
