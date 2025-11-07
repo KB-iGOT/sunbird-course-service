@@ -1230,7 +1230,7 @@ public class CourseBatchManagementActor extends BaseActor {
         placeHolders.put(JsonKey.PROGRAM_NAME, programName);
 
         Map<String, Object> data = new HashMap<>();
-        data.put(JsonKey.COURSE_ID, courseId);
+        data.put(JsonKey.ID, courseId);
         data.put(JsonKey.BATCH_ID, batchId);
 
         for (Map<String, Object> instructor : instructorMaps) {
