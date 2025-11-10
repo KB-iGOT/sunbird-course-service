@@ -179,6 +179,7 @@ public class CourseBatchManagementActor extends BaseActor {
     if (courseNotificationActive()) {
       batchOperationNotifier(actorMessage, courseBatch, null);
     }
+    notifyInstructors(actorMessage.getRequestContext(), courseBatch, batchAttributes, courseId, courseBatchId, null);
   }
 
   private boolean courseNotificationActive() {
@@ -269,6 +270,7 @@ public class CourseBatchManagementActor extends BaseActor {
     if (batchDatesUpdateNotificationActive()) {
       batchDatesUpdateNotifier(actorMessage, courseBatch, oldBatch);
     }
+      notifyInstructors(actorMessage.getRequestContext(), courseBatch, courseBatch.getBatchAttributes(), courseBatch.getCourseId(), batchId, oldBatch);
   }
 
   private Map<String, Object> getMentorLists(
@@ -1027,53 +1029,29 @@ public class CourseBatchManagementActor extends BaseActor {
 
     private void notifyUserUnenrollment(RequestContext requestContext, List<String> userIds, Map<String, Object> contentDetails, CourseBatch batchDetails, String courseId) {
         List<String> emailsIds = ContentUtil.getUserEmails(userIds, requestContext);
-        if (CollectionUtils.isNotEmpty(emailsIds)) {
-            Map<String, Object> params = new HashMap<>();
-            Map<String, Object> notificationRequest = new HashMap<>();
-            Map<String, Object> action = new HashMap<>();
-            Map<String, Object> usermap = new HashMap<>();
-            Map<String, Object> template = new HashMap<>();
-
-            params.put(Constants.BATCH, batchDetails.getName());
-            params.put(Constants.PROGRAM, contentDetails.get(JsonKey.NAME));
-
-
-            template.put(Constants.DATA, constructEmailTemplate(Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE, params, requestContext));
-            template.put(Constants.ID, Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE);
-            template.put(Constants.PARAMS, params);
-            template.put(Constants.TYPE, Constants.EMAIL);
-            usermap.put(Constants.ID, requestContext.getActorId());
-            usermap.put(Constants.TYPE, Constants.USER);
-            action.put(Constants.TYPE, Constants.EMAIL);
-            action.put(Constants.CATEGORY, Constants.EMAIL);
-            action.put(Constants.CREATED_BY, usermap);
-            Map<String, Object> config = new HashMap<>();
-            config.put(Constants.SUBJECT, Constants.DELETE_BATCH_MAIL_SUBJECT);
-            config.put(Constants.SENDER, ProjectUtil.getConfigValue(Constants.SUPPORT_MAIL));
-            template.put(Constants.CONFIG, config);
-            action.put(Constants.TEMPLATE, template);
-            notificationRequest.put(Constants.TYPE, Constants.EMAIL);
-            notificationRequest.put(Constants.PRIORITY, 1);
-            notificationRequest.put(Constants.IDS, Arrays.asList());
-            notificationRequest.put(Constants.BCC_IDS, emailsIds);
-            notificationRequest.put(Constants.ACTION, action);
-
-            Map<String, Object> req = new HashMap<>();
-            Map<String, List<Map<String, Object>>> notificationMap = new HashMap<>();
-            notificationMap.put(Constants.NOTIFICATIONS, Collections.singletonList(notificationRequest));
-            req.put(Constants.REQUEST, notificationMap);
-            Notification.sendNotificationAsync(req);
-
-            Map<String, Object> message = new HashMap<>();
-            Map<String, Object> data = new HashMap<>();
-            data.put(JsonKey.ID, courseId);
-            message.put(JsonKey.DATA, data);
-            message.put(JsonKey.PLACE_HOLDERS, params);
-
-            helperMethodService.sendNotification(JsonKey.DELETED_BATCH, JsonKey.ALERT, userIds, message);
-        } else {
+        if (CollectionUtils.isEmpty(emailsIds)) {
             logger.info(requestContext, "No emails found for users");
+            return;
         }
+
+        Map<String, Object> params = new HashMap<>();
+        params.put(Constants.BATCH, batchDetails.getName());
+        params.put(Constants.PROGRAM, contentDetails.get(JsonKey.NAME));
+
+        // send email via BCC (preserve previous behavior)
+        sendNotificationCommon(
+                requestContext,
+                Collections.emptyList(),   // toRecipients empty
+                emailsIds,                 // bccRecipients
+                Constants.BATCH_DELETE_USER_NOTIFY_TEMPLATE,
+                Constants.DELETE_BATCH_MAIL_SUBJECT,
+                params
+        );
+
+        // send in-app notification separately when needed
+        Map<String, Object> data = new HashMap<>();
+        data.put(JsonKey.ID, courseId);
+        sendInAppNotification(requestContext, JsonKey.DELETED_BATCH, JsonKey.ALERT, userIds, data, params);
     }
 
     private String constructEmailTemplate(String templateName, Map<String, Object> params, RequestContext requestContext) {
@@ -1114,27 +1092,11 @@ public class CourseBatchManagementActor extends BaseActor {
         if (MapUtils.isEmpty(batchAttributes) || !(batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID) instanceof List)) {
             return;
         }
-        List<?> instructors = (List<?>) batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID);
+        List<String> instructors = (List<String>) batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID);
         if (instructors.isEmpty()) {
             return;
         }
-        Set<String> uniqueInstructorIds = instructors.stream()
-                .filter(String.class::isInstance)
-                .map(String.class::cast)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        if (isUpdateFlow && MapUtils.isNotEmpty(courseBatch.getBatchAttributes())) {
-            Object existingIdsObj = courseBatch.getBatchAttributes().get(JsonKey.INSTRUCTORS_USER_ID);
-            if (existingIdsObj instanceof List) {
-                List<String> existingIds = ((List<?>) existingIdsObj).stream()
-                        .filter(String.class::isInstance)
-                        .map(String.class::cast)
-                        .collect(Collectors.toList());
-
-                // Remove existing instructor IDs from new list
-                existingIds.forEach(uniqueInstructorIds::remove);
-            }
-        }
+        Set<String> uniqueInstructorIds = new HashSet<>(instructors);
 
         if (isUpdateFlow && courseBatch.getStartDate() != null && !new Date().before(courseBatch.getStartDate())) {
             throw new ProjectCommonException(
@@ -1151,8 +1113,9 @@ public class CourseBatchManagementActor extends BaseActor {
         }
         if (!validUserIds.isEmpty()) {
             batchAttributes.put(JsonKey.INSTRUCTORS_USER_ID, validUserIds);
-        } else {
-            batchAttributes.remove(JsonKey.INSTRUCTORS_USER_ID);
+        }else{
+            batchAttributes.put(JsonKey.INSTRUCTORS_USER_ID, Collections.emptyList());
+            batchAttributes.put(JsonKey.INSTRUCTORS, Collections.emptyList());
         }
     }
 
@@ -1183,4 +1146,187 @@ public class CourseBatchManagementActor extends BaseActor {
         return true;
     }
 
+    private void notifyInstructors(RequestContext requestContext,
+                                   CourseBatch courseBatch,
+                                   Map<String, Object> batchAttributes,
+                                   String courseId,
+                                   String batchId,
+                                   CourseBatch oldBatch) {
+        if (MapUtils.isEmpty(batchAttributes)) {
+            logger.info(requestContext, "No batch attributes for instructors");
+            return;
+        }
+
+        // extract new instructor ids from incoming/updated batchAttributes
+        List<String> newInstructorIds = new ArrayList<>();
+        Object newIdsObj = batchAttributes.get(JsonKey.INSTRUCTORS_USER_ID);
+        if (newIdsObj instanceof List) {
+            newInstructorIds = ((List<?>) newIdsObj).stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .collect(Collectors.toList());
+        }
+
+        if (CollectionUtils.isEmpty(newInstructorIds)) {
+            logger.info(requestContext, "No valid instructor user ids found");
+            return;
+        }
+
+        // extract previous instructor ids from oldBatch if available
+        List<String> prevInstructorIds = new ArrayList<>();
+        if (oldBatch != null && MapUtils.isNotEmpty(oldBatch.getBatchAttributes())) {
+            Object prevObj = oldBatch.getBatchAttributes().get(JsonKey.INSTRUCTORS_USER_ID);
+            if (prevObj instanceof List) {
+                prevInstructorIds = ((List<?>) prevObj).stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(Collectors.toList());
+            }
+        }
+
+        List<String> targetInstructorIds;
+        if (oldBatch == null) {
+            targetInstructorIds = new ArrayList<>(newInstructorIds);
+        } else {
+            Set<String> added = new LinkedHashSet<>(newInstructorIds);
+            added.removeAll(prevInstructorIds);
+            targetInstructorIds = new ArrayList<>(added);
+        }
+
+        if (CollectionUtils.isEmpty(targetInstructorIds)) {
+            logger.info(requestContext, "No newly added instructors to notify");
+            return;
+        }
+
+        // instructors list from batch attributes (list of maps containing USER_ID and EMAIL)
+        Object instObj = courseBatch.getBatchAttributes().get(JsonKey.INSTRUCTORS);
+        List<Map<String, Object>> instructors = null;
+        if (instObj instanceof List) {
+            instructors = (List<Map<String, Object>>) instObj;
+        }
+        if (CollectionUtils.isEmpty(instructors)) {
+            logger.info(requestContext, "No instructor details present in batch attributes");
+            return;
+        }
+
+        // filter instructor maps to only those in targetInstructorIds
+        List<Map<String, Object>> instructorMaps = new ArrayList<>();
+        for (Object instructor : instructors) {
+            if (!(instructor instanceof Map)) continue;
+            Map<String, Object> instructorMap = (Map<String, Object>) instructor;
+            Object uid = instructorMap.get(JsonKey.ID);
+            if (uid != null && targetInstructorIds.contains(String.valueOf(uid))) {
+                instructorMaps.add(instructorMap);
+            }
+        }
+
+        if (CollectionUtils.isEmpty(instructorMaps)) {
+            logger.info(requestContext, "No instructor detail maps found for newly added instructor ids");
+            return;
+        }
+
+        String programName = courseBatch.getName();
+        Map<String, Object> placeHolders = new HashMap<>();
+        placeHolders.put(JsonKey.PROGRAM_NAME, programName);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put(JsonKey.ID, courseId);
+        data.put(JsonKey.BATCH_ID, batchId);
+
+        for (Map<String, Object> instructor : instructorMaps) {
+            String instructorId = (String) instructor.get(JsonKey.ID);
+            if (StringUtils.isBlank(instructorId)) continue;
+
+            String firstName = (String) instructor.get(JsonKey.NAME);
+            String email = (String) instructor.get(JsonKey.EMAIL);
+
+            if (StringUtils.isBlank(email)) {
+                logger.info(requestContext, "No email for instructor: " + instructorId);
+                continue;
+            }
+
+            Map<String, Object> params = new HashMap<>();
+            params.put(JsonKey.FIRST_NAME, firstName);
+            params.put(Constants.PROGRAM_NAME, programName);
+
+            sendNotificationCommon(
+                    requestContext,
+                    Collections.singletonList(email),
+                    Collections.emptyList(),
+                    Constants.INSTRUCTOR_ADD_BATCH_NOTIFY_TEMPLATE,
+                    Constants.INSTRUCTOR_ADD_BATCH_MAIL_SUBJECT,
+                    params
+            );
+        }
+
+        sendInAppNotification(requestContext, JsonKey.INSTRUCTOR_ADD_BATCH, JsonKey.ALERT, targetInstructorIds, data, placeHolders);
+    }
+
+    private void sendNotificationCommon(RequestContext requestContext,
+                                        List<String> toRecipients,
+                                        List<String> bccRecipients,
+                                        String templateName,
+                                        String subject,
+                                        Map<String, Object> params) {
+        if (CollectionUtils.isEmpty(toRecipients) && CollectionUtils.isEmpty(bccRecipients)) {
+            logger.info(requestContext, "No emails found for users");
+            return;
+        }
+
+        Map<String, Object> template = new HashMap<>();
+        template.put(Constants.DATA, constructEmailTemplate(templateName, params, requestContext));
+        template.put(Constants.ID, templateName);
+        template.put(Constants.PARAMS, params);
+        template.put(Constants.TYPE, Constants.EMAIL);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put(Constants.SUBJECT, subject);
+        config.put(Constants.SENDER, ProjectUtil.getConfigValue(Constants.SUPPORT_MAIL));
+        template.put(Constants.CONFIG, config);
+
+        Map<String, Object> usermap = new HashMap<>();
+        usermap.put(Constants.ID, requestContext.getActorId());
+        usermap.put(Constants.TYPE, Constants.USER);
+
+        Map<String, Object> action = new HashMap<>();
+        action.put(Constants.TYPE, Constants.EMAIL);
+        action.put(Constants.CATEGORY, Constants.EMAIL);
+        action.put(Constants.CREATED_BY, usermap);
+        action.put(Constants.TEMPLATE, template);
+
+        Map<String, Object> notificationRequest = new HashMap<>();
+        notificationRequest.put(Constants.TYPE, Constants.EMAIL);
+        notificationRequest.put(Constants.PRIORITY, 1);
+        // explicit 'to' recipients (may be empty)
+        notificationRequest.put(Constants.IDS, CollectionUtils.isNotEmpty(toRecipients) ? toRecipients : Collections.emptyList());
+        // add BCC only when provided
+        if (CollectionUtils.isNotEmpty(bccRecipients)) {
+            notificationRequest.put(Constants.BCC_IDS, bccRecipients);
+        }
+        notificationRequest.put(Constants.ACTION, action);
+
+        Map<String, Object> notificationMap = new HashMap<>();
+        notificationMap.put(Constants.NOTIFICATIONS, Collections.singletonList(notificationRequest));
+        Map<String, Object> req = new HashMap<>();
+        req.put(Constants.REQUEST, notificationMap);
+
+        Notification.sendNotificationAsync(req);
+    }
+
+    private void sendInAppNotification(RequestContext requestContext,
+                                       String subCategory,
+                                       String subType,
+                                       List<String> targetUserIds,
+                                       Map<String, Object> data,
+                                       Map<String, Object> placeHolders) {
+        Map<String, Object> message = new HashMap<>();
+        message.put(JsonKey.DATA, MapUtils.isNotEmpty(data) ? data : new HashMap<String, Object>());
+        message.put(JsonKey.PLACE_HOLDERS, MapUtils.isNotEmpty(placeHolders) ? placeHolders : new HashMap<String, Object>());
+
+        try {
+            helperMethodService.sendNotification(subCategory, subType, targetUserIds, message);
+        } catch (Exception e) {
+            logger.error(requestContext, "Failed to send in-app notification for event: " + subCategory, e);
+        }
+    }
 }
