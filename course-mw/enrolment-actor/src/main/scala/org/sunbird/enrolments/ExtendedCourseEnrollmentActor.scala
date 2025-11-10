@@ -1227,18 +1227,33 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         add(JsonKey.PROGRESS)
       }
     }).asInstanceOf[java.util.List[String]]
+    val responseFields: List[String] = getConfigValue(JsonKey.CONSUMPTION_RESPONSE_FIELDS).split(",").map(_.trim).filter(_.nonEmpty).toList
     val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
     if (CollectionUtils.isNotEmpty(contentsConsumed)) {
       val filteredContents = contentsConsumed.map { m =>
         ProjectUtil.removeUnwantedFields(m, JsonKey.DATE_TIME, JsonKey.USER_ID, JsonKey.ADDED_BY, JsonKey.LAST_UPDATED_TIME, JsonKey.OLD_LAST_ACCESS_TIME, JsonKey.OLD_LAST_UPDATED_TIME, JsonKey.OLD_LAST_COMPLETED_TIME)
         m.put(JsonKey.COLLECTION_ID, m.getOrDefault(JsonKey.COURSE_ID, ""))
-        jsonFields.foreach(field =>
+        jsonFields.foreach { field =>
           if (m.get(field) != null)
             m.put(field, mapper.readTree(m.get(field).asInstanceOf[String]))
-        )
-        val formattedMap = JsonUtil.convertWithDateFormat(m, classOf[util.Map[String, Object]], dateFormatter)
+        }
+        val resultMap = new java.util.HashMap[String, AnyRef]()
+        if (Option(m.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) != 2) {
+          responseFields.foreach { f =>
+            val value: AnyRef = f match {
+              case JsonKey.COMPLETION_PERCENTAGE => m.getOrDefault(f, java.lang.Double.valueOf(0.0)).asInstanceOf[AnyRef]
+              case JsonKey.STATUS => m.getOrDefault(f, Integer.valueOf(0)).asInstanceOf[AnyRef]
+              case _ => m.getOrDefault(f, "").asInstanceOf[AnyRef]
+            }
+            resultMap.put(f, value)
+          }
+        } else if (Option(m.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) == 2) {
+          resultMap.put(JsonKey.CONTENT_ID, m.getOrDefault(JsonKey.CONTENT_ID, "").asInstanceOf[AnyRef])
+          resultMap.put(JsonKey.STATUS, m.getOrDefault(JsonKey.STATUS, Integer.valueOf(2)).asInstanceOf[AnyRef])
+        }
+        val formattedMap = JsonUtil.convertWithDateFormat(resultMap, classOf[util.Map[String, Object]], dateFormatter)
         if (fields.contains(JsonKey.ASSESSMENT_SCORE))
-          formattedMap.putAll(mapAsJavaMap(Map(JsonKey.ASSESSMENT_SCORE -> getScore(userId, courseId, m.get("contentId").asInstanceOf[String], batchId, request.getRequestContext))))
+          formattedMap.putAll(mapAsJavaMap(Map(JsonKey.ASSESSMENT_SCORE -> getScore(userId, courseId, m.get(Constants.CONTENT_ID).asInstanceOf[String], batchId, request.getRequestContext))))
         formattedMap
       }.asJava
       enrolment.put("contentList", filteredContents)

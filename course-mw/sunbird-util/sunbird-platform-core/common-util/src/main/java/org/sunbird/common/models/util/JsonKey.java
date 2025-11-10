@@ -1284,6 +1284,7 @@ public final class JsonKey {
   public static final String BATCH_ATTRIBUTES = "batchAttributes";
   public static final String COURSE_CONTENT_ALLOWED_FIELDS = "course_content_allowed_fields";
   public static final String CONTENT_ATTRIBUTES = "contentAttributes";
+  public static final String CONSUMPTION_RESPONSE_FIELDS = "consumption_response_fields";
 
   private JsonKey() {}
 }
