@@ -242,13 +242,11 @@ public class CourseBatchManagementActor extends BaseActor {
     CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
-    if(!isExpired) {
-        if (!isPrivateCall) {
-            validateUserPermission(courseBatch, requestedBy);
-            validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
-            validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
-            participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch);
-        }
+    if (!isExpired && !isPrivateCall) {
+          validateUserPermission(courseBatch, requestedBy);
+          validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
+          validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
+          participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch);
     }
     Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(courseBatch, dateFormat);
     Response result =
@@ -326,7 +324,7 @@ public class CourseBatchManagementActor extends BaseActor {
           Map<String, Object> batchAttributes = (Map<String, Object>) batchAttrObj;
           processInstructors(requestContext, batchAttributes, courseBatch, true);
           Map<String, Object> existingBatchAttrs = courseBatch.getBatchAttributes();
-          if (existingBatchAttrs == null) {
+          if (MapUtils.isEmpty(existingBatchAttrs)) {
               existingBatchAttrs = new HashMap<>();
           }
           existingBatchAttrs.putAll(batchAttributes);
@@ -1399,7 +1397,7 @@ public class CourseBatchManagementActor extends BaseActor {
     }
 
     private Set<String> parseCommaSeparatedValues(String value) {
-        if (value == null || value.trim().isEmpty()) {
+        if (StringUtils.isBlank(value)) {
             return Collections.emptySet();
         }
         return Arrays.stream(value.split(","))
