@@ -897,6 +897,15 @@ public enum ResponseCode {
   batchSizeNotDefined(
           ResponseMessage.Key.BATCH_SIZE_NOT_DEFINED,
           ResponseMessage.Message.BATCH_SIZE_NOT_DEFINED_VALUE),
+    invalidBatchEnddateOrInstructorMissing(
+            ResponseMessage.Key.INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING,
+            ResponseMessage.Message.INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING),
+    invalidBatchAttributeorMissing(
+            ResponseMessage.Key.BATCH_ATTRIBUTES_MISSING,
+            ResponseMessage.Message.BATCH_ATTRIBUTES_MISSING),
+    invalidRequiredFieldsToUpdateAfterExpiredBatch(
+            ResponseMessage.Key.REQUIRED_FIELDS_MISSING,
+            ResponseMessage.Message.REQUIRED_FIELDS_MISSING),
 
   OK(200),
   CLIENT_ERROR(400),

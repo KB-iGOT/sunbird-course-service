@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
 
 import static org.sunbird.common.models.util.JsonKey.ID;
 import static org.sunbird.common.models.util.JsonKey.PARTICIPANTS;
+import static org.sunbird.common.request.orgvalidator.BaseOrgRequestValidator.ERROR_CODE;
 
 public class CourseBatchManagementActor extends BaseActor {
 
@@ -225,6 +226,7 @@ public class CourseBatchManagementActor extends BaseActor {
     String requestedBy = (String) actorMessage.getContext().get(JsonKey.REQUESTED_BY);
 
     Map<String, Object> request = actorMessage.getRequest();
+      boolean isExpired = enforceExpiredBatchFieldWhitelist(request);
     if (Util.isNotNull(request.get(JsonKey.PARTICIPANTS))) {
       ProjectCommonException.throwClientErrorException(
           ResponseCode.invalidRequestParameter,
@@ -240,11 +242,14 @@ public class CourseBatchManagementActor extends BaseActor {
     CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
-    if(!isPrivateCall){
-    validateUserPermission(courseBatch, requestedBy);
-    validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
-    validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
-    participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch); }
+    if(!isExpired) {
+        if (!isPrivateCall) {
+            validateUserPermission(courseBatch, requestedBy);
+            validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
+            validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
+            participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch);
+        }
+    }
     Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(courseBatch, dateFormat);
     Response result =
         courseBatchDao.update(actorMessage.getRequestContext(), (String) request.get(JsonKey.COURSE_ID), batchId, courseBatchMap);
@@ -320,7 +325,12 @@ public class CourseBatchManagementActor extends BaseActor {
       if (batchAttrObj instanceof Map && MapUtils.isNotEmpty((Map<?, ?>) batchAttrObj)) {
           Map<String, Object> batchAttributes = (Map<String, Object>) batchAttrObj;
           processInstructors(requestContext, batchAttributes, courseBatch, true);
-          courseBatch.setBatchAttributes(batchAttributes);
+          Map<String, Object> existingBatchAttrs = courseBatch.getBatchAttributes();
+          if (existingBatchAttrs == null) {
+              existingBatchAttrs = new HashMap<>();
+          }
+          existingBatchAttrs.putAll(batchAttributes);
+          courseBatch.setBatchAttributes(existingBatchAttrs);
       }
     updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall);
 
@@ -1098,14 +1108,6 @@ public class CourseBatchManagementActor extends BaseActor {
         }
         Set<String> uniqueInstructorIds = new HashSet<>(instructors);
 
-        if (isUpdateFlow && courseBatch.getStartDate() != null && !new Date().before(courseBatch.getStartDate())) {
-            throw new ProjectCommonException(
-                    ResponseCode.invalidParameterValue.getErrorCode(),
-                    "Instructors cannot be added/updated after the batch start date: "
-                            + courseBatch.getStartDate(),
-                    ResponseCode.CLIENT_ERROR.getResponseCode()
-            );
-        }
         List<String> validUserIds = new ArrayList<>();
         for (String instructorUserId : uniqueInstructorIds) {
             userExists(instructorUserId, requestContext);
@@ -1329,4 +1331,81 @@ public class CourseBatchManagementActor extends BaseActor {
             logger.error(requestContext, "Failed to send in-app notification for event: " + subCategory, e);
         }
     }
+
+
+    private boolean enforceExpiredBatchFieldWhitelist(Map<String, Object> request) {
+
+        boolean endDateValid = validateDateWithTodayDate((String) request.get(JsonKey.END_DATE));
+        if (endDateValid) {
+            return false;  // NOT expired
+        }
+        String rootFields = ProjectUtil.getConfigValue(JsonKey.EXPIRED_BATCH_ALLOWED_ROOT_FIELDS);
+        String batchAttrFields = ProjectUtil.getConfigValue(JsonKey.EXPIRED_BATCH_ALLOWED_BATCH_ATTRIBUTES_FIELDS);
+
+        Set<String> allowedRoot = parseCommaSeparatedValues(rootFields);
+        Set<String> allowedBatchAttrs = parseCommaSeparatedValues(batchAttrFields);
+
+        Object batchAttrsObj = request.get(JsonKey.BATCH_ATTRIBUTES);
+
+        if (!(batchAttrsObj instanceof Map)) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidBatchAttributeorMissing.getErrorCode(),
+                    ResponseCode.invalidBatchAttributeorMissing.getErrorMessage(),
+                    ERROR_CODE);
+        }
+
+        Map<String, Object> batchAttrs = (Map<String, Object>) batchAttrsObj;
+
+        boolean allowedExist = batchAttrs.keySet().stream()
+                .anyMatch(allowedBatchAttrs::contains);
+
+        if (!allowedExist) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidRequiredFieldsToUpdateAfterExpiredBatch.getErrorCode(),
+                    ResponseCode.invalidRequiredFieldsToUpdateAfterExpiredBatch.getErrorMessage(),
+                    ERROR_CODE);
+        }
+        batchAttrs.keySet().removeIf(key -> !allowedBatchAttrs.contains(key));
+        request.keySet().removeIf(key -> !allowedRoot.contains(key));
+        request.put(JsonKey.BATCH_ATTRIBUTES, batchAttrs);
+
+        return true;
+    }
+
+
+
+    private boolean validateDateWithTodayDate(String date) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        format.setLenient(false);
+        try {
+            if (StringUtils.isNotEmpty(date)) {
+                Date reqDate = format.parse(date);
+                Date todayDate = format.parse(format.format(new Date()));
+                Calendar cal1 = Calendar.getInstance();
+                Calendar cal2 = Calendar.getInstance();
+                cal1.setTime(reqDate);
+                cal2.setTime(todayDate);
+                if (reqDate.before(todayDate)) {
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            throw new ProjectCommonException(
+                    ResponseCode.dateFormatError.getErrorCode(),
+                    ResponseCode.dateFormatError.getErrorMessage(),
+                    ERROR_CODE);
+        }
+        return true;
+    }
+
+    private Set<String> parseCommaSeparatedValues(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .collect(Collectors.toSet());
+    }
+
+
 }

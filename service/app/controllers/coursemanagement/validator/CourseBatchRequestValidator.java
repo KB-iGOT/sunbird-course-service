@@ -78,10 +78,10 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
     validateEndDate(startDate, endDate);
 
     boolean bool = validateDateWithTodayDate(endDate);
-    if (!bool) {
+    if (!bool && !instructorsPresent(request)) {
       throw new ProjectCommonException(
-          ResponseCode.invalidBatchEndDateError.getErrorCode(),
-          ResponseCode.invalidBatchEndDateError.getErrorMessage(),
+          ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorCode(),
+          ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorMessage(),
           ERROR_CODE);
     }
 
@@ -392,4 +392,15 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             ResponseCode.mandatoryParamsMissing,
             JsonKey.BATCH_ID);
   }
+
+    private boolean instructorsPresent(Request request) {
+        Object batchAttributesObj = request.getRequest().get(JsonKey.BATCH_ATTRIBUTES);
+
+        if (batchAttributesObj instanceof Map) {
+            Map<String, Object> batchAttributes = (Map<String, Object>) batchAttributesObj;
+
+            return batchAttributes.containsKey(JsonKey.INSTRUCTORS_USER_ID);
+        }
+        return false;
+    }
 }
