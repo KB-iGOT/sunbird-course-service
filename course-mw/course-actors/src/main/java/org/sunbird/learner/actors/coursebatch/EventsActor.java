@@ -384,7 +384,8 @@ public class EventsActor extends BaseActor {
     }
 
     private void validaSamuhikCharchaEnrolment(RequestContext requestContext, String userId, Map<String, Object> contentDetails) {
-        Integer leafNodesCount = (Integer) contentDetails.get(JsonKey.LEAF_NODE_COUNT);
+        Map<String, Object> courseDetails = getContentDetails(requestContext, (String) contentDetails.get(JsonKey.COURSE_LINKED), new HashMap<>());
+        Integer leafNodesCount = (Integer) courseDetails.get(JsonKey.LEAF_NODE_COUNT);
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.USER_ID, userId);
         primaryKey.put(JsonKey.COURSE_ID,contentDetails.get(JsonKey.COURSE_LINKED));
@@ -398,25 +399,25 @@ public class EventsActor extends BaseActor {
                     ResponseCode.samuhikCharchaEnrollmentValidation.getErrorMessage());
         }
         Map<String, Object> userCourseEnrolmentList = activeRecords.get(0);
-        if ((Integer) userCourseEnrolmentList.get(JsonKey.STATUS) != 2) {
-            Map<String, Object> langContentStatus = (Map<String, Object>) userCourseEnrolmentList.get(JsonKey.LANG_CONTENT_STATUS);
-            if (MapUtils.isNotEmpty(langContentStatus)) {
-                int maxProgress = langContentStatus.values().stream()
-                        .filter(Map.class::isInstance)
-                        .map(v -> (Map<String, Object>) v)
-                        .mapToInt(languageMap -> (int) languageMap.values().stream()
-                                .filter(val -> val instanceof Number && ((Number) val).intValue() == 2)
-                                .count())
-                        .max()
-                        .orElse(0);
-                int percentageCompletion = 0;
-                if (leafNodesCount != null && leafNodesCount > 0) {
-                    percentageCompletion = (int) Math.round((maxProgress * 100.0) / leafNodesCount);
-                }
-                if (percentageCompletion <= Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SAMUHIK_CHARCHA_EVENT_ENROL_PERCENTAGE))) {
-                    ProjectCommonException.throwClientErrorException(ResponseCode.samuhikCharchaEnrollmentValidation,
-                            ResponseCode.samuhikCharchaEnrollmentValidation.getErrorMessage());
-                }
+        if ((Integer) userCourseEnrolmentList.get(JsonKey.STATUS) == 2)
+            return;
+        Map<String, Object> langContentStatus = (Map<String, Object>) userCourseEnrolmentList.get(JsonKey.LANG_CONTENT_STATUS);
+        if (MapUtils.isNotEmpty(langContentStatus)) {
+            int maxProgress = langContentStatus.values().stream()
+                    .filter(Map.class::isInstance)
+                    .map(v -> (Map<String, Object>) v)
+                    .mapToInt(languageMap -> (int) languageMap.values().stream()
+                            .filter(val -> val instanceof Number && ((Number) val).intValue() == 2)
+                            .count())
+                    .max()
+                    .orElse(0);
+            int percentageCompletion = 0;
+            if (leafNodesCount != null && leafNodesCount > 0) {
+                percentageCompletion = (int) Math.round((maxProgress * 100.0) / leafNodesCount);
+            }
+            if (percentageCompletion <= Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SAMUHIK_CHARCHA_EVENT_ENROL_PERCENTAGE))) {
+                ProjectCommonException.throwClientErrorException(ResponseCode.samuhikCharchaEnrollmentValidation,
+                        ResponseCode.samuhikCharchaEnrollmentValidation.getErrorMessage());
             }
         }
     }
