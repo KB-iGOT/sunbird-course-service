@@ -1285,6 +1285,11 @@ public final class JsonKey {
   public static final String INSTRUCTORS = "instructors";
   public static final String INSTRUCTOR_ADD_BATCH = "INSTRUCTOR_ADD_BATCH";
   public static final String PROGRAM_NAME = "programName";
+  public static final String SAMUHIK_CHARCHA_COURSE_TYPE = "Samuhik Charcha";
+  public static final String USER_ENROLMENTS_V2 = "user_enrolments_v2";
+  public static final String RESOURCE_TYPE = "resourceType";
+  public static final String COURSE_LINKED = "courseLinked";
+  public static final String SAMUHIK_CHARCHA_EVENT_ENROL_PERCENTAGE = "samuhik_charcha_event_enrol_percentage";
 
   private JsonKey() {}
 }
