@@ -900,6 +900,9 @@ public enum ResponseCode {
   samuhikCharchaEnrollmentValidation(
           ResponseMessage.Key.MINIMUM_ENROLLMENT_CRITERIA_NOT_MET,
           ResponseMessage.Message.MINIMUM_ENROLLMENT_CRITERIA_NOT_MET_VALUE),
+  zeroOrMoreThanOneActiveBatchForCourse(
+          ResponseMessage.Key.ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH,
+          ResponseMessage.Message.ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH_VALUE),
 
   OK(200),
   CLIENT_ERROR(400),

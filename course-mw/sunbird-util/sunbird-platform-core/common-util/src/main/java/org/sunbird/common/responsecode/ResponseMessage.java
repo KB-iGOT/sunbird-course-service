@@ -488,6 +488,7 @@ public interface ResponseMessage {
     String BATCH_SIZE_EXCEEDED_VALUE = "Max batch size exceeded. Only {0} more users can be enrolled to this batch.";
     String BATCH_SIZE_NOT_DEFINED_VALUE = "Batch size is not defined for this course batch.";
     String MINIMUM_ENROLLMENT_CRITERIA_NOT_MET_VALUE = "Minimum enrollment criteria not met for this Event.";
+    String ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH_VALUE = "User is enrolled to zero or more than one active batch for this course.";
   }
 
   interface Key {
@@ -903,5 +904,6 @@ public interface ResponseMessage {
     String BATCH_SIZE_EXCEEDED = "BATCH_SIZE_EXCEEDED";
     String BATCH_SIZE_NOT_DEFINED = "BATCH_SIZE_NOT_DEFINED";
     String MINIMUM_ENROLLMENT_CRITERIA_NOT_MET ="MINIMUM_ENROLLMENT_CRITERIA_NOT_MET";
+    String ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH = "ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH";
   }
 }

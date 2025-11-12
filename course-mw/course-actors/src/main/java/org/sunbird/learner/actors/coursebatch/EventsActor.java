@@ -351,7 +351,7 @@ public class EventsActor extends BaseActor {
         BatchUser batchUserData = batchUserDao.read(request.getRequestContext(), batchId, userId);
         String resourceType = (String) contentDetails.get(JsonKey.RESOURCE_TYPE);
         if (!resourceType.isEmpty() && JsonKey.SAMUHIK_CHARCHA_COURSE_TYPE.equalsIgnoreCase(resourceType))
-            validaSamuhikCharchaEnrolment(request.getRequestContext(), userId, batchId, contentDetails);
+            validaSamuhikCharchaEnrolment(request.getRequestContext(), userId, contentDetails);
 
         validateEnrolment(batchData, enrolmentData, true,contentDetails);
 
@@ -383,17 +383,23 @@ public class EventsActor extends BaseActor {
         }
     }
 
-    private void validaSamuhikCharchaEnrolment(RequestContext requestContext, String userId, String batchId, Map<String, Object> contentDetails) {
+    private void validaSamuhikCharchaEnrolment(RequestContext requestContext, String userId, Map<String, Object> contentDetails) {
         Integer leafNodesCount = (Integer) contentDetails.get(JsonKey.LEAF_NODE_COUNT);
         Map<String, Object> primaryKey = new HashMap<>();
-        primaryKey.put(JsonKey.BATCH_ID, batchId);
         primaryKey.put(JsonKey.USER_ID, userId);
         primaryKey.put(JsonKey.COURSE_ID,contentDetails.get(JsonKey.COURSE_LINKED));
         Response response = cassandraOperation.getRecordByIdentifier(requestContext, JsonKey.KEYSPACE_SUNBIRD_COURSES, JsonKey.USER_ENROLMENTS_V2, primaryKey, null);
-        List<Map<String, Object>> userCourseEnrolmentList =
-                (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-        if ((Integer) userCourseEnrolmentList.get(0).get("status") != 2) {
-            Map<String, Object> langContentStatus = (Map<String, Object>) userCourseEnrolmentList.get(0).get(JsonKey.LANG_CONTENT_STATUS);
+        List<Map<String, Object>> rawUserCourseEnrolmentList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+        List<Map<String, Object>> activeRecords = rawUserCourseEnrolmentList.stream()
+                .filter(activeRecord -> Boolean.TRUE.equals(activeRecord.get(JsonKey.ACTIVE)))
+                .collect(Collectors.toList());
+        if (activeRecords.size() != 1) {
+            ProjectCommonException.throwClientErrorException(ResponseCode.samuhikCharchaEnrollmentValidation,
+                    ResponseCode.samuhikCharchaEnrollmentValidation.getErrorMessage());
+        }
+        Map<String, Object> userCourseEnrolmentList = activeRecords.get(0);
+        if ((Integer) userCourseEnrolmentList.get(JsonKey.STATUS) != 2) {
+            Map<String, Object> langContentStatus = (Map<String, Object>) userCourseEnrolmentList.get(JsonKey.LANG_CONTENT_STATUS);
             if (MapUtils.isNotEmpty(langContentStatus)) {
                 int maxProgress = langContentStatus.values().stream()
                         .filter(Map.class::isInstance)
