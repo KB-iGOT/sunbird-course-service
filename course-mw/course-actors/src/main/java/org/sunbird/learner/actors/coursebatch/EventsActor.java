@@ -5,6 +5,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
+import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.CassandraUtil;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
@@ -13,6 +14,7 @@ import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.common.util.JsonUtil;
+import org.sunbird.helper.ServiceFactory;
 import org.sunbird.kafka.client.InstructionEventGenerator;
 import org.sunbird.learner.actors.coursebatch.dao.BatchUserDao;
 import org.sunbird.learner.actors.coursebatch.dao.UserEventsDao;
@@ -58,6 +60,7 @@ public class EventsActor extends BaseActor {
     private BatchUserDao batchUserDao = new BatchUserDaoImpl();
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private HelperMethodService helperMethodService = new HelperMethodService();
+    private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
 
     @Inject
     @Named("course-batch-notification-actor")
@@ -159,7 +162,7 @@ public class EventsActor extends BaseActor {
     }
 
     private Map<String, Object> getContentDetails(RequestContext requestContext, String eventId, Map<String, String> headers) {
-        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory","versionKey","endDate","endTime"));
+        Map<String, Object> ekStepContent = ContentUtil.getContent(eventId, Arrays.asList("status", "batches", "leafNodesCount", "primaryCategory","versionKey","endDate","endTime","courseLinked","resourceType"));
         logger.info(requestContext, "EventsActor:getEkStepContent: eventId: " + eventId, null,
                 ekStepContent);
         String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
@@ -346,6 +349,9 @@ public class EventsActor extends BaseActor {
         EventBatch batchData = eventBatchDao.readById(eventId, batchId, request.getRequestContext());
         UserEvents enrolmentData = userEventsDao.read(request.getRequestContext(), userId, eventId, batchId);
         BatchUser batchUserData = batchUserDao.read(request.getRequestContext(), batchId, userId);
+        String resourceType = (String) contentDetails.get(JsonKey.RESOURCE_TYPE);
+        if (!resourceType.isEmpty() && JsonKey.SAMUHIK_CHARCHA_COURSE_TYPE.equalsIgnoreCase(resourceType))
+            validaSamuhikCharchaEnrolment(request.getRequestContext(), userId, batchId, contentDetails);
 
         validateEnrolment(batchData, enrolmentData, true,contentDetails);
 
@@ -374,6 +380,38 @@ public class EventsActor extends BaseActor {
             helperMethodService.sendNotificationToMDOs(eventId,userId,request.getRequestContext());
         } else {
             throw new ProjectCommonException(ResponseCode.accessDeniedToEnrolEvent.getErrorCode(), ResponseCode.accessDeniedToEnrolEvent.getErrorMessage(),ResponseCode.CLIENT_ERROR.getResponseCode());
+        }
+    }
+
+    private void validaSamuhikCharchaEnrolment(RequestContext requestContext, String userId, String batchId, Map<String, Object> contentDetails) {
+        Integer leafNodesCount = (Integer) contentDetails.get(JsonKey.LEAF_NODE_COUNT);
+        Map<String, Object> primaryKey = new HashMap<>();
+        primaryKey.put(JsonKey.BATCH_ID, batchId);
+        primaryKey.put(JsonKey.USER_ID, userId);
+        primaryKey.put(JsonKey.COURSE_ID,contentDetails.get(JsonKey.COURSE_LINKED));
+        Response response = cassandraOperation.getRecordByIdentifier(requestContext, JsonKey.KEYSPACE_SUNBIRD_COURSES, JsonKey.USER_ENROLMENTS_V2, primaryKey, null);
+        List<Map<String, Object>> userCourseEnrolmentList =
+                (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+        if ((Integer) userCourseEnrolmentList.get(0).get("status") != 2) {
+            Map<String, Object> langContentStatus = (Map<String, Object>) userCourseEnrolmentList.get(0).get(JsonKey.LANG_CONTENT_STATUS);
+            if (MapUtils.isNotEmpty(langContentStatus)) {
+                int maxProgress = langContentStatus.values().stream()
+                        .filter(Map.class::isInstance)
+                        .map(v -> (Map<String, Object>) v)
+                        .mapToInt(languageMap -> (int) languageMap.values().stream()
+                                .filter(val -> val instanceof Number && ((Number) val).intValue() == 2)
+                                .count())
+                        .max()
+                        .orElse(0);
+                int percentageCompletion = 0;
+                if (leafNodesCount != null && leafNodesCount > 0) {
+                    percentageCompletion = (int) Math.round((maxProgress * 100.0) / leafNodesCount);
+                }
+                if (percentageCompletion <= Integer.parseInt(ProjectUtil.getConfigValue(JsonKey.SAMUHIK_CHARCHA_EVENT_ENROL_PERCENTAGE))) {
+                    ProjectCommonException.throwClientErrorException(ResponseCode.samuhikCharchaEnrollmentValidation,
+                            ResponseCode.samuhikCharchaEnrollmentValidation.getErrorMessage());
+                }
+            }
         }
     }
 
