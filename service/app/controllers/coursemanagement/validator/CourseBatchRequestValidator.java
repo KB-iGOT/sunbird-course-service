@@ -71,22 +71,27 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
         (String) request.getRequest().get(JsonKey.ID),
         ResponseCode.mandatoryParamsMissing,
         JsonKey.ID);
-    String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
-    String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
+      boolean isExpired = Boolean.parseBoolean(
+              String.valueOf(request.getRequest().getOrDefault(JsonKey.IS_EXPIRED, "false"))
+      );
+      if (!isExpired) {
+        String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
+        String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
 
     validateUpdateBatchStartDate(startDate);
     validateEndDate(startDate, endDate);
 
-    boolean bool = validateDateWithTodayDate(endDate);
-    if (!bool && !instructorsPresent(request)) {
-      throw new ProjectCommonException(
-          ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorCode(),
-          ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorMessage(),
-          ERROR_CODE);
-    }
+        boolean bool = validateDateWithTodayDate(endDate);
+        if (!bool) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorCode(),
+                    ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorMessage(),
+                    ERROR_CODE);
+        }
 
-    validateUpdateBatchEndDate(request);
-    validateCreatedForAndMentors(request);
+        validateUpdateBatchEndDate(request);
+        validateCreatedForAndMentors(request);
+    }
   }
 
   public void validateAddUserToCourseBatchRequest(Request courseRequest) {
@@ -393,12 +398,4 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             JsonKey.BATCH_ID);
   }
 
-  private boolean instructorsPresent(Request request) {
-      Object batchAttributesObj = request.getRequest().get(JsonKey.BATCH_ATTRIBUTES);
-      if (batchAttributesObj instanceof Map) {
-          Map<String, Object> batchAttributes = (Map<String, Object>) batchAttributesObj;
-          return batchAttributes.containsKey(JsonKey.INSTRUCTORS_USER_ID);
-      }
-      return false;
-    }
 }
