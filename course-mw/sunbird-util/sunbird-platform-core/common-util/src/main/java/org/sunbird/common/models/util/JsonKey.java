@@ -1290,6 +1290,7 @@ public final class JsonKey {
   public static final String PROGRAM_NAME = "programName";
   public static final String EXPIRED_BATCH_ALLOWED_ROOT_FIELDS = "expired_batch_allowed_root_fields";
   public static final String EXPIRED_BATCH_ALLOWED_BATCH_ATTRIBUTES_FIELDS = "expired_batch_allowed_attribute_fields";
+  public static final String IS_EXPIRED = "isExpired";
 
     private JsonKey() {}
 }

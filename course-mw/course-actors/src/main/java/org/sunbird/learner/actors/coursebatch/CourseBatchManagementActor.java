@@ -220,7 +220,6 @@ public class CourseBatchManagementActor extends BaseActor {
     String requestedBy = (String) actorMessage.getContext().get(JsonKey.REQUESTED_BY);
 
     Map<String, Object> request = actorMessage.getRequest();
-      boolean isExpired = enforceExpiredBatchFieldWhitelist(request);
     if (Util.isNotNull(request.get(JsonKey.PARTICIPANTS))) {
       ProjectCommonException.throwClientErrorException(
           ResponseCode.invalidRequestParameter,
@@ -233,7 +232,8 @@ public class CourseBatchManagementActor extends BaseActor {
             : (String) request.get(JsonKey.ID);
     CourseBatch oldBatch =
         courseBatchDao.readById((String) request.get(JsonKey.COURSE_ID), batchId, actorMessage.getRequestContext());
-    CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall);
+    boolean isExpired = enforceExpiredBatchFieldWhitelist(request, oldBatch);
+    CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall, isExpired);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
     if (!isExpired && !isPrivateCall) {
@@ -294,7 +294,7 @@ public class CourseBatchManagementActor extends BaseActor {
   }
 
   @SuppressWarnings("unchecked")
-  private CourseBatch getUpdateCourseBatch(RequestContext requestContext, Map<String, Object> request, CourseBatch oldBatch,boolean isPrivateCall) throws Exception {
+  private CourseBatch getUpdateCourseBatch(RequestContext requestContext, Map<String, Object> request, CourseBatch oldBatch,boolean isPrivateCall, boolean isExpired) throws Exception {
     CourseBatch courseBatch = JsonUtil.deserialize(JsonUtil.serialize(oldBatch), CourseBatch.class);
     courseBatch.setEnrollmentType(
         getEnrollmentType(
@@ -324,7 +324,7 @@ public class CourseBatchManagementActor extends BaseActor {
           existingBatchAttrs.putAll(batchAttributes);
           courseBatch.setBatchAttributes(existingBatchAttrs);
       }
-    updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall);
+    updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall, isExpired);
 
     return courseBatch;
   }
@@ -439,7 +439,7 @@ public class CourseBatchManagementActor extends BaseActor {
   }
 
   @SuppressWarnings("unchecked")
-  private void updateCourseBatchDate(RequestContext requestContext, CourseBatch courseBatch, Map<String, Object> req,boolean isPrivateCall) throws Exception {
+  private void updateCourseBatchDate(RequestContext requestContext, CourseBatch courseBatch, Map<String, Object> req,boolean isPrivateCall, boolean isExpired) throws Exception {
     Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(courseBatch, dateFormat);
     Date todayDate = getDate(requestContext, null, null);
     Date dbBatchStartDate = getDate(requestContext, JsonKey.START_DATE, courseBatchMap);
@@ -454,7 +454,7 @@ public class CourseBatchManagementActor extends BaseActor {
     dbBatchEndDate = dbBatchEndDate == null ? getDate(requestContext, JsonKey.OLD_END_DATE, courseBatchMap) : dbBatchEndDate;
     dbEnrollmentEndDate = dbEnrollmentEndDate == null ? getDate(requestContext, JsonKey.OLD_ENROLLMENT_END_DATE, courseBatchMap) : dbEnrollmentEndDate;
 
-    if(!isPrivateCall) {
+    if(!isExpired && !isPrivateCall) {
       validateUpdateBatchStartDate(requestedStartDate);
       validateBatchStartAndEndDate(
               dbBatchStartDate, dbBatchEndDate, requestedStartDate, requestedEndDate, todayDate);
@@ -465,14 +465,16 @@ public class CourseBatchManagementActor extends BaseActor {
     *     EndDate can be greater than or equal to today's date or
     *     EndDate can be greater than or equal to existing EndDate
     * */
-    Boolean batchStarted = (null != requestedStartDate && todayDate.compareTo(requestedStartDate) >=0)
-            && ((null == requestedEndDate) 
-                || (null != requestedEndDate && null == dbBatchEndDate && todayDate.compareTo(requestedEndDate) <= 0) 
-                || (null != requestedEndDate && null != dbBatchEndDate && requestedEndDate.compareTo(dbBatchEndDate) >=0));
-    
-    if(batchStarted)
-      courseBatch.setStatus(ProgressStatus.STARTED.getValue());
-    if(!isPrivateCall) {
+      if (!isExpired) {
+          Boolean batchStarted = (null != requestedStartDate && todayDate.compareTo(requestedStartDate) >= 0)
+                  && ((null == requestedEndDate)
+                  || (null != requestedEndDate && null == dbBatchEndDate && todayDate.compareTo(requestedEndDate) <= 0)
+                  || (null != requestedEndDate && null != dbBatchEndDate && requestedEndDate.compareTo(dbBatchEndDate) >= 0));
+
+          if (batchStarted)
+              courseBatch.setStatus(ProgressStatus.STARTED.getValue());
+      }
+    if(!isExpired && !isPrivateCall) {
     validateBatchEnrollmentEndDate(
         dbBatchStartDate,
         dbBatchEndDate,
@@ -1324,8 +1326,11 @@ public class CourseBatchManagementActor extends BaseActor {
         }
     }
 
-    private boolean enforceExpiredBatchFieldWhitelist(Map<String, Object> request) {
-        boolean endDateValid = validateDateWithTodayDate((String) request.get(JsonKey.END_DATE));
+    private boolean enforceExpiredBatchFieldWhitelist(Map<String, Object> request, CourseBatch oldBatch) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Date batchEndDate = oldBatch != null ? oldBatch.getEndDate() : null;
+        String endDateStr = (batchEndDate != null) ? sdf.format(batchEndDate) : null;
+        boolean endDateValid = validateDateWithTodayDate(endDateStr);
         if (endDateValid) {
             return false;  // NOT expired
         }
