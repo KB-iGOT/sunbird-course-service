@@ -393,14 +393,12 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             JsonKey.BATCH_ID);
   }
 
-    private boolean instructorsPresent(Request request) {
-        Object batchAttributesObj = request.getRequest().get(JsonKey.BATCH_ATTRIBUTES);
-
-        if (batchAttributesObj instanceof Map) {
-            Map<String, Object> batchAttributes = (Map<String, Object>) batchAttributesObj;
-
-            return batchAttributes.containsKey(JsonKey.INSTRUCTORS_USER_ID);
-        }
-        return false;
+  private boolean instructorsPresent(Request request) {
+      Object batchAttributesObj = request.getRequest().get(JsonKey.BATCH_ATTRIBUTES);
+      if (batchAttributesObj instanceof Map) {
+          Map<String, Object> batchAttributes = (Map<String, Object>) batchAttributesObj;
+          return batchAttributes.containsKey(JsonKey.INSTRUCTORS_USER_ID);
+      }
+      return false;
     }
 }

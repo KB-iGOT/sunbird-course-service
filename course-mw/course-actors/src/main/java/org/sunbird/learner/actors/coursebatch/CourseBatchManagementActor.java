@@ -1,20 +1,12 @@
 package org.sunbird.learner.actors.coursebatch;
 
 import akka.actor.ActorRef;
-import akka.dispatch.Mapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.request.BaseRequest;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
-import org.json.JSONObject;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.CassandraUtil;
@@ -42,7 +34,10 @@ import org.sunbird.learner.actors.coursebatch.dao.impl.UserCoursesDaoImpl;
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService;
 import org.sunbird.learner.actors.user.dao.impl.UserDaoImpl;
 import org.sunbird.learner.constants.CourseJsonKey;
-import org.sunbird.learner.util.*;
+import org.sunbird.learner.util.ContentUtil;
+import org.sunbird.learner.util.CourseBatchUtil;
+import org.sunbird.learner.util.HelperMethodService;
+import org.sunbird.learner.util.Util;
 import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.telemetry.util.TelemetryUtil;
@@ -56,7 +51,6 @@ import javax.ws.rs.core.MediaType;
 import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -1330,9 +1324,7 @@ public class CourseBatchManagementActor extends BaseActor {
         }
     }
 
-
     private boolean enforceExpiredBatchFieldWhitelist(Map<String, Object> request) {
-
         boolean endDateValid = validateDateWithTodayDate((String) request.get(JsonKey.END_DATE));
         if (endDateValid) {
             return false;  // NOT expired
@@ -1342,7 +1334,6 @@ public class CourseBatchManagementActor extends BaseActor {
 
         Set<String> allowedRoot = parseCommaSeparatedValues(rootFields);
         Set<String> allowedBatchAttrs = parseCommaSeparatedValues(batchAttrFields);
-
         Object batchAttrsObj = request.get(JsonKey.BATCH_ATTRIBUTES);
 
         if (!(batchAttrsObj instanceof Map)) {
@@ -1351,12 +1342,9 @@ public class CourseBatchManagementActor extends BaseActor {
                     ResponseCode.invalidBatchAttributeorMissing.getErrorMessage(),
                     ERROR_CODE);
         }
-
         Map<String, Object> batchAttrs = (Map<String, Object>) batchAttrsObj;
-
         boolean allowedExist = batchAttrs.keySet().stream()
                 .anyMatch(allowedBatchAttrs::contains);
-
         if (!allowedExist) {
             throw new ProjectCommonException(
                     ResponseCode.invalidRequiredFieldsToUpdateAfterExpiredBatch.getErrorCode(),
@@ -1366,11 +1354,8 @@ public class CourseBatchManagementActor extends BaseActor {
         batchAttrs.keySet().removeIf(key -> !allowedBatchAttrs.contains(key));
         request.keySet().removeIf(key -> !allowedRoot.contains(key));
         request.put(JsonKey.BATCH_ATTRIBUTES, batchAttrs);
-
         return true;
     }
-
-
 
     private boolean validateDateWithTodayDate(String date) {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
@@ -1404,6 +1389,5 @@ public class CourseBatchManagementActor extends BaseActor {
                 .map(String::trim)
                 .collect(Collectors.toSet());
     }
-
 
 }
