@@ -205,6 +205,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     int currentOffSet = 1;
     String currentPagingState = null;
     long count = 0L;
+    long activeCount = 0L;
     Response countResponse = cassandraOperation.getCountOfRecordByIdentifier(requestContext, KEYSPACE_NAME,
             ENROLMENT_BATCH_LOOKUP, queryMap, JsonKey.USER_ID);
     if (countResponse != null
@@ -237,6 +238,10 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
         break;
       }
       for (Map<String, Object> userCourse : userCoursesList) {
+          //get Active user count
+          if (Boolean.TRUE.equals(userCourse.get(JsonKey.ACTIVE))) {
+              activeCount++;
+          }
         //From this page, we have already read some records, so skip the records
         if (currentOffSetFromRequest > 0) {
           currentOffSetFromRequest--;
@@ -266,7 +271,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     }
     result.put(JsonKey.CURRENT_OFFSET, (Integer) request.get(JsonKey.CURRENT_OFFSET));
     //Only active users will be returned.
-    result.put(JsonKey.COUNT, count);
+    result.put(JsonKey.COUNT, activeCount);
     result.put(JsonKey.PARTICIPANTS, userList);
     return result;
   }
