@@ -1,20 +1,13 @@
 package org.sunbird.learner.actors.coursebatch;
 
 import akka.actor.ActorRef;
-import akka.dispatch.Mapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.request.BaseRequest;
+import jodd.util.StringUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
-import org.json.JSONObject;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.CassandraUtil;
@@ -42,7 +35,10 @@ import org.sunbird.learner.actors.coursebatch.dao.impl.UserCoursesDaoImpl;
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService;
 import org.sunbird.learner.actors.user.dao.impl.UserDaoImpl;
 import org.sunbird.learner.constants.CourseJsonKey;
-import org.sunbird.learner.util.*;
+import org.sunbird.learner.util.ContentUtil;
+import org.sunbird.learner.util.CourseBatchUtil;
+import org.sunbird.learner.util.HelperMethodService;
+import org.sunbird.learner.util.Util;
 import org.sunbird.models.batch.user.BatchUser;
 import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.telemetry.util.TelemetryUtil;
@@ -56,7 +52,6 @@ import javax.ws.rs.core.MediaType;
 import java.io.StringWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -66,6 +61,7 @@ import java.util.stream.Collectors;
 
 import static org.sunbird.common.models.util.JsonKey.ID;
 import static org.sunbird.common.models.util.JsonKey.PARTICIPANTS;
+import static org.sunbird.common.request.orgvalidator.BaseOrgRequestValidator.ERROR_CODE;
 
 public class CourseBatchManagementActor extends BaseActor {
 
@@ -175,11 +171,12 @@ public class CourseBatchManagementActor extends BaseActor {
     TelemetryUtil.telemetryProcessingCall(request, targetObject, correlatedObject, actorMessage.getContext());
 
   //  updateBatchCount(courseBatch);
+      String courseName = StringUtils.defaultIfBlank((String) contentDetails.get(JsonKey.NAME), "");
       updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
     if (courseNotificationActive()) {
       batchOperationNotifier(actorMessage, courseBatch, null);
     }
-    notifyInstructors(actorMessage.getRequestContext(), courseBatch, batchAttributes, courseId, courseBatchId, null);
+    notifyInstructors(actorMessage.getRequestContext(), courseBatch, batchAttributes, courseId, courseBatchId, null, courseName);
   }
 
   private boolean courseNotificationActive() {
@@ -237,14 +234,16 @@ public class CourseBatchManagementActor extends BaseActor {
             : (String) request.get(JsonKey.ID);
     CourseBatch oldBatch =
         courseBatchDao.readById((String) request.get(JsonKey.COURSE_ID), batchId, actorMessage.getRequestContext());
-    CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall);
+    boolean isExpired = enforceExpiredBatchFieldWhitelist(request, oldBatch);
+    CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall, isExpired);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
-    if(!isPrivateCall){
-    validateUserPermission(courseBatch, requestedBy);
-    validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
-    validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
-    participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch); }
+    if (!isExpired && !isPrivateCall) {
+          validateUserPermission(courseBatch, requestedBy);
+          validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
+          validateMentors(courseBatch, (String) actorMessage.getContext().getOrDefault(JsonKey.X_AUTH_TOKEN, ""), actorMessage.getRequestContext());
+          participantsMap = getMentorLists(participantsMap, oldBatch, courseBatch);
+    }
     Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(courseBatch, dateFormat);
     Response result =
         courseBatchDao.update(actorMessage.getRequestContext(), (String) request.get(JsonKey.COURSE_ID), batchId, courseBatchMap);
@@ -267,10 +266,11 @@ public class CourseBatchManagementActor extends BaseActor {
     if (courseNotificationActive()) {
       batchOperationNotifier(actorMessage, courseBatch, participantsMap);
     }
+      String courseName = StringUtils.defaultIfBlank((String) contentDetails.get(JsonKey.NAME), "");
     if (batchDatesUpdateNotificationActive()) {
-      batchDatesUpdateNotifier(actorMessage, courseBatch, oldBatch);
+        batchDatesUpdateNotifier(actorMessage, courseBatch, oldBatch, courseName);
     }
-      notifyInstructors(actorMessage.getRequestContext(), courseBatch, courseBatch.getBatchAttributes(), courseBatch.getCourseId(), batchId, oldBatch);
+      notifyInstructors(actorMessage.getRequestContext(), courseBatch, courseBatch.getBatchAttributes(), courseBatch.getCourseId(), batchId, oldBatch, courseName);
   }
 
   private Map<String, Object> getMentorLists(
@@ -297,7 +297,7 @@ public class CourseBatchManagementActor extends BaseActor {
   }
 
   @SuppressWarnings("unchecked")
-  private CourseBatch getUpdateCourseBatch(RequestContext requestContext, Map<String, Object> request, CourseBatch oldBatch,boolean isPrivateCall) throws Exception {
+  private CourseBatch getUpdateCourseBatch(RequestContext requestContext, Map<String, Object> request, CourseBatch oldBatch,boolean isPrivateCall, boolean isExpired) throws Exception {
     CourseBatch courseBatch = JsonUtil.deserialize(JsonUtil.serialize(oldBatch), CourseBatch.class);
     courseBatch.setEnrollmentType(
         getEnrollmentType(
@@ -320,9 +320,14 @@ public class CourseBatchManagementActor extends BaseActor {
       if (batchAttrObj instanceof Map && MapUtils.isNotEmpty((Map<?, ?>) batchAttrObj)) {
           Map<String, Object> batchAttributes = (Map<String, Object>) batchAttrObj;
           processInstructors(requestContext, batchAttributes, courseBatch, true);
-          courseBatch.setBatchAttributes(batchAttributes);
+          Map<String, Object> existingBatchAttrs = courseBatch.getBatchAttributes();
+          if (MapUtils.isEmpty(existingBatchAttrs)) {
+              existingBatchAttrs = new HashMap<>();
+          }
+          existingBatchAttrs.putAll(batchAttributes);
+          courseBatch.setBatchAttributes(existingBatchAttrs);
       }
-    updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall);
+    updateCourseBatchDate(requestContext, courseBatch, request,isPrivateCall, isExpired);
 
     return courseBatch;
   }
@@ -437,7 +442,7 @@ public class CourseBatchManagementActor extends BaseActor {
   }
 
   @SuppressWarnings("unchecked")
-  private void updateCourseBatchDate(RequestContext requestContext, CourseBatch courseBatch, Map<String, Object> req,boolean isPrivateCall) throws Exception {
+  private void updateCourseBatchDate(RequestContext requestContext, CourseBatch courseBatch, Map<String, Object> req,boolean isPrivateCall, boolean isExpired) throws Exception {
     Map<String, Object> courseBatchMap = CourseBatchUtil.cassandraCourseMapping(courseBatch, dateFormat);
     Date todayDate = getDate(requestContext, null, null);
     Date dbBatchStartDate = getDate(requestContext, JsonKey.START_DATE, courseBatchMap);
@@ -452,7 +457,7 @@ public class CourseBatchManagementActor extends BaseActor {
     dbBatchEndDate = dbBatchEndDate == null ? getDate(requestContext, JsonKey.OLD_END_DATE, courseBatchMap) : dbBatchEndDate;
     dbEnrollmentEndDate = dbEnrollmentEndDate == null ? getDate(requestContext, JsonKey.OLD_ENROLLMENT_END_DATE, courseBatchMap) : dbEnrollmentEndDate;
 
-    if(!isPrivateCall) {
+    if(!isExpired && !isPrivateCall) {
       validateUpdateBatchStartDate(requestedStartDate);
       validateBatchStartAndEndDate(
               dbBatchStartDate, dbBatchEndDate, requestedStartDate, requestedEndDate, todayDate);
@@ -463,14 +468,16 @@ public class CourseBatchManagementActor extends BaseActor {
     *     EndDate can be greater than or equal to today's date or
     *     EndDate can be greater than or equal to existing EndDate
     * */
-    Boolean batchStarted = (null != requestedStartDate && todayDate.compareTo(requestedStartDate) >=0)
-            && ((null == requestedEndDate) 
-                || (null != requestedEndDate && null == dbBatchEndDate && todayDate.compareTo(requestedEndDate) <= 0) 
-                || (null != requestedEndDate && null != dbBatchEndDate && requestedEndDate.compareTo(dbBatchEndDate) >=0));
-    
-    if(batchStarted)
-      courseBatch.setStatus(ProgressStatus.STARTED.getValue());
-    if(!isPrivateCall) {
+      if (!isExpired) {
+          Boolean batchStarted = (null != requestedStartDate && todayDate.compareTo(requestedStartDate) >= 0)
+                  && ((null == requestedEndDate)
+                  || (null != requestedEndDate && null == dbBatchEndDate && todayDate.compareTo(requestedEndDate) <= 0)
+                  || (null != requestedEndDate && null != dbBatchEndDate && requestedEndDate.compareTo(dbBatchEndDate) >= 0));
+
+          if (batchStarted)
+              courseBatch.setStatus(ProgressStatus.STARTED.getValue());
+      }
+    if(!isExpired && !isPrivateCall) {
     validateBatchEnrollmentEndDate(
         dbBatchStartDate,
         dbBatchEndDate,
@@ -852,13 +859,14 @@ public class CourseBatchManagementActor extends BaseActor {
       return false;
     }
   }
-  private void batchDatesUpdateNotifier(Request actorMessage, CourseBatch updatedCourseBatch, CourseBatch oldCourseBatch) {
+  private void batchDatesUpdateNotifier(Request actorMessage, CourseBatch updatedCourseBatch, CourseBatch oldCourseBatch, String courseName) {
     Request batchNotification = new Request(actorMessage.getRequestContext());
     batchNotification.getContext().putAll(actorMessage.getContext());
     batchNotification.setOperation(ActorOperations.COURSE_BATCH_DATE_NOTIFICATION.getValue());
     Map<String, Object> request = new HashMap<>();
     request.put(Constants.OLD_COURSE_BATCH, oldCourseBatch);
     request.put(Constants.UPDATED_COURSE_BATCH, updatedCourseBatch);
+    request.put(Constants.COURSE_NAME, courseName);
     request.put(Constants.REQUEST_CONTEXT, actorMessage.getRequestContext());
     request.put(Constants.REQUEST_BODY, actorMessage.getRequest());
     batchNotification.setRequest(request);
@@ -1098,14 +1106,6 @@ public class CourseBatchManagementActor extends BaseActor {
         }
         Set<String> uniqueInstructorIds = new HashSet<>(instructors);
 
-        if (isUpdateFlow && courseBatch.getStartDate() != null && !new Date().before(courseBatch.getStartDate())) {
-            throw new ProjectCommonException(
-                    ResponseCode.invalidParameterValue.getErrorCode(),
-                    "Instructors cannot be added/updated after the batch start date: "
-                            + courseBatch.getStartDate(),
-                    ResponseCode.CLIENT_ERROR.getResponseCode()
-            );
-        }
         List<String> validUserIds = new ArrayList<>();
         for (String instructorUserId : uniqueInstructorIds) {
             userExists(instructorUserId, requestContext);
@@ -1151,7 +1151,8 @@ public class CourseBatchManagementActor extends BaseActor {
                                    Map<String, Object> batchAttributes,
                                    String courseId,
                                    String batchId,
-                                   CourseBatch oldBatch) {
+                                   CourseBatch oldBatch,
+                                   String courseName) {
         if (MapUtils.isEmpty(batchAttributes)) {
             logger.info(requestContext, "No batch attributes for instructors");
             return;
@@ -1225,9 +1226,8 @@ public class CourseBatchManagementActor extends BaseActor {
             return;
         }
 
-        String programName = courseBatch.getName();
         Map<String, Object> placeHolders = new HashMap<>();
-        placeHolders.put(JsonKey.PROGRAM_NAME, programName);
+        placeHolders.put(JsonKey.PROGRAM_NAME, courseName);
 
         Map<String, Object> data = new HashMap<>();
         data.put(JsonKey.ID, courseId);
@@ -1247,7 +1247,7 @@ public class CourseBatchManagementActor extends BaseActor {
 
             Map<String, Object> params = new HashMap<>();
             params.put(JsonKey.FIRST_NAME, firstName);
-            params.put(Constants.PROGRAM_NAME, programName);
+            params.put(Constants.PROGRAM_NAME, courseName);
 
             sendNotificationCommon(
                     requestContext,
@@ -1329,4 +1329,74 @@ public class CourseBatchManagementActor extends BaseActor {
             logger.error(requestContext, "Failed to send in-app notification for event: " + subCategory, e);
         }
     }
+
+    private boolean enforceExpiredBatchFieldWhitelist(Map<String, Object> request, CourseBatch oldBatch) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Date batchEndDate = oldBatch != null ? oldBatch.getEndDate() : null;
+        String endDateStr = (batchEndDate != null) ? sdf.format(batchEndDate) : null;
+        boolean endDateValid = validateDateWithTodayDate(endDateStr);
+        if (endDateValid) {
+            return false;  // NOT expired
+        }
+        String rootFields = ProjectUtil.getConfigValue(JsonKey.EXPIRED_BATCH_ALLOWED_ROOT_FIELDS);
+        String batchAttrFields = ProjectUtil.getConfigValue(JsonKey.EXPIRED_BATCH_ALLOWED_BATCH_ATTRIBUTES_FIELDS);
+
+        Set<String> allowedRoot = parseCommaSeparatedValues(rootFields);
+        Set<String> allowedBatchAttrs = parseCommaSeparatedValues(batchAttrFields);
+        Object batchAttrsObj = request.get(JsonKey.BATCH_ATTRIBUTES);
+
+        if (!(batchAttrsObj instanceof Map)) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidBatchAttributeorMissing.getErrorCode(),
+                    ResponseCode.invalidBatchAttributeorMissing.getErrorMessage(),
+                    ERROR_CODE);
+        }
+        Map<String, Object> batchAttrs = (Map<String, Object>) batchAttrsObj;
+        boolean allowedExist = batchAttrs.keySet().stream()
+                .anyMatch(allowedBatchAttrs::contains);
+        if (!allowedExist) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidRequiredFieldsToUpdateAfterExpiredBatch.getErrorCode(),
+                    ResponseCode.invalidRequiredFieldsToUpdateAfterExpiredBatch.getErrorMessage(),
+                    ERROR_CODE);
+        }
+        batchAttrs.keySet().removeIf(key -> !allowedBatchAttrs.contains(key));
+        request.keySet().removeIf(key -> !allowedRoot.contains(key));
+        request.put(JsonKey.BATCH_ATTRIBUTES, batchAttrs);
+        return true;
+    }
+
+    private boolean validateDateWithTodayDate(String date) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        format.setLenient(false);
+        try {
+            if (StringUtils.isNotEmpty(date)) {
+                Date reqDate = format.parse(date);
+                Date todayDate = format.parse(format.format(new Date()));
+                Calendar cal1 = Calendar.getInstance();
+                Calendar cal2 = Calendar.getInstance();
+                cal1.setTime(reqDate);
+                cal2.setTime(todayDate);
+                if (reqDate.before(todayDate)) {
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            throw new ProjectCommonException(
+                    ResponseCode.dateFormatError.getErrorCode(),
+                    ResponseCode.dateFormatError.getErrorMessage(),
+                    ERROR_CODE);
+        }
+        return true;
+    }
+
+    private Set<String> parseCommaSeparatedValues(String value) {
+        if (StringUtils.isBlank(value)) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .collect(Collectors.toSet());
+    }
+
 }

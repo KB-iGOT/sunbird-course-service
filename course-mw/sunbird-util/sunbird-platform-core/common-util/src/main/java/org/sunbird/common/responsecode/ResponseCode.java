@@ -903,6 +903,15 @@ public enum ResponseCode {
   zeroOrMoreThanOneActiveBatchForCourse(
           ResponseMessage.Key.ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH,
           ResponseMessage.Message.ZERO_OR_MORE_THAN_ONE_ACTIVE_BATCH_VALUE),
+    invalidBatchEnddateOrInstructorMissing(
+            ResponseMessage.Key.INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING,
+            ResponseMessage.Message.INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING),
+    invalidBatchAttributeorMissing(
+            ResponseMessage.Key.BATCH_ATTRIBUTES_MISSING,
+            ResponseMessage.Message.BATCH_ATTRIBUTES_MISSING),
+    invalidRequiredFieldsToUpdateAfterExpiredBatch(
+            ResponseMessage.Key.REQUIRED_FIELDS_MISSING,
+            ResponseMessage.Message.REQUIRED_FIELDS_MISSING),
 
   OK(200),
   CLIENT_ERROR(400),

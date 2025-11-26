@@ -8,10 +8,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.actor.base.BaseActor;
 import org.sunbird.common.Constants;
-import org.sunbird.common.models.util.ActorOperations;
-import org.sunbird.common.models.util.JsonKey;
-import org.sunbird.common.models.util.LoggerUtil;
-import org.sunbird.common.models.util.PropertiesCache;
+import org.sunbird.common.models.util.*;
 import org.sunbird.common.request.Request;
 import org.sunbird.common.request.RequestContext;
 import org.sunbird.common.responsecode.ResponseCode;
@@ -25,6 +22,10 @@ import org.sunbird.models.course.batch.CourseBatch;
 import org.sunbird.userorg.UserOrgService;
 import org.sunbird.userorg.UserOrgServiceImpl;
 
+import javax.ws.rs.core.MediaType;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,8 @@ public class CourseBatchNotificationActor extends BaseActor {
   private UserOrgService userOrgService = UserOrgServiceImpl.getInstance();
   private BatchUserDao batchUserDao = new BatchUserDaoImpl();
   private ObjectMapper mapper = new ObjectMapper();
+  private static final DateTimeFormatter DATE_FMT =
+          DateTimeFormatter.ofPattern(Constants.DATE_FORMAT).withZone(ZoneId.systemDefault());
 
   @Override
   public void onReceive(Request request) throws Throwable {
@@ -281,21 +284,22 @@ public class CourseBatchNotificationActor extends BaseActor {
     }
     reciepientList.addAll(batchUserIdList);
     logger.info(requestContext,"Recieved Active Users from enrollment_batch_lookup : " + batchUserIdList);
-    sendEmailNotificationMailForBatchDatesUpdate(requestContext,reciepientList, oldCourseBatch, updatedCourseBatch);
+    sendEmailNotificationMailForBatchDatesUpdate(requestContext,reciepientList, oldCourseBatch, updatedCourseBatch,(String) request.getRequest().get(Constants.COURSE_NAME));
   }
 
-  private void sendEmailNotificationMailForBatchDatesUpdate(RequestContext requestContext,List<String> reciepientList, CourseBatch oldBatch, CourseBatch updatedBatch) {
+  private void sendEmailNotificationMailForBatchDatesUpdate(RequestContext requestContext,List<String> reciepientList, CourseBatch oldBatch, CourseBatch updatedBatch, String courseName) {
     Map<String, Object> request = new HashMap<>();
-    request.put(Constants.COURSE_NAME, updatedBatch.getName());
-    request.put(Constants.BATCH_NAME, updatedBatch.getDescription());
+    request.put(Constants.COURSE_NAME, courseName);
+    request.put(Constants.BATCH_NAME, updatedBatch.getName());
     request.put(Constants.RECIPIENT_IDS, reciepientList);
     request.put(JsonKey.SUBJECT, getBatchUpdateEmailSubject());
     request.put(Constants.TRAINING_NAME, updatedBatch.getName());
     request.put(JsonKey.REGARDS, Constants.KARMAYOGI_BHARAT);
     request.put(JsonKey.EMAIL_TEMPLATE_TYPE, Constants.BATCH_DATE_UPDATE_TEMPLATE);
-    request.put(Constants.START_DATE, updatedBatch.getStartDate());
-    request.put(Constants.END_DATE, updatedBatch.getEndDate());
-    request.put(Constants.ENROLLMENT_END_DATE, updatedBatch.getEnrollmentEndDate());
+    request.put(Constants.START_DATE, formatEpochToString(updatedBatch.getStartDate()));
+    request.put(Constants.END_DATE, formatEpochToString(updatedBatch.getEndDate()));
+    request.put(Constants.ENROLLMENT_END_DATE, formatEpochToString(updatedBatch.getEnrollmentEndDate()));
+    request.put(Constants.SENDER, ProjectUtil.getConfigValue(Constants.SUPPORT_MAIL));
     request.put(JsonKey.BODY, Constants.EMAIL_BODY);
     HashMap<String, String> headers = new HashMap<>();
     headers.put(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON);
@@ -337,5 +341,18 @@ public class CourseBatchNotificationActor extends BaseActor {
     return PropertiesCache.getInstance()
             .getProperty(JsonKey.SUNBIRD_BATCH_DATE_UPDATE_NOTIFICATIONS_SUBJECT);
   }
+
+    private String formatEpochToString(Object epochObj) {
+        if (epochObj == null) return null;
+        long millis;
+        if (epochObj instanceof Number) {
+            millis = ((Number) epochObj).longValue();
+        } else if (epochObj instanceof java.util.Date) {
+            millis = ((java.util.Date) epochObj).getTime();
+        } else {
+            return epochObj.toString();
+        }
+        return DATE_FMT.format(Instant.ofEpochMilli(millis));
+    }
 }
 

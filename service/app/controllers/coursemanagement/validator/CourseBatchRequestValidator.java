@@ -64,29 +64,32 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
           (String) request.getRequest().get(JsonKey.NAME),
           JsonKey.NAME);
     }
-    if (request.getRequest().containsKey(JsonKey.ENROLLMENT_TYPE)) {
-      validateEnrolmentType(request);
-    }
-    validateParam(
-        (String) request.getRequest().get(JsonKey.ID),
-        ResponseCode.mandatoryParamsMissing,
-        JsonKey.ID);
-    String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
-    String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
+      if (request.getRequest().containsKey(JsonKey.ENROLLMENT_TYPE)) {
+          validateEnrolmentType(request);
+      }
+      validateParam(
+              (String) request.getRequest().get(JsonKey.ID),
+              ResponseCode.mandatoryParamsMissing,
+              JsonKey.ID);
+      boolean isExpired = Boolean.parseBoolean(
+              String.valueOf(request.getRequest().getOrDefault(JsonKey.IS_EXPIRED, "false"))
+      );
+      if (!isExpired) {
+          String startDate = (String) request.getRequest().get(JsonKey.START_DATE);
+          String endDate = (String) request.getRequest().get(JsonKey.END_DATE);
+          validateUpdateBatchStartDate(startDate);
+          validateEndDate(startDate, endDate);
 
-    validateUpdateBatchStartDate(startDate);
-    validateEndDate(startDate, endDate);
-
-    boolean bool = validateDateWithTodayDate(endDate);
-    if (!bool) {
-      throw new ProjectCommonException(
-          ResponseCode.invalidBatchEndDateError.getErrorCode(),
-          ResponseCode.invalidBatchEndDateError.getErrorMessage(),
-          ERROR_CODE);
-    }
-
-    validateUpdateBatchEndDate(request);
-    validateCreatedForAndMentors(request);
+          boolean bool = validateDateWithTodayDate(endDate);
+          if (!bool) {
+              throw new ProjectCommonException(
+                      ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorCode(),
+                      ResponseCode.invalidBatchEnddateOrInstructorMissing.getErrorMessage(),
+                      ERROR_CODE);
+          }
+          validateUpdateBatchEndDate(request);
+          validateCreatedForAndMentors(request);
+      }
   }
 
   public void validateAddUserToCourseBatchRequest(Request courseRequest) {
@@ -392,4 +395,5 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
             ResponseCode.mandatoryParamsMissing,
             JsonKey.BATCH_ID);
   }
+
 }

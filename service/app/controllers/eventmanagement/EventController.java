@@ -86,6 +86,11 @@ public class EventController extends BaseController {
     }
 
     public CompletionStage<Result> privateGetEnrolledEventsList_v1(String uid, Http.Request httpRequest) {
+
+        Map<String, String[]> queryParams = new HashMap<>(httpRequest.queryString());
+        if (queryParams.containsKey(JsonKey.EVENT_ID) && queryParams.containsKey(JsonKey.BATCH_ID)) {
+            return getEnrolledEvent(uid, httpRequest);
+        }
         return getEnrolledEventsList(uid, httpRequest, true);
     }
 
