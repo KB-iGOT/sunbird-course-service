@@ -1158,7 +1158,7 @@ public final class RequestValidator {
   }
 
   public static Map<String, Object> getCourseContent(String courseId) throws Exception {
-    return ContentCacheHandlerV2.getInstance().getContent(courseId);
+    return ContentCacheHandlerV2.getInstance().getContent(courseId, null);
   }
 
   private static boolean isProgramCategory(String category) {

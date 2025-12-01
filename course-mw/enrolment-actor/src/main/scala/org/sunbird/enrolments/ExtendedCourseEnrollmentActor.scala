@@ -150,7 +150,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val contentData: util.Map[String, AnyRef] = if (StringUtils.isNotBlank(responseString)) {
       JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
     } else {
-      ContentCacheHandlerV2.getInstance().getContent(programId)
+      ContentCacheHandlerV2.getInstance().getContent(programId, null)
     }
     if (contentData == null || contentData.isEmpty) {
       throw new ProjectCommonException(
@@ -303,20 +303,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val userRecord = cassandraOperation.getUserRecordFromDB(JsonKey.KEYSPACE_SUNBIRD, JsonKey.TABLE_USER, userId, request.getRequestContext)
-      val records = userRecord.get(JsonKey.RESPONSE).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
-
-      if (records != null && !records.isEmpty) {
-        val orgId = records.get(0).get(JsonKey.ROOT_ORG_ID).asInstanceOf[String]
-        if (orgId != null) {
-          request.getContext.put(JsonKey.X_AUTH_USER_ORG_ID, orgId)
-        }
-      }
-    } catch {
-      case e: Exception =>
-        logger.error(request.getRequestContext, "Error while fetching orgId for user " + userId, e)
-    }
-    try {
       val response = getEnrolmentList(request, userId, false, false)
       sender().tell(response, self)
     } catch {
@@ -415,15 +401,17 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
       }
       val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
-      val orgId = Option(request.getContext.get(JsonKey.X_AUTH_USER_ORG_ID))
-        .map(_.toString)
+      val headerMap = Option(request.getContext.get(JsonKey.HEADER))
+        .map(_.asInstanceOf[java.util.Map[String, String]])
+        .getOrElse(new java.util.HashMap[String, String]())
+      val orgId = Option(headerMap.get(JsonKey.X_AUTH_USER_ORG_ID))
         .getOrElse("")
-      val header = new java.util.HashMap[String, String]()
+      val headers = new java.util.HashMap[String, String]()
       if (StringUtils.isNotBlank(orgId)) {
-        header.put(JsonKey.X_AUTH_USER_ORG_ID, orgId)
+        headers.put(JsonKey.X_AUTH_USER_ORG_ID, orgId)
       }
       if (CollectionUtils.isNotEmpty(activeEnrolments)) {
-        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired, parseContentAttributesFromUrl(request), header)
+        val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired, parseContentAttributesFromUrl(request), headers)
         val updatedEnrolmentList = updateProgressData(enrolmentList, request.getRequestContext)
         if (isDetailsRequired && !isMoreThanOneCourse) {
           addBatchDetails(updatedEnrolmentList, request, "v3")
@@ -639,15 +627,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails
   }
 
-  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean, contentAttributes: util.List[String], header: java.util.Map[String, String] = null): java.util.List[java.util.Map[String, AnyRef]] = {
-    activeEnrolments.filter(enrolment => isCourseEligible(enrolment, header)).map(enrolment => {
-      val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
-      val courseContent =
-        if (header != null && !header.isEmpty) {
-          ContentCacheHandlerV2.getInstance().getContentV2WithHeaders(courseId, header)
-        } else {
-          getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
-        }
+  def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean, contentAttributes: util.List[String], headers: java.util.Map[String, String] = null): java.util.List[java.util.Map[String, AnyRef]] = {
+    activeEnrolments.filter(enrolment => isCourseEligible(enrolment, headers)).map(enrolment => {
+      val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String], headers)
       enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
       if (isDetailsRequired) {
         enrolment.put(JsonKey.COURSE_NAME, courseContent.get(JsonKey.NAME))
@@ -686,13 +668,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }).toList.asJava
   }
 
-  def isCourseEligible(enrolment: java.util.Map[String, AnyRef], header: java.util.Map[String, String]): Boolean = {
-    val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
-    val courseContent =
-      if (header != null && !header.isEmpty)
-        ContentCacheHandlerV2.getInstance().getContentV2WithHeaders(courseId, header)
-      else
-        getCourseContent(courseId)
+  def isCourseEligible(enrolment: java.util.Map[String, AnyRef],  headers: java.util.Map[String, String]): Boolean = {
+    val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String], headers)
     if (null == courseContent || (!JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])
       && !isRetiredCoursesIncludedInEnrolList)) {
       logger.info(null,"ExtendedCourseEnrollmentActor :: isCourseEligible :: Failed to fetch data from cache for courseId " + enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
@@ -714,8 +691,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-    ContentCacheHandlerV2.getInstance().getContent(courseId)
+  def getCourseContent(courseId: String, headers: java.util.Map[String, String] = null): java.util.Map[String, AnyRef] = {
+    ContentCacheHandlerV2.getInstance().getContent(courseId, headers)
   }
 
   def getExternalCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
@@ -1330,7 +1307,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case (lang, contents) => (lang, contents.asScala.map { case (k, v) => (k, v.toInt) }.toMap)
     }.toMap
 
-    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId)
+    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId, null)
 
     val languageMap = Option(courseMetadata.get(JsonKey.LANGUAGE_MAP))
       .map(_.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]].asScala)
@@ -1341,7 +1318,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         val langCourseId = Option(langMeta.get(JsonKey.ID)).map(_.toString).getOrElse("")
         val completedCount = langContentMap.getOrElse(lang, Map.empty).count(_._2 == 2)
 
-        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId)
+        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId, null)
 
         val status = Option(langMeta.get(JsonKey.STATUS)).map(_.toString).getOrElse("")
         if (JsonKey.LIVE.equalsIgnoreCase(status)) {
