@@ -443,9 +443,11 @@ public final class ContentUtil {
       if (allHeaders != null && allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
         headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
-      
-      String baseContentReadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/"
-          + collectionId;
+        String baseContentReadUrl =
+                ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL)
+                        + ProjectUtil.getConfigValue(JsonKey.EKSTEP_ADMIN_CONTENT_READ_URL)
+                        + collectionId;
+        logger.info(null, "ContentUtil::getAdminContentV4:: baseContentReadUrl: " + baseContentReadUrl);
       logger.info(null, "ContentUtil::getContentV3:: baseContentReadUrl: " + baseContentReadUrl);
       if (CollectionUtils.isNotEmpty(fields)) {
         StringJoiner apiFields = new StringJoiner(",");
