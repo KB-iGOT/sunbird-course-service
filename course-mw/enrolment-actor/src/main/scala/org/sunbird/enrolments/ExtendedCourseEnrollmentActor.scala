@@ -404,7 +404,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val headerMap = Option(request.getContext.get(JsonKey.HEADER))
         .map(_.asInstanceOf[java.util.Map[String, String]])
         .getOrElse(new java.util.HashMap[String, String]())
-      val orgId = Option(headerMap.get(JsonKey.X_AUTH_USER_ORG_ID))
+      val orgId = Option(headerMap.get(JsonKey.X_AUTH_USER_ORG_ID_CAMEL))
         .getOrElse("")
       val headers = new java.util.HashMap[String, String]()
       if (StringUtils.isNotBlank(orgId)) {
