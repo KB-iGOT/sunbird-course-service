@@ -408,7 +408,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         .getOrElse("")
       val headers = new java.util.HashMap[String, String]()
       if (StringUtils.isNotBlank(orgId)) {
-        headers.put(JsonKey.X_AUTH_USER_ORG_ID, orgId)
+        headers.put(JsonKey.X_AUTH_USER_ORG_ID_CAMEL, orgId)
       }
       if (CollectionUtils.isNotEmpty(activeEnrolments)) {
         val enrolmentList: java.util.List[java.util.Map[String, AnyRef]] = addCourseDetails_v2(activeEnrolments, isDetailsRequired, parseContentAttributesFromUrl(request), headers)
