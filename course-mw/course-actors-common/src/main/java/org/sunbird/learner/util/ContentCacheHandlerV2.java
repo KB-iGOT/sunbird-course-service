@@ -86,32 +86,4 @@ public class ContentCacheHandlerV2 {
         }
         return null;
     }
-
-    public Map<String, Object> getContentV2WithHeaders(String id, Map<String, String> header) throws Exception {
-        Map<String, Object> content = contentCache.getIfPresent(id);
-        if (content != null) return content;
-        int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
-        ObjectMapper mapper = new ObjectMapper();
-        try {
-            logger.info(null, "ContentCacheHandlerV2:getContent: Reading content from Redis for id: " + id);
-            String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
-            if (StringUtils.isNotBlank(cacheResponse) && !StringUtils.equals(StringUtils.trim(cacheResponse), "{}")) {
-                content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
-                });
-                contentCache.put(id, content);
-                return content;
-            }
-        } catch (Exception e) {
-            logger.error(null, "ContentCacheHandlerV2:getContent: Error while reading content from Redis for id: " + id, e);
-        }
-        logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id);
-        content = ContentUtil.getContentReadV3(id, null, header);
-
-        if (content != null && !content.isEmpty()) {
-            contentCache.put(id, content);
-            redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
-            return content;
-        }
-        return null;
-    }
 }
