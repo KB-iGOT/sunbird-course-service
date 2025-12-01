@@ -580,7 +580,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
     }
 
     def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-        ContentCacheHandlerV2.getInstance().getContent(courseId)
+        ContentCacheHandlerV2.getInstance().getContent(courseId, null)
     }
 
     def getBatchFrmLocalCache(batchId: String): java.util.Map[String, AnyRef] = {
@@ -670,7 +670,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val contentData: util.Map[String, AnyRef] = if (StringUtils.isNotBlank(responseString)) {
             JsonUtil.deserialize(responseString, new util.HashMap[String, AnyRef]().getClass)
         } else {
-            ContentCacheHandlerV2.getInstance().getContent(programId)
+            ContentCacheHandlerV2.getInstance().getContent(programId, null)
         }
         contentData
     }

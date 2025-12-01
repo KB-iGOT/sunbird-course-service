@@ -321,7 +321,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     val contentsConsumed = getContentsConsumption(userId, courseId, contentIds, batchId, language, request.getRequestContext)
     val response = new Response
     val allLanguages: List[String] = {
-      val courseContent = ContentCacheHandlerV2.getInstance.getContent(courseId)
+      val courseContent = ContentCacheHandlerV2.getInstance.getContent(courseId, null)
       val langMap = if (courseContent != null) courseContent.get("languageMapV1").asInstanceOf[java.util.Map[String, Object]] else null
       if (langMap != null) langMap.keySet().asScala.map(_.toLowerCase).toList else List.empty[String]
     }
@@ -447,7 +447,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
             val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-            val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
+            val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId, null)
             val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
             pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList, language)
             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)
@@ -695,7 +695,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
       case (lang, contents) => (lang, contents.asScala.map { case (k, v) => (k, v.toInt) }.toMap)
     }.toMap
 
-    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId)
+    val courseMetadata = ContentCacheHandlerV2.getInstance().getContent(courseId, null)
 
     val languageMap = Option(courseMetadata.get(JsonKey.LANGUAGE_MAP))
       .map(_.asInstanceOf[java.util.Map[String, java.util.Map[String, AnyRef]]].asScala)
@@ -706,7 +706,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         val langCourseId = Option(langMeta.get(JsonKey.ID)).map(_.toString).getOrElse("")
         val completedCount = langContentMap.getOrElse(lang, Map.empty).count(_._2 == 2)
 
-        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId)
+        val courseDetails = ContentCacheHandlerV2.getInstance().getContent(langCourseId, null)
 
         val status = Option(langMeta.get(JsonKey.STATUS)).map(_.toString).getOrElse("")
         if (JsonKey.LIVE.equalsIgnoreCase(status)) {

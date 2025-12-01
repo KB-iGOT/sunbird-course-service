@@ -414,7 +414,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-    ContentCacheHandlerV2.getInstance().getContent(courseId)
+    ContentCacheHandlerV2.getInstance().getContent(courseId, null)
   }
 
   def getExternalCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
@@ -501,7 +501,7 @@ class CourseEnrolmentActorV3 @Inject()(implicit val  cacheUtil: RedisCacheUtil )
   }
 
   def getContentReadAPIData(programId: String, fieldList: List[String], request: Request): util.Map[String, AnyRef] = {
-    ContentCacheHandlerV2.getInstance().getContent(programId)
+    ContentCacheHandlerV2.getInstance().getContent(programId, null)
   }
 
   def updateProgressData(enrolments: java.util.List[java.util.Map[String, AnyRef]], requestContext: RequestContext): util.List[java.util.Map[String, AnyRef]] = {

@@ -279,7 +279,7 @@ public class ExtendedRequestValidator {
     }
 
     public static Map<String, Object> getCourseContent(String courseId) throws Exception {
-        return ContentCacheHandlerV2.getInstance().getContent(courseId);
+        return ContentCacheHandlerV2.getInstance().getContent(courseId, null);
     }
 
 
