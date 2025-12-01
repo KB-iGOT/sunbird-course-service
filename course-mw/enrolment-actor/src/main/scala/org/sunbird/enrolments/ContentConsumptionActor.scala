@@ -182,7 +182,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                             })
                             // First push the event to kafka and then update cassandra user_content_consumption table
                             val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-                            val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
+                            val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId, null)
                             val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
                             pushInstructionEvent(requestContext, userId, batchId, courseId, contents.asJava, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
                             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, contents)
@@ -499,7 +499,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
                         val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
                         val updatedContentList: List[java.util.Map[String, AnyRef]] = List(updatedContent)
                         val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.PARENT_COLLECTIONS)
-                        val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId)
+                        val contentInfoMap = ContentCacheHandlerV2.getInstance().getContent(courseId, null)
                         val parentCollectionList = contentInfoMap.get(JsonKey.PARENT_COLLECTIONS).asInstanceOf[java.util.List[String]]
                         pushInstructionEvent(requestContext, userId, batchId, courseId, updatedContentList, contentInfoMap.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String], parentCollectionList)
                         cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)

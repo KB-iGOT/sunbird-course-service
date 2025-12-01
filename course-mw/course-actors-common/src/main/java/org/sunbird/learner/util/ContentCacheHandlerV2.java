@@ -42,7 +42,7 @@ public class ContentCacheHandlerV2 {
         return instance;
     }
 
-    public Map<String, Object> getContent(String id) throws Exception {
+    public Map<String, Object> getContent(String id, Map<String, String> headers) throws Exception {
         Map<String, Object> content = contentCache.getIfPresent(id);
         if (content != null) return content;
         int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
@@ -59,7 +59,7 @@ public class ContentCacheHandlerV2 {
             logger.error(null, "ContentCacheHandlerV2:getContent: Error while reading content from Redis for id: " + id, e);
         }
         logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id);
-        content = ContentUtil.getContentReadV3(id, null, null);
+        content = ContentUtil.getContentReadV3(id, null, headers);
 
         if (content != null && !content.isEmpty()) {
             contentCache.put(id, content);

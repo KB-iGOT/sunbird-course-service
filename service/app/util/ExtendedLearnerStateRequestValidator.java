@@ -93,7 +93,7 @@ public class ExtendedLearnerStateRequestValidator extends BaseRequestValidator {
 
     public Map<String, Object> fetchCourseContent(String contentId) {
         try {
-            return ContentCacheHandlerV2.getInstance().getContent(contentId);
+            return ContentCacheHandlerV2.getInstance().getContent(contentId, null);
         } catch (Exception e) {
             logger.error(null, "Error fetching course content for contentId: " + contentId, e);
             return null;
