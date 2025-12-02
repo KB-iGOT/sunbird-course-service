@@ -1296,6 +1296,7 @@ public final class JsonKey {
   public static final String EXPIRED_BATCH_ALLOWED_ROOT_FIELDS = "expired_batch_allowed_root_fields";
   public static final String EXPIRED_BATCH_ALLOWED_BATCH_ATTRIBUTES_FIELDS = "expired_batch_allowed_attribute_fields";
   public static final String IS_EXPIRED = "isExpired";
+  public static final String EKSTEP_ADMIN_CONTENT_READ_URL = "sunbird_admin_content_read_api";
 
     private JsonKey() {}
 }

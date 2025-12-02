@@ -716,4 +716,40 @@ public final class ContentUtil {
         }
         return emailResponseList;
     }
+
+    public static Map<String, Object> getAdminContentReadV4(String collectionId, List<String> fields,
+                                                            Map<String, String> allHeaders) {
+        logger.info(null, "ContentUtil::getAdminContentRead:: Reading content using REST API." + collectionId);
+        try {
+            Map<String, String> headers = new HashMap<>();
+            if (allHeaders != null && allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
+                headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
+            }
+            String baseContentReadUrl =
+                    ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL)
+                            + ProjectUtil.getConfigValue(JsonKey.EKSTEP_ADMIN_CONTENT_READ_URL)
+                            + collectionId;
+            logger.info(null, "ContentUtil::getAdminContentV4:: baseContentReadUrl: " + baseContentReadUrl);
+            if (CollectionUtils.isNotEmpty(fields)) {
+                StringJoiner apiFields = new StringJoiner(",");
+                for (String item : fields) {
+                    apiFields.add(item);
+                }
+                if (StringUtils.isNotBlank(apiFields.toString())) {
+                    baseContentReadUrl = baseContentReadUrl + "?fields=" + apiFields;
+                }
+            }
+            String response = HttpUtil.sendGetRequest(baseContentReadUrl, headers);
+            if (response != null && !response.isEmpty()) {
+                Map<String, Object> data = mapper.readValue(response, Map.class);
+                if (JsonKey.OK.equalsIgnoreCase((String) data.get(JsonKey.RESPONSE_CODE))) {
+                    Map<String, Object> contentResult = (Map<String, Object>) data.get(JsonKey.RESULT);
+                    return (Map<String, Object>) contentResult.get(JsonKey.CONTENT);
+                }
+            }
+        } catch (Exception e) {
+            logger.error(null, "User don't have access to this programId " + collectionId, e);
+        }
+        return new HashMap<>();
+    }
 }

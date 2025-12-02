@@ -683,7 +683,11 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   def getCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
-    ContentCacheHandlerV2.getInstance().getContent(courseId)
+    if (StringUtils.isNotEmpty(courseId) && courseId.endsWith("_rc")) {
+      ContentCacheHandlerV2.getInstance().getAdminContent(courseId)
+    } else {
+      ContentCacheHandlerV2.getInstance().getContent(courseId)
+    }
   }
 
   def getExternalCourseContent(courseId: String): java.util.Map[String, AnyRef] = {
