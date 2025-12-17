@@ -1297,6 +1297,8 @@ public final class JsonKey {
   public static final String EXPIRED_BATCH_ALLOWED_BATCH_ATTRIBUTES_FIELDS = "expired_batch_allowed_attribute_fields";
   public static final String IS_EXPIRED = "isExpired";
   public static final String EKSTEP_ADMIN_CONTENT_READ_URL = "sunbird_admin_content_read_api";
+  public static final String LAST_ENROLLMENT_DATE = "lastEnrollmentDate";
+  public static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 
-    private JsonKey() {}
+  private JsonKey() {}
 }

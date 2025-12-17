@@ -259,21 +259,21 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
   }
 
   private void validateLastEnrollmentDateIfPresent(Map<String, Object> courseDetails) {
-    if (!courseDetails.containsKey("lastEnrollmentDate")) {
+    if (!courseDetails.containsKey(JsonKey.LAST_ENROLLMENT_DATE)) {
       return;
     }
-    Object lastEnrollmentDateObj = courseDetails.get("lastEnrollmentDate");
+    Object lastEnrollmentDateObj = courseDetails.get(JsonKey.LAST_ENROLLMENT_DATE);
     if (lastEnrollmentDateObj == null || StringUtils.isBlank(lastEnrollmentDateObj.toString())) {
       return;
     }
     ZonedDateTime lastEnrollmentDateTime =
             ZonedDateTime.parse(
                     lastEnrollmentDateObj.toString(),
-                    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+                    DateTimeFormatter.ofPattern(JsonKey.DATE_TIME_FORMAT)
             );
     LocalDate lastEnrollmentDate = lastEnrollmentDateTime.toLocalDate();
     LocalDate today = LocalDate.now();
-    if (lastEnrollmentDate.isEqual(today.minusDays(1))) {
+    if (lastEnrollmentDate.isBefore(today)) {
       throw new ProjectCommonException(
               ResponseCode.enrollmentDateExpired.getErrorCode(),
               "Enrollment closed: last enrollment date has already passed",
