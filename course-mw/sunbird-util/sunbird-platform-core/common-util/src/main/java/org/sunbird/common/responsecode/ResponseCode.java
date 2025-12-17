@@ -912,6 +912,9 @@ public enum ResponseCode {
     invalidRequiredFieldsToUpdateAfterExpiredBatch(
             ResponseMessage.Key.REQUIRED_FIELDS_MISSING,
             ResponseMessage.Message.REQUIRED_FIELDS_MISSING),
+    enrollmentDateExpired(
+          ResponseMessage.Key.ENROLLMENT_END_DATE_EXPIRED_ERROR,
+          ResponseMessage.Message.ENROLLMENT_END_DATE_EXPIRED_ERROR),
 
   OK(200),
   CLIENT_ERROR(400),

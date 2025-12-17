@@ -492,6 +492,8 @@ public interface ResponseMessage {
     String INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING = "Batch end date expired or instructorUserId is missing.";
     String BATCH_ATTRIBUTES_MISSING = "batchAttributes is missing or not a valid object. Only instructorsUserId can be updated after batch expiry.";
     String REQUIRED_FIELDS_MISSING = "Required fields for expired batch update are missing or invalid.";
+    String ENROLLMENT_END_DATE_EXPIRED_ERROR =
+            "Enrollment End date is expired";
 
   }
 
@@ -912,8 +914,6 @@ public interface ResponseMessage {
     String INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING = "INVALID_BATCH_END_DATE_OR_INSTRUCTOR_MISSING";
     String BATCH_ATTRIBUTES_MISSING = "BATCH_ATTRIBUTES_MISSING";
     String REQUIRED_FIELDS_MISSING = "REQUIRED_FIELDS_MISSING";
-
-
-
+    String ENROLLMENT_END_DATE_EXPIRED_ERROR = "ENROLLMENT_END_DATE_END_ERROR";
   }
 }
