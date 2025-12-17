@@ -25,6 +25,10 @@ import org.sunbird.learner.util.ContentCacheHandlerV2;
 import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.userorg.UserOrgServiceImpl;
 
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -186,6 +190,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
           ResponseCode.courseNotFound.getErrorMessage(),
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
+    validateLastEnrollmentDateIfPresent(courseDetails);
     Object preEnrolmentResourcesObj = courseDetails.get("preEnrolmentResources");
     if (preEnrolmentResourcesObj instanceof List && !((List<?>) preEnrolmentResourcesObj).isEmpty()) {
       validatePreEnrolmentResources((List<Map<String, Object>>) preEnrolmentResourcesObj, requestDto, courseDetails);
@@ -252,6 +257,31 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
           ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
+
+  private void validateLastEnrollmentDateIfPresent(Map<String, Object> courseDetails) {
+    if (!courseDetails.containsKey("lastEnrollmentDate")) {
+      return;
+    }
+    Object lastEnrollmentDateObj = courseDetails.get("lastEnrollmentDate");
+    if (lastEnrollmentDateObj == null || StringUtils.isBlank(lastEnrollmentDateObj.toString())) {
+      return;
+    }
+    ZonedDateTime lastEnrollmentDateTime =
+            ZonedDateTime.parse(
+                    lastEnrollmentDateObj.toString(),
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+            );
+    LocalDate lastEnrollmentDate = lastEnrollmentDateTime.toLocalDate();
+    LocalDate today = LocalDate.now();
+    if (lastEnrollmentDate.isEqual(today.minusDays(1))) {
+      throw new ProjectCommonException(
+              ResponseCode.enrollmentDateExpired.getErrorCode(),
+              "Enrollment closed: last enrollment date has already passed",
+              ResponseCode.CLIENT_ERROR.getResponseCode()
+      );
+    }
+  }
+
 
   private Map<String, String> getUserAttributes(Map<String, Object> userProfileMap) {
     Map<String, String> userAttributes = new HashMap<>();
