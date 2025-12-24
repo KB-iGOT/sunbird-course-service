@@ -672,9 +672,11 @@ public class CourseBatchManagementActor extends BaseActor {
             ekStepContent);
     String status = (String) ((Map<String, Object>)ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("status", "");
     Integer leafNodesCount = (Integer) ((Map<String, Object>) ekStepContent.getOrDefault("content", new HashMap<>())).getOrDefault("leafNodesCount", 0);
+    String courseCategory = (String) ((Map<String, Object>)ekStepContent.getOrDefault(JsonKey.CONTENT, new HashMap<>())).getOrDefault(JsonKey.COURSE_CATEGORY, "");
+    boolean isLearningPathway = JsonKey.LEARNING_PATHWAY.equalsIgnoreCase(courseCategory);
     if (null == ekStepContent ||
             ekStepContent.size() == 0 ||
-            !validCourseStatus.contains(status) || leafNodesCount == 0) {
+            !validCourseStatus.contains(status) || !isLearningPathway && leafNodesCount == 0) {
       logger.info(requestContext, "CourseBatchManagementActor:getEkStepContent: Invalid courseId = " + courseId);
       throw new ProjectCommonException(
           ResponseCode.invalidCourseId.getErrorCode(),
