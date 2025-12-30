@@ -93,6 +93,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "enrolBlendedProgramV2" => enrollBlendedProgram(request)
       case "bulkEnrolProgramV3" => bulkEnrolProgramV3(request)
       case "enrolDetailsWithProgress" => enrolDetailsWithProgress(request)
+      case "enrolLearningPathway" => enrolLearingPathway(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -1448,5 +1449,68 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
     }
     contentAttributes
+  }
+
+  def enrolLearingPathway(request: Request): Unit = {
+    val programId: String = request.get(JsonKey.LEARNING_PATHWAY_ID).asInstanceOf[String]
+    val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    logger.info(request.getRequestContext, "enrolLearingPathway :: Request received for programId=$programId, userId=$userId, batchId=$batchId")
+
+    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES, JsonKey.LANGUAGE, JsonKey.MILESTONES_V1)
+    val contentData = getContentReadAPIData(programId, fieldList, request)
+
+    // Validate batch and enrollment
+    val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+    val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
+    val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
+    var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, programId)
+    if (CollectionUtils.isEmpty(enrolmentData)) enrolmentData = new util.ArrayList[UserCourses]()
+
+    val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
+    validateEnrolmentV3(batchData, enrolmentData, true)
+
+    // Enroll user to courses and assessments in each milestone
+    val milestones = contentData.get(JsonKey.MILESTONES_V1).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+    if (CollectionUtils.isNotEmpty(milestones)) {
+      for (milestone <- milestones.asScala) {
+        // Enroll courses within the milestone
+        val courses = milestone.get(JsonKey.COURSES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+        if (CollectionUtils.isNotEmpty(courses)) {
+          for (course <- courses.asScala) {
+            val courseId = course.get(JsonKey.COURSE_ID).asInstanceOf[String]
+            enrollMilestoneCourse(request, courseId, userId, batchId)
+          }
+        }
+      }
+    }
+
+    // Enroll user to the Learning Pathway
+    val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId, batchUserData)
+    val existingEnrolmentForTheBatch = enrolmentData.asScala.find(_.getBatchId == batchId).orNull
+    val requestId: String = request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String]
+    val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, programId, batchId, existingEnrolmentForTheBatch, requestId, request.getRequestContext, "")
+
+    upsertEnrollment(userId, programId, batchId, data, dataBatch, existingEnrolmentForTheBatch == null, request.getRequestContext)
+    sender().tell(successResponse(), self)
+    logger.info(request.getRequestContext, s"enrolLearingPathway :: Successfully enrolled userId=$userId to programId=$programId")
+  }
+
+  def enrollMilestoneCourse(request: Request, courseId: String, userId: String, parentBatchId: String): Unit = {
+    val courseBatchMap: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
+    val contentData = getContentReadAPIData(courseId, List(JsonKey.PRIMARYCATEGORY), request)
+    val primaryCategory: String = contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
+    if (util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_RESTRICTED_CHILDREN_PRIMARY_CATEGORY).split(","): _*).contains(primaryCategory))
+      ProjectCommonException.throwClientErrorException(ResponseCode.contentTypeMismatch, courseId)
+    else if (util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_CHILDREN_PRIMARY_CATEGORY).split(","): _*).contains(primaryCategory)) {
+      try {
+        val batchData: CourseBatch = courseBatchDao.readFirstAvailableBatch(courseId, request.getRequestContext)
+        courseBatchMap.put(courseId, batchData)
+      } catch {
+        case e: ProjectCommonException => ProjectCommonException.throwClientErrorException(ResponseCode.courseDoesNotHaveBatch);
+      }
+    } else {
+      logger.info(request.getRequestContext, "Skipping the enrol for Primary Category" + primaryCategory)
+    }
+    enrollProgramCourses(request, courseId, courseBatchMap.get(courseId).asInstanceOf[CourseBatch], userId)
   }
 }
