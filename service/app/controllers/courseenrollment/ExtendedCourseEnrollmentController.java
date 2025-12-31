@@ -248,10 +248,8 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                     Request request = (Request) req;
                     String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
                     validator.validateRequestedBy(userId);
-                    request.getContext().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.USER_ID, userId);
                     request.getRequest().put(JsonKey.LEARNING_PATHWAY_ID, id);
-                    validator.validateLearningPathwayContent(id, request.getRequestContext());
                     return null;
                 },
                 null,

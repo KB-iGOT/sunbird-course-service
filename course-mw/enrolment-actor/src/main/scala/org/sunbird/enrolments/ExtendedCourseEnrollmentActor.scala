@@ -1452,18 +1452,19 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   def enrolLearingPathway(request: Request): Unit = {
-    val programId: String = request.get(JsonKey.LEARNING_PATHWAY_ID).asInstanceOf[String]
+    val learningPathwayId: String = request.get(JsonKey.LEARNING_PATHWAY_ID).asInstanceOf[String]
     val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext, "enrolLearingPathway :: Request received for programId=$programId, userId=$userId, batchId=$batchId")
+    logger.info(request.getRequestContext, "enrolLearingPathway :: Request received for learningPathwayId=learningPathwayId, userId=$userId ")
 
-    val fieldList = List(JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER, JsonKey.BATCHES, JsonKey.LANGUAGE, JsonKey.MILESTONES_V1)
-    val contentData = getContentReadAPIData(programId, fieldList, request)
+    val fieldList = ProjectUtil.getConfigValue(JsonKey.LEARNING_PATHWAY_FIELDS).split(",").toList
+    val contentData = getContentReadAPIData(learningPathwayId, fieldList, request)
 
-    // Validate batch and enrollment
+    validateLearningPathwayContent(contentData, request.getRequestContext)
     val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+
     val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
-    val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
-    var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, programId)
+    val batchData: CourseBatch = courseBatchDao.readById(learningPathwayId, batchId, request.getRequestContext)
+    var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, learningPathwayId)
     if (CollectionUtils.isEmpty(enrolmentData)) enrolmentData = new util.ArrayList[UserCourses]()
 
     val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
@@ -1478,7 +1479,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         if (CollectionUtils.isNotEmpty(courses)) {
           for (course <- courses.asScala) {
             val courseId = course.get(JsonKey.COURSE_ID).asInstanceOf[String]
-            enrollMilestoneCourse(request, courseId, userId, batchId)
+            enrollMilestoneCourse(request, courseId, userId)
           }
         }
       }
@@ -1488,14 +1489,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId, batchUserData)
     val existingEnrolmentForTheBatch = enrolmentData.asScala.find(_.getBatchId == batchId).orNull
     val requestId: String = request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String]
-    val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, programId, batchId, existingEnrolmentForTheBatch, requestId, request.getRequestContext, "")
+    val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, learningPathwayId, batchId, existingEnrolmentForTheBatch, requestId, request.getRequestContext, "")
 
-    upsertEnrollment(userId, programId, batchId, data, dataBatch, existingEnrolmentForTheBatch == null, request.getRequestContext)
+    upsertEnrollment(userId, learningPathwayId, batchId, data, dataBatch, null == existingEnrolmentForTheBatch, request.getRequestContext)
     sender().tell(successResponse(), self)
-    logger.info(request.getRequestContext, s"enrolLearingPathway :: Successfully enrolled userId=$userId to programId=$programId")
+    logger.info(request.getRequestContext, s"enrolLearingPathway :: Successfully enrolled userId=$userId to learningPathwayId=$learningPathwayId")
   }
 
-  def enrollMilestoneCourse(request: Request, courseId: String, userId: String, parentBatchId: String): Unit = {
+  def enrollMilestoneCourse(request: Request, courseId: String, userId: String): Unit = {
     val courseBatchMap: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
     val contentData = getContentReadAPIData(courseId, List(JsonKey.PRIMARYCATEGORY), request)
     val primaryCategory: String = contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
@@ -1512,5 +1513,39 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       logger.info(request.getRequestContext, "Skipping the enrol for Primary Category" + primaryCategory)
     }
     enrollProgramCourses(request, courseId, courseBatchMap.get(courseId).asInstanceOf[CourseBatch], userId)
+  }
+
+  def validateLearningPathwayContent(contentData: util.Map[String, AnyRef], requestContext: RequestContext): Unit = {
+    val status = contentData.get(JsonKey.STATUS).asInstanceOf[String]
+    if (!JsonKey.LIVE.equalsIgnoreCase(status)) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.invalidParameterValue,
+        s"Content status must be Live. Current status: $status"
+      )
+    }
+
+    val courseCategory = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+    if (!JsonKey.LEARNING_PATHWAY.equalsIgnoreCase(courseCategory)) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.invalidParameterValue,
+        s"Course category must be 'Learning Pathway'. Current category: $courseCategory"
+      )
+    }
+
+    val milestonesObj = contentData.get(JsonKey.MILESTONES_V1)
+    if (null == milestonesObj || !milestonesObj.isInstanceOf[java.util.List[_]] || milestonesObj.asInstanceOf[java.util.List[_]].isEmpty) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.invalidParameterValue,
+        "No milestones found in Learning Pathway"
+      )
+    }
+
+    val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+    if (CollectionUtils.isEmpty(batches)) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.learningPathwayBatchNotFound,
+        ResponseCode.learningPathwayBatchNotFound.getErrorMessage
+      )
+    }
   }
 }

@@ -494,6 +494,7 @@ public interface ResponseMessage {
     String REQUIRED_FIELDS_MISSING = "Required fields for expired batch update are missing or invalid.";
     String ENROLLMENT_END_DATE_EXPIRED_ERROR =
             "Enrollment End date is expired";
+    String LEARNING_PATHWAY_BATCH_NOT_FOUND = "Learning pathway batch not found";
 
   }
 
@@ -915,5 +916,6 @@ public interface ResponseMessage {
     String BATCH_ATTRIBUTES_MISSING = "BATCH_ATTRIBUTES_MISSING";
     String REQUIRED_FIELDS_MISSING = "REQUIRED_FIELDS_MISSING";
     String ENROLLMENT_END_DATE_EXPIRED_ERROR = "ENROLLMENT_END_DATE_END_ERROR";
+    String LEARNING_PATHWAY_BATCH_NOT_FOUND = "LEARNING_PATHWAY_BATCH_NOT_FOUND";
   }
 }

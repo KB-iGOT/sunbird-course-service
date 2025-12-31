@@ -915,6 +915,9 @@ public enum ResponseCode {
     enrollmentDateExpired(
           ResponseMessage.Key.ENROLLMENT_END_DATE_EXPIRED_ERROR,
           ResponseMessage.Message.ENROLLMENT_END_DATE_EXPIRED_ERROR),
+    learningPathwayBatchNotFound(
+          ResponseMessage.Key.LEARNING_PATHWAY_BATCH_NOT_FOUND,
+          ResponseMessage.Message.LEARNING_PATHWAY_BATCH_NOT_FOUND),
 
   OK(200),
   CLIENT_ERROR(400),
