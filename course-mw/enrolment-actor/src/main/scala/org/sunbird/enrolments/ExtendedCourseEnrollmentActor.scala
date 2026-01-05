@@ -408,10 +408,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         if (isDetailsRequired && !isMoreThanOneCourse) {
           addBatchDetails(updatedEnrolmentList, request, "v3")
           for (enrolment <- updatedEnrolmentList.asScala) {
-            if (
-              isProgressEnabled &&
-                !enrolment.get(JsonKey.STATUS).equals(2)
-            ) {
+            if (isProgressEnabled && !enrolment.get(JsonKey.STATUS).equals(2)) {
               val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
               val recentLanguage = enrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
               val batchId = enrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
@@ -419,19 +416,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                 .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
                 .getOrElse(new java.util.HashMap[String, AnyRef]())
 
-              if (
-                StringUtils.isNotBlank(recentLanguage) &&
-                  langContentStatus != null &&
-                  !langContentStatus.isEmpty &&
-                  langContentStatus.containsKey(recentLanguage)
-              ) {
-                val contentIds = Option(langContentStatus.get(recentLanguage))
-                  .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
-                  .getOrElse(new java.util.ArrayList[String]())
+              val courseCategory = request.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
 
-                if (!contentIds.isEmpty) {
-                  getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, enrolment)
-                }
+              courseCategory match {
+                case category if JsonKey.LEARNING_PATHWAY.equalsIgnoreCase(category) =>
+                  processLearningPathwayProgress(request, userId, recentLanguage, langContentStatus, enrolment)
+                case _ =>
+                  processRegularCourseProgress(request, userId, courseId, batchId, recentLanguage, langContentStatus, enrolment)
               }
             }
           }
@@ -761,6 +752,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val courseId = courseIdList.get(0)
       val contentData = getCourseContent(courseId)
       val primaryCategory: String = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+      request.put(JsonKey.COURSECATEGORY, primaryCategory)
+      if (primaryCategory.equalsIgnoreCase(JsonKey.LEARNING_PATHWAY)) {
+        addLearningPathwayCourseIds(request, contentData)
+      }
       if (util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_CHILDREN_COURSES_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(primaryCategory)) {
         val redisKey = s"$courseId:$courseId:childrenCourses"
         val childrenNodes: List[String] = cacheUtil.getList(redisKey, redisCollectionIndex)
@@ -1459,7 +1454,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val fieldList = ProjectUtil.getConfigValue(JsonKey.LEARNING_PATHWAY_FIELDS).split(",").toList
     val contentData = getContentReadAPIData(learningPathwayId, fieldList, request)
 
-    validateLearningPathwayContent(contentData, request.getRequestContext)
+    validateLearningPathwayContent(contentData)
     val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
 
     val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
@@ -1515,7 +1510,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrollProgramCourses(request, courseId, courseBatchMap.get(courseId).asInstanceOf[CourseBatch], userId)
   }
 
-  def validateLearningPathwayContent(contentData: util.Map[String, AnyRef], requestContext: RequestContext): Unit = {
+  def validateLearningPathwayContent(contentData: util.Map[String, AnyRef]): Unit = {
     val status = contentData.get(JsonKey.STATUS).asInstanceOf[String]
     if (!JsonKey.LIVE.equalsIgnoreCase(status)) {
       ProjectCommonException.throwClientErrorException(
@@ -1546,6 +1541,113 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         ResponseCode.learningPathwayBatchNotFound,
         ResponseCode.learningPathwayBatchNotFound.getErrorMessage
       )
+    }
+  }
+
+  def addLearningPathwayCourseIds(request: Request, contentData: util.Map[String, AnyRef]): Unit = {
+    val courseIdList = new util.ArrayList[String]()
+    val assessmentIdList = new util.ArrayList[String]()
+    val milestones = contentData.get(JsonKey.MILESTONES_V1).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+    if (CollectionUtils.isNotEmpty(milestones)) {
+      for (milestone <- milestones.asScala) {
+        assessmentIdList.add(milestone.get(JsonKey.ASSESSMENT_ID).asInstanceOf[String])
+        val courses = milestone.get(JsonKey.COURSES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+        if (CollectionUtils.isNotEmpty(courses)) {
+          for (course <- courses.asScala) {
+            courseIdList.add(course.get(JsonKey.COURSE_ID).asInstanceOf[String])
+          }
+        }
+      }
+    }
+    request.put(JsonKey.LP_COURSE_ID_LIST, courseIdList)
+    request.put(JsonKey.LP_ASSESSMENT_ID_LIST, assessmentIdList)
+  }
+
+  def processRegularCourseProgress(request: Request, userId: String, courseId: String, batchId: String, recentLanguage: String,
+                                   langContentStatus: java.util.Map[String, AnyRef],
+                                   enrolment: java.util.Map[String, AnyRef]): Unit = {
+    if (StringUtils.isNotBlank(recentLanguage) && langContentStatus != null && !langContentStatus.isEmpty &&
+      langContentStatus.containsKey(recentLanguage)) {
+      val contentIds = Option(langContentStatus.get(recentLanguage))
+        .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+        .getOrElse(new java.util.ArrayList[String]())
+
+      if (!contentIds.isEmpty) {
+        getConsumption(request, userId, courseId, batchId, contentIds, recentLanguage, enrolment)
+      }
+    }
+  }
+
+  def processLearningPathwayProgress(request: Request, userId: String, recentLanguage: String,
+                                     langContentStatus: java.util.Map[String, AnyRef],
+                                     enrolment: java.util.Map[String, AnyRef]): Unit = {
+    val lpCourseIdList = Option(request.get(JsonKey.LP_COURSE_ID_LIST))
+      .map(_.asInstanceOf[java.util.List[String]])
+      .getOrElse(new java.util.ArrayList[String]())
+
+    val lpAssessmentIdList = Option(request.get(JsonKey.LP_ASSESSMENT_ID_LIST))
+      .map(_.asInstanceOf[java.util.List[String]])
+      .getOrElse(new java.util.ArrayList[String]())
+
+    if (CollectionUtils.isNotEmpty(lpCourseIdList) || CollectionUtils.isNotEmpty(lpAssessmentIdList)) {
+      val contentProgress = new java.util.HashMap[String, AnyRef]()
+
+      // Handle courses
+      if (CollectionUtils.isNotEmpty(lpCourseIdList)) {
+        val enrolmentList = userCoursesDao.listEnrolments_v2(request.getRequestContext, userId, lpCourseIdList)
+        val enrolmentMap = new java.util.HashMap[String, java.util.Map[String, AnyRef]]()
+
+        for (enrolmentRecord <- enrolmentList.asScala) {
+          val courseId = enrolmentRecord.get(JsonKey.COURSE_ID).asInstanceOf[String]
+          if (StringUtils.isNotBlank(courseId)) {
+            enrolmentMap.put(courseId, enrolmentRecord)
+          }
+        }
+
+        for (lpCourseId <- lpCourseIdList.asScala) {
+          if (enrolmentMap.containsKey(lpCourseId)) {
+            val courseEnrolment = enrolmentMap.get(lpCourseId)
+            val courseRecentLanguage = courseEnrolment.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String]
+            val courseBatchId = courseEnrolment.get(JsonKey.BATCH_ID).asInstanceOf[String]
+            val courseLangContentStatus = Option(courseEnrolment.get(JsonKey.LANG_CONTENT_STATUS))
+              .map(_.asInstanceOf[java.util.Map[String, AnyRef]])
+              .orNull
+
+            if (StringUtils.isNotBlank(courseRecentLanguage) && null != courseLangContentStatus && !courseLangContentStatus.isEmpty &&
+              courseLangContentStatus.containsKey(courseRecentLanguage)) {
+              val contentIds = Option(courseLangContentStatus.get(courseRecentLanguage))
+                .map(_.asInstanceOf[java.util.Map[String, AnyRef]].keySet().asScala.toList.asJava)
+                .getOrElse(new java.util.ArrayList[String]())
+
+              if (!contentIds.isEmpty) {
+                val courseProgress = new java.util.HashMap[String, AnyRef]()
+                getConsumption(request, userId, lpCourseId, courseBatchId, contentIds, courseRecentLanguage, courseProgress)
+                contentProgress.put(lpCourseId, courseProgress)
+              }
+            }
+          }
+        }
+      }
+
+      // Handle assessments - extract progress from langContentStatus
+      if (CollectionUtils.isNotEmpty(lpAssessmentIdList)) {
+        if (StringUtils.isNotBlank(recentLanguage) && null != langContentStatus && !langContentStatus.isEmpty &&
+          langContentStatus.containsKey(recentLanguage)) {
+          val langProgress = langContentStatus.get(recentLanguage).asInstanceOf[java.util.Map[String, Integer]]
+
+          if (null != langProgress) {
+            for (assessmentId <- lpAssessmentIdList.asScala) {
+              if (StringUtils.isNotBlank(assessmentId) && langProgress.containsKey(assessmentId)) {
+                val assessmentProgress = new java.util.HashMap[String, AnyRef]()
+                val progressStatus = langProgress.get(assessmentId).intValue()
+                assessmentProgress.put(JsonKey.STATUS, progressStatus.asInstanceOf[AnyRef])
+                contentProgress.put(assessmentId, assessmentProgress)
+              }
+            }
+          }
+        }
+      }
+      enrolment.put(JsonKey.CONTENT_PROGRESS_KEY, contentProgress)
     }
   }
 }
