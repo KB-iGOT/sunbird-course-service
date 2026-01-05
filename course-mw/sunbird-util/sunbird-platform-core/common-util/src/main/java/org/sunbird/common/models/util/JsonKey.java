@@ -1031,7 +1031,7 @@ public final class JsonKey {
   public static final String CREATOR_DETAILS_FIELDS = "sunbird_user_search_cretordetails_fields";
   public static final String USER_SEARCH_BASE_URL = "sunbird_user_service_api_base_url";
   public static final String SUNBIRD_QRCODE_COURSES_LIMIT ="sunbird_user_qrcode_courses_limit";
-  public static final String ACCESS_TOKEN_PUBLICKEY_BASEPATH = "accesstoken.publickey.basepath";
+  public static final String ACCESS_TOKEN_PUBLICKEY_BASEPATH = "accesstoken_publickey_basepath";
   public static final String ACCESS_TOKEN_PUBLICKEY_KEYPREFIX = "accesstoken.publickey.keyprefix";
   public static final String ACCESS_TOKEN_PUBLICKEY_KEYCOUNT = "accesstoken.publickey.keycount";
   public static final String SHA_256_WITH_RSA = "SHA256withRSA";
@@ -1305,6 +1305,10 @@ public final class JsonKey {
   public static final String MILESTONES_V1 = "milestones_v1";
   public static final String LEARNING_PATHWAY_ID = "learningPathwayId";
   public static final String LEARNING_PATHWAY_FIELDS = "learningPathwayFields";
+  public static final String LP_COURSE_ID_LIST = "lpCourseIdList";
+  public static final String LP_ASSESSMENT_ID_LIST = "lpAssessmentIdList";
+  public static final String ASSESSMENT_ID = "assessmentId";
+  public static final String CONTENT_PROGRESS_KEY = "contentProgress";
 
   private JsonKey() {}
 }
