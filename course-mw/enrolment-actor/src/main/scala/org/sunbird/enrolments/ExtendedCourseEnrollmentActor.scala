@@ -1595,6 +1595,12 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       // Handle courses
       if (CollectionUtils.isNotEmpty(lpCourseIdList)) {
         val enrolmentList = userCoursesDao.listEnrolments_v2(request.getRequestContext, userId, lpCourseIdList)
+        if (CollectionUtils.isEmpty(enrolmentList)){
+          ProjectCommonException.throwClientErrorException(
+            ResponseCode.invalidParameterValue,
+            "No enrolments found for the provided course IDs in Learning Pathway"
+          )
+        }
         val enrolmentMap = new java.util.HashMap[String, java.util.Map[String, AnyRef]]()
 
         for (enrolmentRecord <- enrolmentList.asScala) {
