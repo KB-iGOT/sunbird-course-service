@@ -1301,14 +1301,9 @@ public final class JsonKey {
   public static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
   public static final String LEARNING_PATHWAY = "Learning Pathway";
   public static final String COURSE_CATEGORY = "courseCategory";
-  public static final String PRE_ENROLMENT_RESOURCES = "preEnrolmentResources";
   public static final String MILESTONES_V1 = "milestones_v1";
   public static final String LEARNING_PATHWAY_ID = "learningPathwayId";
   public static final String LEARNING_PATHWAY_FIELDS = "learningPathwayFields";
-  public static final String LP_COURSE_ID_LIST = "lpCourseIdList";
-  public static final String LP_ASSESSMENT_ID_LIST = "lpAssessmentIdList";
-  public static final String ASSESSMENT_ID = "assessmentId";
-  public static final String CONTENT_PROGRESS_KEY = "contentProgress";
 
   private JsonKey() {}
 }

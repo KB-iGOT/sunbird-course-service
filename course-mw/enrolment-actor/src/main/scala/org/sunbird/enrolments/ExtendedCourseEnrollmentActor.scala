@@ -1481,7 +1481,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         val courses = milestone.get(JsonKey.COURSES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
         if (CollectionUtils.isNotEmpty(courses)) {
           for (course <- courses.asScala) {
-            val courseId = course.get(JsonKey.COURSE_ID).asInstanceOf[String]
+            val courseId = course.get(JsonKey.IDENTIFIER).asInstanceOf[String]
             enrollMilestoneCourse(request, courseId, userId)
           }
         }
@@ -1559,7 +1559,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         val courses = milestone.get(JsonKey.COURSES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
         if (CollectionUtils.isNotEmpty(courses)) {
           for (course <- courses.asScala) {
-            courseIdList.add(course.get(JsonKey.COURSE_ID).asInstanceOf[String])
+            courseIdList.add(course.get(JsonKey.IDENTIFIER).asInstanceOf[String])
           }
         }
       }
