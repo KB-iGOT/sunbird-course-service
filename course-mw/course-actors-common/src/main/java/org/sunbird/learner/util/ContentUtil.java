@@ -539,74 +539,31 @@ public final class ContentUtil {
     Map<String, Object> filters = new HashMap<>();
     if (identifierList != null && identifierList.size() > 0) {
       filters.put(JsonKey.CONTENT_ID, identifierList);
-      searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
     }
+    searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
 
-    String response = "";
     int count = 0;
     Map<String, Map<String, Object>> coursesMap = new HashMap<>();
+
     try {
       String contentUpdateBaseUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_SERVICE_BASE_URL);
-      response = HttpUtil.sendPostRequest(
-          contentUpdateBaseUrl
-              + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
-          JsonUtil.serialize(searchObject),
-          headerMap);
+      String response = HttpUtil.sendPostRequest(
+              contentUpdateBaseUrl + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
+              JsonUtil.serialize(searchObject),
+              headerMap);
 
       Map<String, Object> data = mapper.readValue(response, Map.class);
       if (MapUtils.isNotEmpty(data)) {
         count = (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-        List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
-            new ArrayList<>());
-        filters.put(JsonKey.IS_ACTIVE, false);
-        searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
-        response = HttpUtil.sendPostRequest(
-            contentUpdateBaseUrl
-                + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
-            JsonUtil.serialize(searchObject),
-            headerMap);
+        List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA, new ArrayList<>());
 
-        data = mapper.readValue(response, Map.class);
-        if (MapUtils.isNotEmpty(data)) {
-          count = count + (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-          List<Map<String, Object>> retireCoursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
-              new ArrayList<>());
-          coursesList.addAll(retireCoursesList);
-        }
-        if (CollectionUtils.isNotEmpty(coursesList)) {
-          for (Map<String, Object> enrolment : coursesList) {
-            String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
-            coursesMap.put(courseId, enrolment);
-          }
-        }
-      } else {
-        if (identifierList != null && identifierList.size() > 0) {
-          filters.put(JsonKey.IS_ACTIVE, false);
-          searchObject.put(JsonKey.FILTER_CRITERIA_MAP, filters);
-          response = HttpUtil.sendPostRequest(
-              contentUpdateBaseUrl
-                  + PropertiesCache.getInstance().getProperty(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL),
-              JsonUtil.serialize(searchObject),
-              headerMap);
-
-          data = mapper.readValue(response, Map.class);
-          if (MapUtils.isNotEmpty(data)) {
-            count = (int) data.getOrDefault(JsonKey.TOTAL_COUNT, 0);
-            List<Map<String, Object>> coursesList = (List<Map<String, Object>>) data.getOrDefault(JsonKey.DATA,
-                new ArrayList<>());
-            if (CollectionUtils.isNotEmpty(coursesList)) {
-              for (Map<String, Object> enrolment : coursesList) {
-                String courseId = (String) enrolment.get(JsonKey.CONTENT_ID);
-                coursesMap.put(courseId, enrolment);
-              }
-            }
-          } else {
-            logger.error(null, "Issue while fetching the data for externalCourses", null);
-          }
+        for (Map<String, Object> course : coursesList) {
+          String courseId = (String) course.get(JsonKey.CONTENT_ID);
+          coursesMap.put(courseId, course);
         }
       }
     } catch (Exception e) {
-      logger.error(null, "Issue while fetching the data " + e.getMessage(), e);
+      logger.error(null, "Issue while fetching external content: " + e.getMessage(), e);
     }
     return new AbstractMap.SimpleEntry<>(count, coursesMap);
   }
