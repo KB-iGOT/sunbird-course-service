@@ -49,11 +49,16 @@ public class UserGroupCriteria {
         return criteriaValue;
     }
 
-    public void setCriteriaValue(Collection<String> criteriaValue) {
-        if (criteriaValue != null) {
-            this.criteriaValue = criteriaValue.stream()
+    public void setCriteriaValue(Object criteriaValue) {
+        if (criteriaValue == null) {
+            this.criteriaValue = new HashSet<>();
+        } else if (criteriaValue instanceof Boolean) {
+            this.criteriaValue = new HashSet<>();
+            this.criteriaValue.add(String.valueOf(criteriaValue).toLowerCase());
+        } else if (criteriaValue instanceof Collection) {
+            this.criteriaValue = ((Collection<?>) criteriaValue).stream()
                 .filter(Objects::nonNull)
-                .map(String::toLowerCase)
+                .map(obj -> obj.toString().toLowerCase())
                 .collect(Collectors.toSet());
         } else {
             this.criteriaValue = new HashSet<>();

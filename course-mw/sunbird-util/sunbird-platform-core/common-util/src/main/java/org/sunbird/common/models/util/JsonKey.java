@@ -1301,6 +1301,7 @@ public final class JsonKey {
   public static final String DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
   public static final String LEARNING_PATHWAY = "Learning Pathway";
   public static final String COURSE_CATEGORY = "courseCategory";
+  public static final String IS_ON_CENTRAL_DEPUTATION = "isOnCentralDeputation";
 
   private JsonKey() {}
 }
