@@ -310,6 +310,9 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
               if (cadreDetails.containsKey(JsonKey.CADRE_BATCH)) {
                 userAttributes.put(JsonKey.BATCH, String.valueOf(cadreDetails.get(JsonKey.CADRE_BATCH)));
               }
+              if(cadreDetails.containsKey(JsonKey.IS_ON_CENTRAL_DEPUTATION) && null != cadreDetails.get(JsonKey.IS_ON_CENTRAL_DEPUTATION)) {
+                userAttributes.put(JsonKey.IS_ON_CENTRAL_DEPUTATION.toLowerCase(), String.valueOf(cadreDetails.get(JsonKey.IS_ON_CENTRAL_DEPUTATION)));
+              }
             }
           }
         }
