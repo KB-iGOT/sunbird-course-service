@@ -12,7 +12,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- <versions.jacoco>0.7.6.201602180812</versions.jacoco> -->
-        <learner.akka.version>2.5.19</learner.akka.version>
+        <learner.akka.version>2.5.31</learner.akka.version>
         <mockito.core.version>2.22.0</mockito.core.version>
         <powermock.api.mockito2.version>2.0.7</powermock.api.mockito2.version>
         <powermock.module.junit4.version>2.0.0-beta.5</powermock.module.junit4.version>
@@ -43,7 +43,7 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>6.3</version>
+            <version>6.6</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
         <dependency>

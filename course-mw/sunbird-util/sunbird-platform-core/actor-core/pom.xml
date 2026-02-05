@@ -11,7 +11,7 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<slf4j.version>1.6.1</slf4j.version>
 		<logback.version>1.0.7</logback.version>
-		<learner.akka.version>2.5.19</learner.akka.version>
+		<learner.akka.version>2.5.31</learner.akka.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -22,7 +22,7 @@
 		<dependency>
 			<groupId>net.logstash.logback</groupId>
 			<artifactId>logstash-logback-encoder</artifactId>
-			<version>6.3</version>
+			<version>6.6</version>
 		</dependency>
 		<dependency>
 			<groupId>org.sunbird</groupId>
