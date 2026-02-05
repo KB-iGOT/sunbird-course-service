@@ -4,6 +4,7 @@ package org.sunbird.common.models.util;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
+import net.logstash.logback.encoder.org.apache.commons.lang3.StringUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.sunbird.common.models.response.HttpUtilResponse;
 import org.sunbird.common.responsecode.ResponseCode;
@@ -83,7 +84,8 @@ public class HttpUtil {
   public static String sendPostRequest(
       String requestURL, String params, Map<String, String> headers) throws Exception {
     long startTime = System.currentTimeMillis();
-    logger.info(null,"The request url is :" + requestURL + ": headers : " + headers + " : params : " + params);
+    Map<String, String> logHeaders = cleanHeadersForLogging(headers);
+    logger.info(null,"The request url is :" + requestURL + ": headers : " + logHeaders + " : params : " + params);
     HttpResponse<String> httpResponse = Unirest.post(requestURL).headers(headers).body(params).asString();
     String str = httpResponse.getBody();
     long stopTime = System.currentTimeMillis();
@@ -198,5 +200,21 @@ public class HttpUtil {
         if (MapUtils.isNotEmpty(input)) putAll(input);
       }
     };
+  }
+
+  public static Map<String, String> cleanHeadersForLogging(final Map<String, String> headers) {
+    if (MapUtils.isEmpty(headers)) {
+      return headers;
+    }
+    final Map<String, String> cleanedHeaders = new HashMap<>(headers);
+    final String authorization = cleanedHeaders.get(JsonKey.AUTHORIZATION);
+    if (StringUtils.isBlank(authorization)) {
+      return cleanedHeaders;
+    }
+    final int length = authorization.length();
+    final String lastFiveChars =
+            length > 5 ? authorization.substring(length - 5) : authorization;
+    cleanedHeaders.put(JsonKey.AUTHORIZATION, lastFiveChars);
+    return cleanedHeaders;
   }
 }
