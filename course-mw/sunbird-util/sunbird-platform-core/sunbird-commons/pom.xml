@@ -57,6 +57,8 @@
                             <artifactSet>
                                 <excludes>
                                     <exclude>com.google.guava:guava</exclude>
+                                    <exclude>org.slf4j:*</exclude>
+                                    <exclude>ch.qos.logback:*</exclude>
                                 </excludes>
                             </artifactSet>
                             <transformers>
