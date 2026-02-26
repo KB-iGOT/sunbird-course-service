@@ -42,7 +42,7 @@ public class ExtendedLearnerController extends BaseController {
         String apiDebugLog = "UpdateContentState Request: " + requestData.toString() + " RequestedBy: " + requestedBy + " RequestedFor: " + requestedFor + " ";
         try {
             Request reqObj = (Request) mapper.RequestMapper.mapRequest(requestData, Request.class);
-            ExtendedRequestValidator.validateUpdateContent(reqObj);
+            ExtendedRequestValidator.validateUpdateContent(reqObj,false);
             reqObj = transformUserId(reqObj);
             reqObj.setOperation("updateConsumption");
             reqObj.setRequestId(httpRequest.attrs().getOptional(Attrs.REQUEST_ID).orElse(null));
@@ -128,7 +128,7 @@ public class ExtendedLearnerController extends BaseController {
         try {
             Request reqObj = (Request) mapper.RequestMapper.mapRequest(requestData, Request.class);
             String requestedFor = (String) reqObj.getRequest().getOrDefault(JsonKey.USER_ID, null);
-            ExtendedRequestValidator.validateUpdateContent(reqObj);
+            ExtendedRequestValidator.validateUpdateContent(reqObj, true);
             reqObj = transformUserId(reqObj);
             reqObj.setOperation("updateConsumption");
             reqObj.setRequestId(httpRequest.attrs().getOptional(Attrs.REQUEST_ID).orElse(null));

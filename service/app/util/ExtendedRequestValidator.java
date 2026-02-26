@@ -37,7 +37,7 @@ public class ExtendedRequestValidator {
      * @param contentRequestDto Request
      */
     @SuppressWarnings("unchecked")
-    public static void validateUpdateContent(Request contentRequestDto) throws Exception {
+    public static void validateUpdateContent(Request contentRequestDto, boolean isAdminRequest) throws Exception {
         List<Map<String, Object>> list =
                 (List<Map<String, Object>>) (contentRequestDto.getRequest().get(JsonKey.CONTENTS));
         if(CollectionUtils.isNotEmpty(list)) {
@@ -102,7 +102,8 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorCode(),
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
-                } else if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY))) {
+                }
+                if (!isAdminRequest && JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY))) {
                     if ((Boolean) courseDetails.get("cumulativeTracking")) {
                         Map<String, Object> resourceContent = getCourseContent(contentId);
                         String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
