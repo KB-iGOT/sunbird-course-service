@@ -1305,6 +1305,7 @@ public final class JsonKey {
   public static final String MILESTONES_V1 = "milestones_v1";
   public static final String LEARNING_PATHWAY_ID = "learningPathwayId";
   public static final String LEARNING_PATHWAY_FIELDS = "learningPathwayFields";
+  public static final String COMPREHENSIVE_ASSESSMENT_PROGRAM = "Comprehensive Assessment Program";
 
   private JsonKey() {}
 }
