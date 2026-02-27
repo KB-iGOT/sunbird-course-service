@@ -103,7 +103,7 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
                 }
-                if (!isAdminRequest && JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY))) {
+                if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY)) && !isAdminRequest) {
                     if ((Boolean) courseDetails.get("cumulativeTracking")) {
                         Map<String, Object> resourceContent = getCourseContent(contentId);
                         String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
