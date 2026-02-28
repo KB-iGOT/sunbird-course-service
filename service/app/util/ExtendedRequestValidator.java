@@ -104,18 +104,11 @@ public class ExtendedRequestValidator {
                             ERROR_CODE);
                 }
                 if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY)) && !isAdminRequest) {
-                    if ((Boolean) courseDetails.get("cumulativeTracking")) {
-                        Map<String, Object> resourceContent = getCourseContent(contentId);
-                        String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
-                        if (StringUtils.isNotBlank(contextCategory)) {
-                            if (isCategoryAllowed(contextCategory)) {
-                                throw new ProjectCommonException(
-                                        ResponseCode.invalidContentId.getErrorCode(),
-                                        ResponseCode.invalidContentId.getErrorMessage(),
-                                        ERROR_CODE);
-                            }
-                        }
-                    }
+                    // this is CAP and non-admin user called. Let's return error by default.
+                    throw new ProjectCommonException(
+                            ResponseCode.invalidContentId.getErrorCode(),
+                            ResponseCode.invalidContentId.getErrorMessage(),
+                            ERROR_CODE);
                 }
                 if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, (String) courseDetails.get(JsonKey.COURSECATEGORY))) {
                     throw new ProjectCommonException(
