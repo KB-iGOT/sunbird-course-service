@@ -37,7 +37,7 @@ public class ExtendedRequestValidator {
      * @param contentRequestDto Request
      */
     @SuppressWarnings("unchecked")
-    public static void validateUpdateContent(Request contentRequestDto) throws Exception {
+    public static void validateUpdateContent(Request contentRequestDto, boolean isAdminRequest) throws Exception {
         List<Map<String, Object>> list =
                 (List<Map<String, Object>>) (contentRequestDto.getRequest().get(JsonKey.CONTENTS));
         if(CollectionUtils.isNotEmpty(list)) {
@@ -102,6 +102,20 @@ public class ExtendedRequestValidator {
                             ResponseCode.invalidProgramId.getErrorCode(),
                             ResponseCode.invalidProgramId.getErrorMessage(),
                             ERROR_CODE);
+                }
+                if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase((String) courseDetails.get(JsonKey.COURSECATEGORY)) && !isAdminRequest) {
+                    if ((Boolean) courseDetails.get("cumulativeTracking")) {
+                        Map<String, Object> resourceContent = getCourseContent(contentId);
+                        String contextCategory = (String) resourceContent.get(JsonKey.CONTEXT_CATEGORY);
+                        if (StringUtils.isNotBlank(contextCategory)) {
+                            if (isCategoryAllowed(contextCategory)) {
+                                throw new ProjectCommonException(
+                                        ResponseCode.invalidContentId.getErrorCode(),
+                                        ResponseCode.invalidContentId.getErrorMessage(),
+                                        ERROR_CODE);
+                            }
+                        }
+                    }
                 }
                 if (StringUtils.equalsIgnoreCase(Constants.MULTI_LINGUAL_COURSE, (String) courseDetails.get(JsonKey.COURSECATEGORY))) {
                     throw new ProjectCommonException(
