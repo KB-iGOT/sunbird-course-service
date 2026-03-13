@@ -370,6 +370,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val resp: Response = new Response()
       resp.put(JsonKey.USER_COURSE_ENROLMENT_INFO, userCourseEnrolmentInfo)
       resp.put(JsonKey.USER_COURSE_EXTERNAL_ENROLMENT_INFO, externalCourseInfo)
+      resp.put(JsonKey.BADGE_COUNT, getUserBadgeCount(request.getRequestContext,userId).asInstanceOf[AnyRef])
       sender().tell(resp, self)
     } catch {
       case e: Exception =>
