@@ -10,6 +10,7 @@ public class ExtendedUtil {
     public static final String LEARNER_CONTENT_DB = "learnerContent_db";
     public static final String COURSE_KEY_SPACE_NAME = "sunbird_courses";
     public static final String USER_ENROLMENTS_V2_DB = "user_enrolments_v2";
+    public static final String USER_BADGE_LOOKUP_DB = "userBadgeLookup_db";
 
     public static final Map<String, DbInfo> dbInfoMap = new HashMap<>();
 
@@ -32,6 +33,8 @@ public class ExtendedUtil {
                 LEARNER_CONTENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_content_consumption_v2"));
         dbInfoMap.put(
                 USER_ENROLMENTS_V2_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_enrolments_v2"));
+        dbInfoMap.put(
+                USER_BADGE_LOOKUP_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_badge_lookup"));
     }
 
     private static DbInfo getDbInfoObject(String keySpace, String table) {
