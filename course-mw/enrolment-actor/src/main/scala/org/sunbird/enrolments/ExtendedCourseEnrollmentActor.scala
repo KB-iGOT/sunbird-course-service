@@ -1570,26 +1570,30 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   def getUserBadgeCount(requestContext: RequestContext, userId: String): Int = {
     val redisKey = JsonKey.USER_BADGE_COUNT_REDIS_KEY + userId
     try {
-      val cachedValue = cacheUtil.get(redisKey)
-      if (cachedValue != null && cachedValue.nonEmpty) {
-        return cachedValue.toInt
-      }
-      val badgeResponse = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-        requestContext,
-        badgeDbInfo.getKeySpace,
-        badgeDbInfo.getTableName,
-        JsonKey.USER_ID,
-        userId,
-        util.Arrays.asList(JsonKey.COURSE_ID)
-      )
-      val badgeRecords: java.util.List[util.Map[String, AnyRef]] = badgeResponse.get(JsonKey.RESPONSE).asInstanceOf[java.util.List[util.Map[String, AnyRef]]]
-      val totalBadgeCount: Int = if (CollectionUtils.isEmpty(badgeRecords)) 0 else badgeRecords.size()
-      cacheUtil.set(redisKey, totalBadgeCount.toString)
-      totalBadgeCount
+      Option(cacheUtil.get(redisKey))
+        .filter(_.nonEmpty)
+        .flatMap(v => scala.util.Try(v.toInt).toOption)
+        .getOrElse {
+          val badgeResponse = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+            requestContext,
+            badgeDbInfo.getKeySpace,
+            badgeDbInfo.getTableName,
+            JsonKey.USER_ID,
+            userId,
+            util.Arrays.asList(JsonKey.COURSE_ID)
+          )
+          val badgeRecords = Option(badgeResponse.get(JsonKey.RESPONSE))
+            .collect { case list: java.util.List[_] => list }
+            .getOrElse(java.util.Collections.emptyList())
+
+          val count = badgeRecords.size()
+          cacheUtil.set(redisKey, count.toString, 3600)
+          count
+        }
     } catch {
       case e: Exception =>
         logger.warn(null, s"Failed to fetch badge count for userId $userId: ${e.getMessage}", e)
-        0
+        -1
     }
   }
 }
