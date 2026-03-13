@@ -576,7 +576,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       Option(dbResponse.get(0)).flatMap(record => Option(record.get(JsonKey.ADD_INFO)).collect { case str: String => str }).getOrElse("")
     }
     if (addInfoString != null && addInfoString.nonEmpty) {
-      val objectMapper = new ObjectMapper()
+      val objectMapper = new ObjectMapper().registerModule(DefaultScalaModule)
       addInfo = objectMapper.readValue(addInfoString, classOf[util.Map[String, AnyRef]])
     }
     val enrolmentCourseDetails = new util.HashMap[String, AnyRef]()
