@@ -1307,6 +1307,21 @@ public final class JsonKey {
   public static final String LEARNING_PATHWAY_FIELDS = "learningPathwayFields";
   public static final String BADGE_COUNT = "badgeCount";
   public static final String USER_BADGE_COUNT_REDIS_KEY = "user:badgeCount_";
+  public static final String ISSUED_BADGES = "issued_badges";
+  public static final String BADGE_DETAILS_V1 = "badgeDetails_v1";
+  public static final String BADGE_EARNING_DATE_TIME = "badgeEarningDateTime";
+  public static final String BADGE_EARNING_DATE_ENABLED = "badgeEarningDateEnabled";
+  public static final String COMPLETION_RATE="completionRate";
+  public static final String IN_PROGRESS_COUNT = "inProgressCount";
+  public static final String TOTAL_BADGES_EARNED = "totalBadgesEarned";
+  public static final String COURSE_COMPLETED = "courseCompleted";
+  public static final String EARNED_BADGES_DETAILS = "earnedBadgesDetails";
+  public static final String IN_PROGRESS_BADGES_DETAILS = "inProgressBadgesDetails";
+  public static final String BADGES = "badges";
+  public static final String CB_PORES_CIOS_SEARCH_API_URL = "cb_pores_cios_search_api_url";
+  public static final String REQUESTED_FIELDS =  "requestedFields";
+  public static final String CONTENT_TYPE_KEY = "Content-Type";
+  public static final String APPLICATION_JSON = "application/json";
 
   private JsonKey() {}
 }

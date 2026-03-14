@@ -22,6 +22,10 @@ public class ExtendedCourseEnrollmentController extends BaseController {
     @Named("extended-course-enrolment-actor")
     private ActorRef extendedCourseEnrolmentActor;
 
+    @Inject
+    @Named("extended-badge-enrolment-actor")
+    private ActorRef extendedBadgeEnrolmentActor;
+
     private CourseEnrollmentRequestValidator validator = new CourseEnrollmentRequestValidator();
 
     public CompletionStage<Result> enrollCourseWithLanguage(Http.Request httpRequest) {
@@ -257,6 +261,22 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 null,
                 getAllRequestHeaders((httpRequest)),
                 false,
+                httpRequest);
+    }
+
+    public CompletionStage<Result> getEnrolledBadgeDetails(Http.Request httpRequest) {
+        return handleRequest(extendedBadgeEnrolmentActor, "list",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    validator.validateEnrollListRequest(request);
+                    return null;
+                },
+                getAllRequestHeaders((httpRequest)),
                 httpRequest);
     }
 }
