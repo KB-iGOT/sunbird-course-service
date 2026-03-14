@@ -259,4 +259,15 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 false,
                 httpRequest);
     }
+
+    public CompletionStage<Result> getParticipantsForExternalTrainingBatch(Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "getParticipantsForExternalTrainingBatch",
+                httpRequest.body().asJson(),
+                (request) -> {
+                    new CourseEnrollmentRequestValidator().validateParticipantsForExternalTrainingBatch((Request) request);
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
 }

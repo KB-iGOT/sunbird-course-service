@@ -88,6 +88,7 @@ public final class Util {
             JsonKey.USER_INFO_DB, getDbInfoObject(KEY_SPACE_NAME, "user"));
     dbInfoMap.put(
             JsonKey.ACCESS_SETTINGS_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "access_setting_rules_v2"));
+    dbInfoMap.put(JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "external_training_enrolments_batch_lookup"));
   }
 
   /**

@@ -145,3 +145,4 @@ POST     /v3/event/enroll	    		    @controllers.courseenrollment.ExtendedCourse
 
 POST     /v1/course/batch/delete				@controllers.coursemanagement.CourseBatchController.deleteBatch(request: play.mvc.Http.Request)
 GET      /v1/learningpathway/enroll/:id	    	@controllers.courseenrollment.ExtendedCourseEnrollmentController.enrolLearningPathway(id:String, request: play.mvc.Http.Request)
+POST	 /v1/externaltraining/batch/participants/list			@controllers.courseenrollment.ExtendedCourseEnrollmentController.getParticipantsForExternalTrainingBatch(request: play.mvc.Http.Request)

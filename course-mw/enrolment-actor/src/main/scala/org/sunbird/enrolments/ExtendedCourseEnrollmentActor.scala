@@ -18,6 +18,7 @@ import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
+import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
 import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, ExtendedUtil, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
@@ -63,6 +64,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val consumptionDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_CONTENT_DB)
   private val assessmentAggregatorDBInfo = Util.dbInfoMap.get(JsonKey.ASSESSMENT_AGGREGATOR_DB)
   val dateFormatter = ProjectUtil.getDateFormatter
+  private val userCoursesService = new UserCoursesService
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -94,6 +96,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "bulkEnrolProgramV3" => bulkEnrolProgramV3(request)
       case "enrolDetailsWithProgress" => enrolDetailsWithProgress(request)
       case "enrolLearningPathway" => enrolLearingPathway(request)
+      case "getParticipantsForExternalTrainingBatch" => fetchParticipantsForExternalTrainingBatch(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -1564,5 +1567,16 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
       }
     }
+  }
+
+  private def fetchParticipantsForExternalTrainingBatch(actorMessage: Request): Unit = {
+    val request = actorMessage.getRequest.get(JsonKey.BATCH).asInstanceOf[util.Map[String, AnyRef]]
+    if (null == request.get(JsonKey.ACTIVE)) request.put(JsonKey.ACTIVE, java.lang.Boolean.TRUE)
+    if (null == request.get(JsonKey.LIMIT)) request.put(JsonKey.LIMIT, Constants.DEFAULT_LIMIT.asInstanceOf[AnyRef])
+    if (null == request.get(JsonKey.OFFSET)) request.put(JsonKey.OFFSET, java.lang.Integer.valueOf(0))
+    val result = userCoursesService.getParticipantsListForExternalTraining(actorMessage.getRequestContext, request)
+    val response = new Response
+    response.put(JsonKey.BATCH, result)
+    sender.tell(response, self)
   }
 }
