@@ -1322,6 +1322,7 @@ public final class JsonKey {
   public static final String REQUESTED_FIELDS =  "requestedFields";
   public static final String CONTENT_TYPE_KEY = "Content-Type";
   public static final String APPLICATION_JSON = "application/json";
+  public static final String BADGE_CACHE_TTL = "badge_cache_ttl_seconds";
 
   private JsonKey() {}
 }

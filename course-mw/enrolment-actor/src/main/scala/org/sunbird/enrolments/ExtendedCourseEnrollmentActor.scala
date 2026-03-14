@@ -1588,7 +1588,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
             .getOrElse(java.util.Collections.emptyList())
 
           val count = badgeRecords.size()
-          cacheUtil.set(redisKey, count.toString, 3600)
+          val redisCacheTtl = ProjectUtil.getConfigValue(JsonKey.BADGE_CACHE_TTL).toInt
+          cacheUtil.set(redisKey, count.toString, redisCacheTtl)
           count
         }
     } catch {
