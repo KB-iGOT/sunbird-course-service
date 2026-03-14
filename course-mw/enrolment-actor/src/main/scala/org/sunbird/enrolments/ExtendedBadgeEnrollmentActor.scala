@@ -945,23 +945,41 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     // totalBadgesEarned = Completed courses that have issued_badges (subset of courseCompleted)
     val totalBadgesEarned = completedBadgesDetails.size
 
+    // Sort in-progress badges by completionPercentage in descending order
+    val sortedInProgressBadges = inProgressBadgesDetails.sortBy { badge =>
+      -Option(badge.get(JsonKey.COMPLETION_PERCENTAGE))
+        .map(_.asInstanceOf[Number].intValue())
+        .getOrElse(0)
+    }
+
+    val totalBadgesAttempted = totalBadgesEarned + sortedInProgressBadges.size
+    val completionRate = if (totalBadgesAttempted > 0) {
+      (totalBadgesEarned * 100) / totalBadgesAttempted
+    } else {
+      0
+    }
+
     // STEP 7: Build final response
     val summary = new java.util.HashMap[String, AnyRef]()
     summary.put(JsonKey.TOTAL_BADGES_EARNED, totalBadgesEarned.asInstanceOf[AnyRef])
     summary.put(JsonKey.COURSE_COMPLETED, courseCompleted.asInstanceOf[AnyRef])
+    summary.put(JsonKey.COMPLETION_RATE, completionRate.asInstanceOf[AnyRef])
 
     val earnedBadgesDetails = new java.util.HashMap[String, AnyRef]()
     earnedBadgesDetails.put(JsonKey.COUNT, completedBadgesDetails.size.asInstanceOf[AnyRef])
     earnedBadgesDetails.put(JsonKey.BADGES, completedBadgesDetails.asJava)
 
     val inProgressBadgesDetailsMap = new java.util.HashMap[String, AnyRef]()
-    inProgressBadgesDetailsMap.put(JsonKey.COUNT, inProgressBadgesDetails.size.asInstanceOf[AnyRef])
-    inProgressBadgesDetailsMap.put(JsonKey.BADGES, inProgressBadgesDetails.asJava)
+    inProgressBadgesDetailsMap.put(JsonKey.COUNT, sortedInProgressBadges.size.asInstanceOf[AnyRef])
+    inProgressBadgesDetailsMap.put(JsonKey.BADGES, sortedInProgressBadges.asJava)
 
     val result = new java.util.HashMap[String, AnyRef]()
     result.put(JsonKey.SUMMARY, summary)
     result.put(JsonKey.EARNED_BADGES_DETAILS, earnedBadgesDetails)
     result.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, inProgressBadgesDetailsMap)
+
+    logger.info(request.getRequestContext, s"getBadgeStats :: Returning result with ${inProgressBadgesDetails.size} in-progress badges")
+    logger.info(request.getRequestContext, s"getBadgeStats :: Result JSON: ${mapper.writeValueAsString(result)}")
 
     // Cache disabled for testing
     // cacheStats(cacheKey, result, request)
@@ -1171,7 +1189,6 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     // Calculate completion percentage using the same logic as CourseEnrollmentActor
     val completionPercentage = getCompletionPerc(progress, leafNodesCount)
     detail.put(JsonKey.COMPLETION_PERCENTAGE, completionPercentage.asInstanceOf[AnyRef])
-
     detail
   }
 
