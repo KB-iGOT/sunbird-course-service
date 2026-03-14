@@ -864,7 +864,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
     // STEP 3: Search API — Filter badge courses (with built-in content data)
     logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: getBadgeStats :: About to call fetchBadgeCoursesFromSearch with ${courseIds.size()} course IDs")
-    val badgeCourseMap: Map[String, (java.util.List[java.util.Map[String, AnyRef]], String)] =
+    val badgeCourseMap: Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] =
       fetchBadgeCoursesFromSearch(courseIds, request)
 
     logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: getBadgeStats :: fetchBadgeCoursesFromSearch returned ${badgeCourseMap.size} badge courses from search out of ${courseIds.size()} total courses")
@@ -898,7 +898,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     // STEP 6A: Process completed badge courses
     val completedBadgesDetails = completedEnrolments.flatMap { e =>
       val courseId = e.get(JsonKey.COURSE_ID).asInstanceOf[String]
-      badgeCourseMap.get(courseId).flatMap { case (badges, courseName) =>
+      badgeCourseMap.get(courseId).flatMap { case (badges, courseName, leafNodesCount) =>
         val issuedBadges = Option(e.get(JsonKey.ISSUED_BADGES))
           .collect { case l: java.util.List[_] if !l.isEmpty => l }
           .getOrElse(new java.util.ArrayList())
@@ -914,7 +914,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     // STEP 6B: Process in-progress badge courses with expiry filter
     val inProgressBadgesDetails = inProgressEnrolments.flatMap { e =>
       val courseId = e.get(JsonKey.COURSE_ID).asInstanceOf[String]
-      badgeCourseMap.get(courseId).flatMap { case (badges, courseName) =>
+      badgeCourseMap.get(courseId).flatMap { case (badges, courseName, leafNodesCount) =>
 
         // Check if at least one badge is within expiry
         val hasValidBadge = badges.asScala.exists { badge =>
@@ -931,15 +931,13 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
         }
 
         if (hasValidBadge) {
-          Some(createInProgressBadgeDetail(e, badges, courseId, courseName, now))
+          Some(createInProgressBadgeDetail(e, badges, courseId, courseName, leafNodesCount, now))
         } else {
           None
         }
       }
     }
 
-    // Calculate summary stats
-    // courseCompleted = ALL completed courses from ALL enrolments (not just badge courses)
     val courseCompleted = enrolments.asScala.count { e =>
       Option(e.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) == 2
     }
@@ -1008,7 +1006,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
   private def fetchBadgeCoursesFromSearch(
     courseIds: java.util.List[String],
     request: Request
-  ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String)] = {
+  ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] = {
     logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: ENTRY :: courseIds.size=${courseIds.size()}")
     try {
       // Get max identifier size from config (default: 100)
@@ -1051,7 +1049,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
   private def fetchBadgeCoursesFromSearchBatch(
     courseIds: java.util.List[String],
     request: Request
-  ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String)] = {
+  ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] = {
     try {
       logger.info(request.getRequestContext,
         s"fetchBadgeCoursesFromSearchBatch :: Processing ${courseIds.size()} course IDs")
@@ -1072,6 +1070,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       fields.add(JsonKey.IDENTIFIER)
       fields.add(JsonKey.BADGE_DETAILS_V1)
       fields.add(JsonKey.NAME)
+      fields.add(JsonKey.LEAF_NODE_COUNT)
       searchRequest.put(JsonKey.FIELDS, fields)
 
       val requestBody = new java.util.HashMap[String, AnyRef]()
@@ -1095,25 +1094,28 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       logger.info(request.getRequestContext,
         s"fetchBadgeCoursesFromSearchBatch :: Search returned ${contents.size()} badge courses out of ${courseIds.size()} requested")
 
-      // Build map of courseId -> (badgeDetails, courseName)
+      // Build map of courseId -> (badgeDetails, courseName, leafNodesCount)
       // This eliminates N+1 getCourseContent() calls
       val resultMap = contents.asScala.flatMap { content =>
         val identifier = content.get(JsonKey.IDENTIFIER).asInstanceOf[String]
         val courseName = Option(content.get(JsonKey.NAME))
           .map(_.asInstanceOf[String])
           .getOrElse("")
+        val leafNodesCount = Option(content.get(JsonKey.LEAF_NODE_COUNT))
+          .map(_.asInstanceOf[Number].intValue())
+          .getOrElse(0)
         val badgeDetails = Option(content.get(JsonKey.BADGE_DETAILS_V1))
           .collect { case l: java.util.List[java.util.Map[String, AnyRef]] => l }
 
         if (badgeDetails.isDefined) {
           logger.info(request.getRequestContext,
-            s"fetchBadgeCoursesFromSearchBatch :: Found badge details for course: $identifier (${badgeDetails.get.size()} badges)")
+            s"fetchBadgeCoursesFromSearchBatch :: Found badge details for course: $identifier (${badgeDetails.get.size()} badges, leafNodesCount: $leafNodesCount)")
         } else {
           logger.info(request.getRequestContext,
             s"fetchBadgeCoursesFromSearchBatch :: No badge details for course: $identifier")
         }
 
-        badgeDetails.map(bd => identifier -> (bd, courseName))
+        badgeDetails.map(bd => identifier -> (bd, courseName, leafNodesCount))
       }.toMap
 
       logger.info(request.getRequestContext,
@@ -1151,6 +1153,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     badges: java.util.List[java.util.Map[String, AnyRef]],
     courseId: String,
     courseName: String,
+    leafNodesCount: Int,
     now: Long
   ): java.util.Map[String, AnyRef] = {
     val detail = new java.util.HashMap[String, AnyRef]()
@@ -1158,10 +1161,17 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     detail.put(JsonKey.COURSE_ID, courseId)
     detail.put(JsonKey.COURSE_NAME, courseName)
     detail.put(JsonKey.BADGE_DETAILS_V1, badges)
+
+    // Get progress from enrolment
     val progress = Option(enrolment.get(JsonKey.PROGRESS))
       .map(_.asInstanceOf[Number].intValue())
       .getOrElse(0)
     detail.put(JsonKey.PROGRESS, progress.asInstanceOf[AnyRef])
+
+    // Calculate completion percentage using the same logic as CourseEnrollmentActor
+    val completionPercentage = getCompletionPerc(progress, leafNodesCount)
+    detail.put(JsonKey.COMPLETION_PERCENTAGE, completionPercentage.asInstanceOf[AnyRef])
+
     detail
   }
 
