@@ -302,14 +302,12 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
         0
       }
 
-      // Build merged summary
       val mergedSummary = new java.util.HashMap[String, AnyRef]()
       mergedSummary.put(JsonKey.TOTAL_BADGES_EARNED, totalBadgesEarned.asInstanceOf[AnyRef])
       mergedSummary.put(JsonKey.COURSE_COMPLETED, totalCourseCompleted.asInstanceOf[AnyRef])
       mergedSummary.put(JsonKey.COMPLETION_RATE, completionRate.asInstanceOf[AnyRef])
 
       val response = new Response()
-      // Add merged summary to response
       response.put(JsonKey.SUMMARY, mergedSummary)
       // Add details based on status filter
       if ("Completed".equalsIgnoreCase(statusFilter)) {
@@ -1277,6 +1275,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
   /**
    * Search external content using CIOS API
+   * CIOS API uses different structure: filterCriteriaMap, requestedFields, contentId
    */
   private def searchExternalContent(
     requestBody: java.util.Map[String, AnyRef],
@@ -1284,24 +1283,149 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     request: Request
   ): java.util.Map[String, AnyRef] = {
     try {
-      val ciosSearchUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+      // Construct full CIOS API URL: base URL + endpoint path
+      val ciosBaseUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_SERVICE_BASE_URL)
+      val ciosSearchPath = ProjectUtil.getConfigValue(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+      val ciosSearchUrl = ciosBaseUrl + ciosSearchPath
       logger.info(request.getRequestContext, s"searchExternalContent :: Calling CIOS API at: $ciosSearchUrl")
 
-      val response = HttpUtil.sendPostRequest(ciosSearchUrl, mapper.writeValueAsString(requestBody), headers)
+      // Transform composite search request to CIOS format
+      val searchRequest = requestBody.get(JsonKey.REQUEST).asInstanceOf[java.util.Map[String, AnyRef]]
+      val filters = searchRequest.get(JsonKey.FILTERS).asInstanceOf[java.util.Map[String, AnyRef]]
+      val fields = searchRequest.get(JsonKey.FIELDS).asInstanceOf[java.util.List[String]]
+
+      // Build CIOS request format
+      val ciosRequestBody = new java.util.HashMap[String, AnyRef]()
+
+      // filterCriteriaMap - convert from composite search filters
+      val filterCriteriaMap = new java.util.HashMap[String, AnyRef]()
+
+      // Add contentId filter (mapped from identifier)
+      if (filters.containsKey(JsonKey.IDENTIFIER)) {
+        val courseIds = filters.get(JsonKey.IDENTIFIER).asInstanceOf[java.util.List[String]]
+        filterCriteriaMap.put("contentId", courseIds)
+      }
+
+      // Add badgeDetails_v1.badgeEarningDateEnabled filter
+      val badgeFilterKey = s"${JsonKey.BADGE_DETAILS_V1}.${JsonKey.BADGE_EARNING_DATE_ENABLED}"
+      if (filters.containsKey(badgeFilterKey)) {
+        filterCriteriaMap.put("badgeDetails_v1.badgeEarningDateEnabled", filters.get(badgeFilterKey))
+      }
+
+      // Add contentPartner.isActive filter for CIOS
+      filterCriteriaMap.put("contentPartner.isActive", java.lang.Boolean.TRUE)
+
+      ciosRequestBody.put("filterCriteriaMap", filterCriteriaMap)
+
+      // requestedFields - map field names
+      val requestedFields = new java.util.ArrayList[String]()
+      if (fields != null) {
+        fields.asScala.foreach {
+          case JsonKey.IDENTIFIER => requestedFields.add("contentId")  // Map identifier to contentId
+          case JsonKey.NAME => requestedFields.add("name")
+          case JsonKey.BADGE_DETAILS_V1 => requestedFields.add("badgeDetails_v1")
+          case JsonKey.LEAF_NODE_COUNT => requestedFields.add("leafNodesCount")  // May not exist in CIOS
+          case other => requestedFields.add(other)
+        }
+      }
+      ciosRequestBody.put("requestedFields", requestedFields)
+
+      logger.info(request.getRequestContext, s"searchExternalContent :: CIOS request: ${mapper.writeValueAsString(ciosRequestBody)}")
+
+      // Update headers for CIOS API - ensure correct Content-Type without charset
+      val ciosHeaders = new java.util.HashMap[String, String]()
+      ciosHeaders.put("Content-Type", "application/json")  // No charset
+      ciosHeaders.put("accept", "*/*")
+
+      // Copy authorization header if present
+      if (headers.containsKey("Authorization")) {
+        ciosHeaders.put("Authorization", headers.get("Authorization"))
+      }
+
+      logger.info(request.getRequestContext, s"searchExternalContent :: Using headers: $ciosHeaders")
+
+      val response = HttpUtil.sendPostRequest(ciosSearchUrl, mapper.writeValueAsString(ciosRequestBody), ciosHeaders)
 
       if (response != null && response.nonEmpty) {
-        val responseMap = mapper.readValue(response, classOf[java.util.Map[String, AnyRef]])
+        val ciosResponse = mapper.readValue(response, classOf[java.util.Map[String, AnyRef]])
         logger.info(request.getRequestContext, s"searchExternalContent :: CIOS API returned response")
-        responseMap
+
+        // Transform CIOS response to composite search format for compatibility
+        val transformedResponse = transformCiosResponseToCompositeFormat(ciosResponse, request)
+        transformedResponse
       } else {
         logger.info(request.getRequestContext, "searchExternalContent :: Empty response from CIOS API")
-        new java.util.HashMap[String, AnyRef]()
+        createEmptySearchResponse()
       }
     } catch {
       case e: Exception =>
         logger.error(request.getRequestContext, s"searchExternalContent :: Error calling CIOS API: ${e.getMessage}", e)
-        new java.util.HashMap[String, AnyRef]()
+        createEmptySearchResponse()
     }
+  }
+
+  /**
+   * Transform CIOS API response to Composite Search API format for compatibility
+   */
+  private def transformCiosResponseToCompositeFormat(
+    ciosResponse: java.util.Map[String, AnyRef],
+    request: Request
+  ): java.util.Map[String, AnyRef] = {
+    try {
+      val result = new java.util.HashMap[String, AnyRef]()
+
+      // CIOS response typically has: { "data": [...], "count": X }
+      // We need: { "contents": [...], "count": X }
+      val data = Option(ciosResponse.get("data"))
+        .orElse(Option(ciosResponse.get("content")))
+        .orElse(Option(ciosResponse.get("contents")))
+        .collect { case l: java.util.List[java.util.Map[String, AnyRef]] => l }
+        .getOrElse(new java.util.ArrayList[java.util.Map[String, AnyRef]]())
+
+      // Transform each content item: contentId → identifier
+      val transformedContents = new java.util.ArrayList[java.util.Map[String, AnyRef]]()
+      data.asScala.foreach { item =>
+        val transformed = new java.util.HashMap[String, AnyRef]()
+
+        // Map contentId to identifier
+        if (item.containsKey("contentId")) {
+          transformed.put(JsonKey.IDENTIFIER, item.get("contentId"))
+        }
+
+        // Copy other fields as-is
+        item.asScala.foreach {
+          case ("contentId", _) => // Already mapped to identifier
+          case (key, value) => transformed.put(key, value)
+        }
+
+        // Set leafNodesCount to 0 for external courses (not provided by CIOS)
+        if (!transformed.containsKey(JsonKey.LEAF_NODE_COUNT)) {
+          transformed.put(JsonKey.LEAF_NODE_COUNT, Integer.valueOf(0))
+        }
+
+        transformedContents.add(transformed)
+      }
+
+      result.put(JsonKey.CONTENTS, transformedContents)
+      result.put(JsonKey.COUNT, transformedContents.size().asInstanceOf[AnyRef])
+
+      logger.info(request.getRequestContext, s"searchExternalContent :: Transformed ${transformedContents.size()} CIOS contents to composite format")
+      result
+    } catch {
+      case e: Exception =>
+        logger.error(request.getRequestContext, s"transformCiosResponseToCompositeFormat :: Error: ${e.getMessage}", e)
+        createEmptySearchResponse()
+    }
+  }
+
+  /**
+   * Create empty search response
+   */
+  private def createEmptySearchResponse(): java.util.Map[String, AnyRef] = {
+    val response = new java.util.HashMap[String, AnyRef]()
+    response.put(JsonKey.CONTENTS, new java.util.ArrayList[java.util.Map[String, AnyRef]]())
+    response.put(JsonKey.COUNT, Integer.valueOf(0))
+    response
   }
 
   /**
