@@ -256,29 +256,69 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       val savedStatus = request.get(JsonKey.STATUS)
       request.getRequest.remove(JsonKey.STATUS)
 
+      // Fetch internal enrollments
       val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+
+      // Fetch external enrollments
+      val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
+      logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: list :: Found ${externalEnrolments.size()} external enrollments")
 
       if (savedStatus != null) {
         request.getRequest.put(JsonKey.STATUS, savedStatus)
       }
 
-//      val courses = response.get(JsonKey.COURSES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
-//      logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: list :: Found ${courses.size()} enrolments for userId: $userId")
+      // Process internal badge stats
+      val badgeStats = getBadgeStats(request, userId, activeEnrolments, statusFilter, isExternal = false)
 
-      val badgeStats = getBadgeStats(request, userId, activeEnrolments, statusFilter)
+      // Process external badge stats
+      val externalBadgeStats = getBadgeStats(request, userId, externalEnrolments, statusFilter, isExternal = true)
 
-      val summary = badgeStats.get(JsonKey.SUMMARY)
+      // Merge summaries
+      val internalSummary = badgeStats.get(JsonKey.SUMMARY).asInstanceOf[java.util.Map[String, AnyRef]]
+      val externalSummary = externalBadgeStats.get(JsonKey.SUMMARY).asInstanceOf[java.util.Map[String, AnyRef]]
+
+      val totalBadgesEarned = internalSummary.get(JsonKey.TOTAL_BADGES_EARNED).asInstanceOf[Integer] +
+                              externalSummary.get(JsonKey.TOTAL_BADGES_EARNED).asInstanceOf[Integer]
+      val totalCourseCompleted = internalSummary.get(JsonKey.COURSE_COMPLETED).asInstanceOf[Integer] +
+                                 externalSummary.get(JsonKey.COURSE_COMPLETED).asInstanceOf[Integer]
+
+      // Merge badge lists
+      val mergedEarnedBadges = mergeBadgeLists(
+        badgeStats.get(JsonKey.EARNED_BADGES_DETAILS).asInstanceOf[java.util.Map[String, AnyRef]],
+        externalBadgeStats.get(JsonKey.EARNED_BADGES_DETAILS).asInstanceOf[java.util.Map[String, AnyRef]]
+      )
+
+      val mergedInProgressBadges = mergeBadgeLists(
+        badgeStats.get(JsonKey.IN_PROGRESS_BADGES_DETAILS).asInstanceOf[java.util.Map[String, AnyRef]],
+        externalBadgeStats.get(JsonKey.IN_PROGRESS_BADGES_DETAILS).asInstanceOf[java.util.Map[String, AnyRef]]
+      )
+
+      // Recalculate completionRate based on merged data
+      val inProgressCount = mergedInProgressBadges.get(JsonKey.COUNT).asInstanceOf[Integer]
+      val totalAttempted = totalBadgesEarned + inProgressCount
+      val completionRate = if (totalAttempted > 0) {
+        (totalBadgesEarned * 100) / totalAttempted
+      } else {
+        0
+      }
+
+      // Build merged summary
+      val mergedSummary = new java.util.HashMap[String, AnyRef]()
+      mergedSummary.put(JsonKey.TOTAL_BADGES_EARNED, totalBadgesEarned.asInstanceOf[AnyRef])
+      mergedSummary.put(JsonKey.COURSE_COMPLETED, totalCourseCompleted.asInstanceOf[AnyRef])
+      mergedSummary.put(JsonKey.COMPLETION_RATE, completionRate.asInstanceOf[AnyRef])
+
       val response = new Response()
-      // Add summary to response (always included)
-      response.put(JsonKey.SUMMARY, summary)
+      // Add merged summary to response
+      response.put(JsonKey.SUMMARY, mergedSummary)
       // Add details based on status filter
       if ("Completed".equalsIgnoreCase(statusFilter)) {
-        response.put(JsonKey.EARNED_BADGES_DETAILS, badgeStats.get(JsonKey.EARNED_BADGES_DETAILS))
+        response.put(JsonKey.EARNED_BADGES_DETAILS, mergedEarnedBadges)
       } else if ("In-Progress".equalsIgnoreCase(statusFilter) || "InProgress".equalsIgnoreCase(statusFilter)) {
-        response.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, badgeStats.get(JsonKey.IN_PROGRESS_BADGES_DETAILS))
+        response.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, mergedInProgressBadges)
       } else {
-        response.put(JsonKey.EARNED_BADGES_DETAILS, badgeStats.get(JsonKey.EARNED_BADGES_DETAILS))
-        response.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, badgeStats.get(JsonKey.IN_PROGRESS_BADGES_DETAILS))
+        response.put(JsonKey.EARNED_BADGES_DETAILS, mergedEarnedBadges)
+        response.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, mergedInProgressBadges)
       }
       logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: list :: Badge stats computed with statusFilter=$statusFilter")
       sender().tell(response, self)
@@ -840,7 +880,8 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     request: Request,
     userId: String,
     enrolments: java.util.List[java.util.Map[String, AnyRef]],
-    statusFilter: String = null
+    statusFilter: String = null,
+    isExternal: Boolean = false
   ): java.util.Map[String, AnyRef] = {
 
 
@@ -863,9 +904,9 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     }
 
     // STEP 3: Search API — Filter badge courses (with built-in content data)
-    logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: getBadgeStats :: About to call fetchBadgeCoursesFromSearch with ${courseIds.size()} course IDs")
+    logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: getBadgeStats :: About to call fetchBadgeCoursesFromSearch with ${courseIds.size()} course IDs, isExternal=$isExternal")
     val badgeCourseMap: Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] =
-      fetchBadgeCoursesFromSearch(courseIds, request)
+      fetchBadgeCoursesFromSearch(courseIds, request, isExternal)
 
     logger.info(request.getRequestContext, s"ExtendedBadgeEnrollmentActor :: getBadgeStats :: fetchBadgeCoursesFromSearch returned ${badgeCourseMap.size} badge courses from search out of ${courseIds.size()} total courses")
 
@@ -1023,9 +1064,10 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
   private def fetchBadgeCoursesFromSearch(
     courseIds: java.util.List[String],
-    request: Request
+    request: Request,
+    isExternal: Boolean = false
   ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] = {
-    logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: ENTRY :: courseIds.size=${courseIds.size()}")
+    logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: ENTRY :: courseIds.size=${courseIds.size()}, isExternal=$isExternal")
     try {
       // Get max identifier size from config (default: 100)
       val searchIdentifierMaxSize = try {
@@ -1044,7 +1086,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
         val batches = courseIds.asScala.grouped(searchIdentifierMaxSize).toList
         val result = batches.flatMap { batch =>
-          fetchBadgeCoursesFromSearchBatch(batch.asJava, request)
+          fetchBadgeCoursesFromSearchBatch(batch.asJava, request, isExternal)
         }.toMap
         
         logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: Batching complete, returning ${result.size} results")
@@ -1052,7 +1094,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
       } else {
         logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: Calling fetchBadgeCoursesFromSearchBatch directly")
-        val result = fetchBadgeCoursesFromSearchBatch(courseIds, request)
+        val result = fetchBadgeCoursesFromSearchBatch(courseIds, request, isExternal)
         logger.info(request.getRequestContext, s"fetchBadgeCoursesFromSearch :: fetchBadgeCoursesFromSearchBatch returned ${result.size} results")
         result
       }
@@ -1066,7 +1108,8 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
 
   private def fetchBadgeCoursesFromSearchBatch(
     courseIds: java.util.List[String],
-    request: Request
+    request: Request,
+    isExternal: Boolean = false
   ): Map[String, (java.util.List[java.util.Map[String, AnyRef]], String, Int)] = {
     try {
       logger.info(request.getRequestContext,
@@ -1100,7 +1143,16 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       logger.info(request.getRequestContext,
         s"fetchBadgeCoursesFromSearchBatch :: Calling search API with payload: ${mapper.writeValueAsString(requestBody)}")
 
-      val searchResult = ContentUtil.searchContent(mapper.writeValueAsString(requestBody), headers)
+      // Use different search API based on isExternal
+      val searchResult = if (isExternal) {
+        // For external courses, use CIOS API
+        logger.info(request.getRequestContext, "fetchBadgeCoursesFromSearchBatch :: Using CIOS API for external courses")
+        searchExternalContent(requestBody, headers, request)
+      } else {
+        // For internal courses, use composite search API
+        logger.info(request.getRequestContext, "fetchBadgeCoursesFromSearchBatch :: Using composite search API for internal courses")
+        ContentUtil.searchContent(mapper.writeValueAsString(requestBody), headers)
+      }
 
       logger.info(request.getRequestContext,
         s"fetchBadgeCoursesFromSearchBatch :: Search API response: ${mapper.writeValueAsString(searchResult)}")
@@ -1187,7 +1239,12 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     detail.put(JsonKey.PROGRESS, progress.asInstanceOf[AnyRef])
 
     // Calculate completion percentage using the same logic as CourseEnrollmentActor
-    val completionPercentage = getCompletionPerc(progress, leafNodesCount)
+    // For external courses (leafNodesCount = 0), default to 0
+    val completionPercentage = if (leafNodesCount > 0) {
+      getCompletionPerc(progress, leafNodesCount)
+    } else {
+      0 // Default for external courses where leafNodesCount is not available
+    }
     detail.put(JsonKey.COMPLETION_PERCENTAGE, completionPercentage.asInstanceOf[AnyRef])
     detail
   }
@@ -1216,5 +1273,64 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
         logger.warn(null, s"Failed to fetch badge count for userId $userId: ${e.getMessage}", e)
         0
     }
+  }
+
+  /**
+   * Search external content using CIOS API
+   */
+  private def searchExternalContent(
+    requestBody: java.util.Map[String, AnyRef],
+    headers: java.util.Map[String, String],
+    request: Request
+  ): java.util.Map[String, AnyRef] = {
+    try {
+      val ciosSearchUrl = ProjectUtil.getConfigValue(JsonKey.CB_PORES_CIOS_EXTERNAL_CONTENT_SEARCH_BASE_URL)
+      logger.info(request.getRequestContext, s"searchExternalContent :: Calling CIOS API at: $ciosSearchUrl")
+
+      val response = HttpUtil.sendPostRequest(ciosSearchUrl, mapper.writeValueAsString(requestBody), headers)
+
+      if (response != null && response.nonEmpty) {
+        val responseMap = mapper.readValue(response, classOf[java.util.Map[String, AnyRef]])
+        logger.info(request.getRequestContext, s"searchExternalContent :: CIOS API returned response")
+        responseMap
+      } else {
+        logger.info(request.getRequestContext, "searchExternalContent :: Empty response from CIOS API")
+        new java.util.HashMap[String, AnyRef]()
+      }
+    } catch {
+      case e: Exception =>
+        logger.error(request.getRequestContext, s"searchExternalContent :: Error calling CIOS API: ${e.getMessage}", e)
+        new java.util.HashMap[String, AnyRef]()
+    }
+  }
+
+  /**
+   * Merge two badge detail maps (earned or in-progress)
+   */
+  private def mergeBadgeLists(
+    internal: java.util.Map[String, AnyRef],
+    external: java.util.Map[String, AnyRef]
+  ): java.util.Map[String, AnyRef] = {
+    val merged = new java.util.HashMap[String, AnyRef]()
+
+    val internalBadges = internal.get(JsonKey.BADGES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+    val externalBadges = external.get(JsonKey.BADGES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+
+    val allBadges = new java.util.ArrayList[java.util.Map[String, AnyRef]]()
+    if (internalBadges != null) allBadges.addAll(internalBadges)
+    if (externalBadges != null) allBadges.addAll(externalBadges)
+
+    // Sort merged list by completionPercentage DESC (for in-progress badges)
+    if (allBadges.size() > 0 && allBadges.get(0).containsKey(JsonKey.COMPLETION_PERCENTAGE)) {
+      allBadges.sort((a, b) => {
+        val percA = Option(a.get(JsonKey.COMPLETION_PERCENTAGE)).map(_.asInstanceOf[Number].intValue()).getOrElse(0)
+        val percB = Option(b.get(JsonKey.COMPLETION_PERCENTAGE)).map(_.asInstanceOf[Number].intValue()).getOrElse(0)
+        percB.compareTo(percA) // Descending order
+      })
+    }
+
+    merged.put(JsonKey.COUNT, allBadges.size().asInstanceOf[AnyRef])
+    merged.put(JsonKey.BADGES, allBadges)
+    merged
   }
 }
