@@ -33,7 +33,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   private static final String USER_ENROLMENTS = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_DB).getTableName();
   private static final String ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.ENROLLMENT_BATCH_DB).getTableName();
   private static final String USER_ENROLMENTS_V2 = ExtendedUtil.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
-  private static final String EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB).getTableName();
+  private static final String EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP = ExtendedUtil.dbInfoMap.get(JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB).getTableName();
   public static UserCoursesDao getInstance() {
     if (userCoursesDao == null) {
       userCoursesDao = new UserCoursesDaoImpl();

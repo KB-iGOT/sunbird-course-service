@@ -1,5 +1,7 @@
 package org.sunbird.learner.util;
 
+import org.sunbird.common.models.util.JsonKey;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,6 +34,10 @@ public class ExtendedUtil {
                 LEARNER_CONTENT_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_content_consumption_v2"));
         dbInfoMap.put(
                 USER_ENROLMENTS_V2_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_enrolments_v2"));
+        dbInfoMap.put(
+                USER_ENROLMENTS_V2_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "user_enrolments_v2"));
+        dbInfoMap.put(
+                JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB, getDbInfoObject(COURSE_KEY_SPACE_NAME, "external_training_enrolments_batch_lookup"));
     }
 
     private static DbInfo getDbInfoObject(String keySpace, String table) {
