@@ -160,9 +160,9 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       val response = new Response()
       response.put(JsonKey.SUMMARY, mergedSummary)
       // Add details based on status filter
-      if ("Completed".equalsIgnoreCase(statusFilter)) {
+      if (JsonKey.COMPLETED.equalsIgnoreCase(statusFilter)) {
         response.put(JsonKey.EARNED_BADGES_DETAILS, mergedEarnedBadges)
-      } else if ("In-Progress".equalsIgnoreCase(statusFilter) || "InProgress".equalsIgnoreCase(statusFilter)) {
+      } else if (JsonKey.IN_PROGRESS.equalsIgnoreCase(statusFilter) || "InProgress".equalsIgnoreCase(statusFilter)) {
         response.put(JsonKey.IN_PROGRESS_BADGES_DETAILS, mergedInProgressBadges)
       } else {
         response.put(JsonKey.EARNED_BADGES_DETAILS, mergedEarnedBadges)
@@ -171,7 +171,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       sender().tell(response, self)
     } catch {
       case e: Exception =>
-        logger.error(request.getRequestContext, "Exception in enrolment list v3 : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
+        logger.error(request.getRequestContext, "Exception in badge list : request ::" + mapper.writeValueAsString(request) + "| Exception is:" + e.getMessage, e)
         throw e
     }
   }
