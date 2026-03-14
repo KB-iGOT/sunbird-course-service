@@ -33,6 +33,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   private static final String USER_ENROLMENTS = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_DB).getTableName();
   private static final String ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.ENROLLMENT_BATCH_DB).getTableName();
   private static final String USER_ENROLMENTS_V2 = ExtendedUtil.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
+  private static final String EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP = ExtendedUtil.dbInfoMap.get(JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB).getTableName();
   public static UserCoursesDao getInstance() {
     if (userCoursesDao == null) {
       userCoursesDao = new UserCoursesDaoImpl();
@@ -451,6 +452,97 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
     }
     return null;
+  }
+
+  @Override
+  public Map<String, Object> getEventParticipantsForExternalTraining(RequestContext requestContext, Map<String, Object> request) {
+    logger.info(requestContext, "UserCourseDao:: getEventParticipantsForExternalTraining:: Received request:: " + request);
+    boolean active = Boolean.TRUE.equals(request.getOrDefault(JsonKey.ACTIVE, true));
+    int limit = request.get(JsonKey.LIMIT) != null ? (Integer) request.get(JsonKey.LIMIT) : Constants.DEFAULT_LIMIT;
+    int currentOffSet = request.get(JsonKey.CURRENT_OFFSET) != null ? (Integer) request.get(JsonKey.CURRENT_OFFSET) : 0;
+
+    long activeCount = fetchExternalTrainingActiveCount(requestContext, request);
+    Map<String, Object> pagedResult = collectExternalTrainingPagedUsers(requestContext, request, active, limit, currentOffSet);
+
+    Map<String, Object> result = new HashMap<>();
+    if (StringUtils.isNotBlank((String) pagedResult.get(JsonKey.PAGE_ID))) {
+      result.put(JsonKey.PAGE_ID, pagedResult.get(JsonKey.PAGE_ID));
+    }
+    result.put(JsonKey.CURRENT_OFFSET, request.get(JsonKey.CURRENT_OFFSET));
+    result.put(JsonKey.COUNT, activeCount);
+    result.put(JsonKey.PARTICIPANTS, pagedResult.get(JsonKey.PARTICIPANTS));
+    return result;
+  }
+
+  private long fetchExternalTrainingActiveCount(RequestContext requestContext, Map<String, Object> request) {
+    Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+            requestContext,
+            KEYSPACE_NAME,
+            EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP,
+            JsonKey.BATCH_ID,
+            request.get(JsonKey.EVENT_ID),
+            Arrays.asList(JsonKey.USER_ID, JsonKey.ACTIVE)
+    );
+    List<Map<String, Object>> batchUsers = (List<Map<String, Object>>) res.get(JsonKey.RESPONSE);
+    if (CollectionUtils.isEmpty(batchUsers)) {
+      return 0L;
+    }
+    return batchUsers.stream().filter(row -> Boolean.TRUE.equals(row.get(JsonKey.ACTIVE))).count();
+  }
+
+  private Map<String, Object> collectExternalTrainingPagedUsers(RequestContext requestContext, Map<String, Object> request,
+                                                                 boolean active, int limit, int offsetFromRequest) {
+    Map<String, Object> queryMap = new HashMap<>();
+    queryMap.put(JsonKey.BATCH_ID, (String) request.get(JsonKey.EVENT_ID));
+
+    List<String> userList = new ArrayList<>();
+    String pageId = (String) request.get(JsonKey.PAGE_ID);
+    String previousPageId = null;
+    String currentPagingState = null;
+
+    do {
+      Response response = cassandraOperation.getRecordByIdentifierWithPage(requestContext, KEYSPACE_NAME,
+              EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP, queryMap, null, pageId, limit);
+      currentPagingState = (String) response.get(JsonKey.PAGE_ID);
+      if (StringUtils.isBlank(previousPageId) && StringUtils.isNotBlank(currentPagingState)) {
+        previousPageId = currentPagingState;
+      }
+      pageId = currentPagingState;
+
+      List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+      if (CollectionUtils.isEmpty(userCoursesList)) {
+        previousPageId = null;
+        break;
+      }
+
+      offsetFromRequest = processPageUsers(userCoursesList, userList, active, limit, offsetFromRequest);
+      if (userList.size() == limit) {
+        previousPageId = pageId != null ? pageId : previousPageId;
+        break;
+      }
+    } while (StringUtils.isNotBlank(currentPagingState));
+
+    Map<String, Object> result = new HashMap<>();
+    result.put(JsonKey.PAGE_ID, previousPageId);
+    result.put(JsonKey.PARTICIPANTS, userList);
+    return result;
+  }
+
+  private int processPageUsers(List<Map<String, Object>> userCoursesList, List<String> userList,
+                                boolean active, int limit, int offsetFromRequest) {
+    for (Map<String, Object> userCourse : userCoursesList) {
+      if (offsetFromRequest > 0) {
+        offsetFromRequest--;
+        continue;
+      }
+      if (Boolean.valueOf(active).equals(userCourse.get(JsonKey.ACTIVE))) {
+        userList.add((String) userCourse.get(JsonKey.USER_ID));
+        if (userList.size() == limit) {
+          break;
+        }
+      }
+    }
+    return offsetFromRequest;
   }
 
 }

@@ -585,4 +585,18 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
             ResponseCode.CLIENT_ERROR.getResponseCode()
     );
   }
+
+  public void validateParticipantsForExternalTrainingBatch(Request requestDto) {
+    Map<String, Object> batchMap = (Map<String, Object>) requestDto.getRequest().get(JsonKey.BATCH);
+    if (MapUtils.isEmpty(batchMap)) {
+      throw new ProjectCommonException(
+              ResponseCode.mandatoryParamsMissing.getErrorCode(),
+              ResponseCode.mandatoryParamsMissing.getErrorMessage() + " " + JsonKey.BATCH,
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    validateParam(
+            (String) batchMap.get(JsonKey.EVENT_ID),
+            ResponseCode.mandatoryParamsMissing,
+            JsonKey.EVENT_ID);
+  }
 }

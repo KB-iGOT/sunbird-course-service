@@ -122,4 +122,8 @@ public class UserCoursesService {
   public Map<String, Object> getParticipantsListByPage(RequestContext requestContext, Map<String, Object> request) {
     return userCourseDao.getBatchParticipantsByPage(requestContext, request);
   }
+
+  public Map<String, Object> getParticipantsListForExternalTraining(RequestContext requestContext, Map<String, Object> request) {
+    return userCourseDao.getEventParticipantsForExternalTraining(requestContext, request);
+  }
 }
