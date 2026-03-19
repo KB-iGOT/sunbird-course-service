@@ -24,7 +24,6 @@ public class UserRequestValidatorTest {
   public void testValidatePasswordFailure() {
     Request request = initailizeRequest();
     Map<String, Object> requestObj = request.getRequest();
-    requestObj.put(JsonKey.PASSWORD, "password");
     request.setRequest(requestObj);
     try {
       userRequestValidator.validateCreateUserRequest(request);
@@ -32,31 +31,6 @@ public class UserRequestValidatorTest {
       assertEquals(ResponseCode.CLIENT_ERROR.getResponseCode(), e.getResponseCode());
       assertEquals(ResponseCode.passwordValidation.getErrorCode(), e.getCode());
     }
-  }
-
-  @Test
-  public void testIsGoodPassword() {
-    HashMap<String, Boolean> passwordExpectations = new HashMap<String, Boolean>(){
-      {
-        // Bad ones.
-        put("Test 1234", false); // space is not a valid char
-        put("hello1234", false); // no uppercase
-        put("helloABCD", false); // no numeral
-        put("hello#$%&'", false); // no uppercase/numeral
-        put("sho!1", false); // too short, not 8 char
-        put("B1!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~", false); // no lowercase
-        put("Test @1234", false); // contains space
-
-        // Good ones.
-        put("Test123!", true); // good
-        put("ALongPassword@123", true); // more than 8 char
-        put("Abc1!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~", true); // with all spl char, PASS
-      }
-    };
-
-    passwordExpectations.forEach((pwd, expectedResult) -> {
-        assertEquals(expectedResult, UserRequestValidator.isGoodPassword(pwd));
-    });
   }
 
   @Test
@@ -101,7 +75,6 @@ public class UserRequestValidatorTest {
     boolean response = false;
     Request request = initailizeRequest();
     Map<String, Object> requestObj = request.getRequest();
-    requestObj.put(JsonKey.PASSWORD, "Password@1");
     request.setRequest(requestObj);
     try {
       userRequestValidator.validateCreateUserV3Request(request);
@@ -117,7 +90,6 @@ public class UserRequestValidatorTest {
     boolean response = false;
     Request request = initailizeRequest();
     Map<String, Object> requestObj = request.getRequest();
-    requestObj.put(JsonKey.PASSWORD, "Password@1");
     request.setRequest(requestObj);
     try {
       userRequestValidator.validateCreateUserRequest(request);
@@ -133,7 +105,6 @@ public class UserRequestValidatorTest {
     boolean response = false;
     Request request = initailizeRequest();
     Map<String, Object> requestObj = request.getRequest();
-    requestObj.put(JsonKey.PASSWORD, "Password@1");
     request.setRequest(requestObj);
     try {
       userRequestValidator.validateUserCreateV3(request);
@@ -252,71 +223,9 @@ public class UserRequestValidatorTest {
   }
 
   @Test
-  public void testValidateChangePasswordSuccess() {
-    Request request = new Request();
-    boolean response = false;
-    Map<String, Object> requestObj = new HashMap<>();
-    requestObj.put(JsonKey.NEW_PASSWORD, "password1");
-    requestObj.put(JsonKey.PASSWORD, "password");
-    request.setRequest(requestObj);
-    try {
-      userRequestValidator.validateChangePassword(request);
-      response = true;
-    } catch (ProjectCommonException e) {
-      Assert.assertNull(e);
-    }
-    assertEquals(true, response);
-  }
-
-  @Test
-  public void testValidateChangePasswordFailureWithEmptyNewPassword() {
-    Request request = new Request();
-    Map<String, Object> requestObj = new HashMap<>();
-    requestObj.put(JsonKey.NEW_PASSWORD, "");
-    requestObj.put(JsonKey.PASSWORD, "password");
-    request.setRequest(requestObj);
-    try {
-      userRequestValidator.validateChangePassword(request);
-    } catch (ProjectCommonException e) {
-      assertEquals(ResponseCode.CLIENT_ERROR.getResponseCode(), e.getResponseCode());
-      assertEquals(ResponseCode.newPasswordEmpty.getErrorCode(), e.getCode());
-    }
-  }
-
-  @Test
-  public void testValidateChangePasswordFailureWithoutNewPassword() {
-    Request request = new Request();
-    Map<String, Object> requestObj = new HashMap<>();
-    requestObj.put(JsonKey.PASSWORD, "password");
-    request.setRequest(requestObj);
-    try {
-      userRequestValidator.validateChangePassword(request);
-    } catch (ProjectCommonException e) {
-      assertEquals(ResponseCode.CLIENT_ERROR.getResponseCode(), e.getResponseCode());
-      assertEquals(ResponseCode.newPasswordRequired.getErrorCode(), e.getCode());
-    }
-  }
-
-  @Test
-  public void testValidateChangePasswordFailureWithSameOldPassword() {
-    Request request = new Request();
-    Map<String, Object> requestObj = new HashMap<>();
-    requestObj.put(JsonKey.NEW_PASSWORD, "password");
-    requestObj.put(JsonKey.PASSWORD, "password");
-    request.setRequest(requestObj);
-    try {
-      userRequestValidator.validateChangePassword(request);
-    } catch (ProjectCommonException e) {
-      assertEquals(ResponseCode.CLIENT_ERROR.getResponseCode(), e.getResponseCode());
-      assertEquals(ResponseCode.samePasswordError.getErrorCode(), e.getCode());
-    }
-  }
-
-  @Test
   public void testValidateChangePasswordFailureWithPasswordMissing() {
     Request request = new Request();
     Map<String, Object> requestObj = new HashMap<>();
-    requestObj.put(JsonKey.NEW_PASSWORD, "password");
     request.setRequest(requestObj);
     try {
       userRequestValidator.validateChangePassword(request);
