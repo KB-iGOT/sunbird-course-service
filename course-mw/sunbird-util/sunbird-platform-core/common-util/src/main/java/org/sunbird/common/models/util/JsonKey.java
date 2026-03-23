@@ -1326,6 +1326,7 @@ public final class JsonKey {
   public static final String BADGE_CACHE_TTL = "badge_cache_ttl";
   public static final String COMPLETED = "Completed";
   public static final String IN_PROGRESS = "In-Progress";
+  public static final String ISSUED_DATE = "issuedDate";
 
   private JsonKey() {}
 }

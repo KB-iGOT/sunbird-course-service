@@ -399,7 +399,8 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       status != 2
     }
 
-    // STEP 6A: Process completed badge courses
+    // STEP 6A: Process completed badge courses (status=2 with issued badges)
+    var totalIssuedBadgesCount = 0
     val completedBadgesDetails = completedEnrolments.flatMap { e =>
       val courseId = e.get(JsonKey.COURSE_ID).asInstanceOf[String]
       badgeCourseMap.get(courseId).flatMap { case (badges, courseName, leafNodesCount) =>
@@ -408,17 +409,28 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
           .getOrElse(new java.util.ArrayList())
 
         if (!issuedBadges.isEmpty) {
-          Some(createCompletedBadgeDetail(e, badges, courseId, courseName))
+          totalIssuedBadgesCount += issuedBadges.size()
+          Some(createEarnedBadgeDetail(e, badges, courseId, courseName, isCompleted = true))
         } else {
           None
         }
       }
     }
 
-    // STEP 6B: Process in-progress badge courses with expiry filter
+    // Process in-progress badge courses
+    var inProgressWithEarnedBadges = List[java.util.Map[String, AnyRef]]()
     val inProgressBadgesDetails = inProgressEnrolments.flatMap { e =>
       val courseId = e.get(JsonKey.COURSE_ID).asInstanceOf[String]
       badgeCourseMap.get(courseId).flatMap { case (badges, courseName, leafNodesCount) =>
+
+        // Check if badges were already issued for this in-progress course/program
+        val issuedBadges = Option(e.get(JsonKey.ISSUED_BADGES))
+          .collect { case l: java.util.List[_] if !l.isEmpty => l }
+
+        if (issuedBadges.isDefined) {
+          totalIssuedBadgesCount += issuedBadges.get.size()
+          inProgressWithEarnedBadges = createEarnedBadgeDetail(e, badges, courseId, courseName, isCompleted = false) :: inProgressWithEarnedBadges
+        }
 
         val hasValidBadge = badges.asScala.exists { badge =>
           val dateEnabled = Option(badge.get(JsonKey.BADGE_EARNING_DATE_ENABLED))
@@ -433,7 +445,7 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
           }
         }
 
-        if (hasValidBadge) {
+        if (hasValidBadge && issuedBadges.isEmpty) {
           Some(createInProgressBadgeDetail(e, badges, courseId, courseName, leafNodesCount, now))
         } else {
           None
@@ -441,12 +453,40 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
       }
     }
 
-    val courseCompleted = enrolments.asScala.count { e =>
-      Option(e.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) == 2
+    // Combine all earned badges (completed + in-progress with issued badges)
+    val allEarnedBadges = completedBadgesDetails ++ inProgressWithEarnedBadges
+
+    // courseCompleted = Count of completed courses that have badges AND have issued_badges
+    val courseCompleted = completedEnrolments.count { e =>
+      val courseId = e.get(JsonKey.COURSE_ID).asInstanceOf[String]
+      val issuedBadges = Option(e.get(JsonKey.ISSUED_BADGES))
+        .collect { case l: java.util.List[_] if !l.isEmpty => l }
+      badgeCourseMap.contains(courseId) && issuedBadges.isDefined
     }
 
-    // totalBadgesEarned = Completed courses that have issued_badges (subset of courseCompleted)
-    val totalBadgesEarned = completedBadgesDetails.size
+    // totalBadgesEarned = Total count of issued_badges across all enrollments
+    val totalBadgesEarned = totalIssuedBadgesCount
+
+    // Sort earned badges by issue date (most recent first)
+    val sortedEarnedBadges = allEarnedBadges.sortBy { badge =>
+      val issuedDate = Option(badge.get(JsonKey.ISSUED_DATE))  // Added by createEarnedBadgeDetail (from issuedOn)
+        .orElse(Option(badge.get(JsonKey.COMPLETED_ON)))
+        .map {
+          case ts: java.sql.Timestamp => ts.getTime
+          case date: java.util.Date => date.getTime
+          case dateStr: String =>
+            try {
+              // Parse ISO date string like "2026-03-20T06:30:43.240+0000"
+              java.time.Instant.parse(dateStr).toEpochMilli
+            } catch {
+              case _: Exception => 0L
+            }
+          case num: Number => num.longValue()
+          case _ => 0L
+        }
+        .getOrElse(0L)
+      -issuedDate  // Descending order (most recent first)
+    }
 
     // Sort in-progress badges by completionPercentage in descending order
     val sortedInProgressBadges = inProgressBadgesDetails.sortBy { badge =>
@@ -469,8 +509,8 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     summary.put(JsonKey.COMPLETION_RATE, completionRate.asInstanceOf[AnyRef])
 
     val earnedBadgesDetails = new java.util.HashMap[String, AnyRef]()
-    earnedBadgesDetails.put(JsonKey.COUNT, completedBadgesDetails.size.asInstanceOf[AnyRef])
-    earnedBadgesDetails.put(JsonKey.BADGES, completedBadgesDetails.asJava)
+    earnedBadgesDetails.put(JsonKey.COUNT, totalBadgesEarned.asInstanceOf[AnyRef])
+    earnedBadgesDetails.put(JsonKey.BADGES, sortedEarnedBadges.asJava)
 
     val inProgressBadgesDetailsMap = new java.util.HashMap[String, AnyRef]()
     inProgressBadgesDetailsMap.put(JsonKey.COUNT, sortedInProgressBadges.size.asInstanceOf[AnyRef])
@@ -636,16 +676,51 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     }
   }
 
-  private def createCompletedBadgeDetail(
+  private def createEarnedBadgeDetail(
     enrolment: java.util.Map[String, AnyRef],
     badges: java.util.List[java.util.Map[String, AnyRef]],
     courseId: String,
-    courseName: String
+    courseName: String,
+    isCompleted: Boolean
   ): java.util.Map[String, AnyRef] = {
     val detail = new java.util.HashMap[String, AnyRef]()
     detail.put(JsonKey.COURSE_ID, courseId)
     detail.put(JsonKey.COURSE_NAME, courseName)
     detail.put(JsonKey.BADGE_DETAILS_V1, badges)
+
+    // Extract issued date from the first badge in issued_badges array
+    val issuedBadges = Option(enrolment.get(JsonKey.ISSUED_BADGES))
+      .collect { case l: java.util.List[_] if !l.isEmpty =>
+        l.asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+      }
+
+    if (issuedBadges.isDefined && !issuedBadges.get.isEmpty) {
+      val firstBadge = issuedBadges.get.get(0)
+      val issuedDate = Option(firstBadge.get("issuedDate"))
+        .orElse(Option(firstBadge.get("issuedOn")))
+        .orElse(Option(firstBadge.get("createdOn")))
+
+      if (issuedDate.isDefined) {
+        detail.put("issuedDate", issuedDate.get)
+      }
+    }
+
+    // Add completedOn if available (will be NULL for in-progress programs)
+    val completedOn = Option(enrolment.get(JsonKey.COMPLETED_ON))
+    if (completedOn.isDefined) {
+      detail.put(JsonKey.COMPLETED_ON, completedOn.get)
+    }
+
+    // Add enrolledDate as fallback for sorting
+    val enrolledDate = Option(enrolment.get(JsonKey.ENROLLED_DATE))
+      .orElse(Option(enrolment.get("datetime")))
+    if (enrolledDate.isDefined) {
+      detail.put(JsonKey.ENROLLED_DATE, enrolledDate.get)
+    }
+
+    // Add flag to indicate if course/program is fully completed
+    detail.put("isCompleted", isCompleted.asInstanceOf[AnyRef])
+
     detail
   }
 
