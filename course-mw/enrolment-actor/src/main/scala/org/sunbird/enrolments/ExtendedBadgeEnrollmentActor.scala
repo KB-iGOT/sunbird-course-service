@@ -470,7 +470,6 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
     // Sort earned badges by issue date (most recent first)
     val sortedEarnedBadges = allEarnedBadges.sortBy { badge =>
       val issuedDate = Option(badge.get(JsonKey.ISSUED_DATE))  // Added by createEarnedBadgeDetail (from issuedOn)
-        .orElse(Option(badge.get(JsonKey.COMPLETED_ON)))
         .map {
           case ts: java.sql.Timestamp => ts.getTime
           case date: java.util.Date => date.getTime
@@ -704,23 +703,6 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
         detail.put("issuedDate", issuedDate.get)
       }
     }
-
-    // Add completedOn if available (will be NULL for in-progress programs)
-    val completedOn = Option(enrolment.get(JsonKey.COMPLETED_ON))
-    if (completedOn.isDefined) {
-      detail.put(JsonKey.COMPLETED_ON, completedOn.get)
-    }
-
-    // Add enrolledDate as fallback for sorting
-    val enrolledDate = Option(enrolment.get(JsonKey.ENROLLED_DATE))
-      .orElse(Option(enrolment.get("datetime")))
-    if (enrolledDate.isDefined) {
-      detail.put(JsonKey.ENROLLED_DATE, enrolledDate.get)
-    }
-
-    // Add flag to indicate if course/program is fully completed
-    detail.put("isCompleted", isCompleted.asInstanceOf[AnyRef])
-
     detail
   }
 
