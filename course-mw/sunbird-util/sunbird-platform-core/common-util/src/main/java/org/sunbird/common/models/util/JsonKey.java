@@ -1327,6 +1327,9 @@ public final class JsonKey {
   public static final String COMPLETED = "Completed";
   public static final String IN_PROGRESS = "In-Progress";
   public static final String ISSUED_DATE = "issuedDate";
+  public static final String FUTURE_EVENT = "futureEvent";
+  public static final String PAST_EVENT = "pastEvent";
+  public static final String PRESENT_EVENT = "presentEvent";
 
   private JsonKey() {}
 }

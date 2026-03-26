@@ -475,21 +475,8 @@ class ExtendedBadgeEnrollmentActor @Inject()(@Named("course-batch-notification-a
           case date: java.util.Date => date.getTime
           case dateStr: String =>
             try {
-              val formats = List(
-                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-                "yyyy-MM-dd'T'HH:mm:ssZ",
-                "yyyy-MM-dd'T'HH:mm:ss'Z'"
-              )
-              formats.view.flatMap { pattern =>
-                try {
-                  val sdf = new java.text.SimpleDateFormat(pattern)
-                  sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
-                  Some(sdf.parse(dateStr).getTime)
-                } catch {
-                  case _: Exception => None
-                }
-              }.headOption.getOrElse(0L)
+              // Parse ISO date string like "2026-03-20T06:30:43.240+0000"
+              java.time.Instant.parse(dateStr).toEpochMilli
             } catch {
               case _: Exception => 0L
             }
