@@ -422,7 +422,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             String contentEndDateStr = (String) contentDetails.get(JsonKey.END_DATE);
             LocalDate contentStartDate = null;
             LocalDate contentEndDate = null;
-            if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
+            if (StringUtils.isNotBlank(contentStartDateStr) && StringUtils.isNotBlank(contentEndDateStr)) {
                 contentStartDate = LocalDate.parse(contentStartDateStr);
                 contentEndDate = LocalDate.parse(contentEndDateStr);
 
@@ -446,19 +446,30 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         }
     }
     private String determineEventType(LocalTime endTime, Map<String, Object> contentDetails) {
+        if (MapUtils.isEmpty(contentDetails)) {
+            log.warn("contentDetails is null or empty");
+            return JsonKey.FUTURE_EVENT;
+        }
         LocalDate currentDate = LocalDate.now();
-        LocalDate eventEndDate = LocalDate.parse(contentDetails.get("endDate").toString());
-        OffsetTime eventEndTime = OffsetTime.parse(contentDetails.get("endTime").toString());
-        LocalDate eventStartDate = LocalDate.parse(contentDetails.get("startDate").toString());
+        String endDateStr = Objects.toString(contentDetails.get(JsonKey.END_DATE), null);
+        String endTimeStr = Objects.toString(contentDetails.get(JsonKey.END_TIME), null);
+        String startDateStr = Objects.toString(contentDetails.get(JsonKey.START_DATE), null);
+        if (StringUtils.isBlank(endDateStr) || StringUtils.isBlank(endTimeStr) || StringUtils.isBlank(startDateStr)) {
+            log.warn("Missing date/time fields in contentDetails: startDate={}, endDate={}, endTime={}", 
+                    startDateStr, endDateStr, endTimeStr);
+            return JsonKey.FUTURE_EVENT;
+        }
+        LocalDate eventEndDate = LocalDate.parse(endDateStr);
+        OffsetTime eventEndTime = OffsetTime.parse(endTimeStr);
+        LocalDate eventStartDate = LocalDate.parse(startDateStr);
         if (eventEndDate.isBefore(currentDate)
                 || (eventEndDate.isEqual(currentDate)
                 && eventEndTime.isBefore(OffsetTime.of(endTime, ZoneOffset.ofHoursMinutes(5, 30))))) {
-            return "pastEvent";
+            return JsonKey.PAST_EVENT;
         } else if (eventStartDate.isEqual(currentDate)) {
-
-            return "presentEvent";
+            return JsonKey.PRESENT_EVENT;
         } else {
-            return "futureEvent";
+            return JsonKey.FUTURE_EVENT;
         }
     }
 
