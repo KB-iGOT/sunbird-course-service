@@ -63,7 +63,7 @@ public class ContentCacheHandlerV2 {
 
         if (content != null && !content.isEmpty()) {
             contentCache.put(id, content);
-            redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
+            //redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
             return content;
         }
 
@@ -109,7 +109,7 @@ public class ContentCacheHandlerV2 {
 
         if (content != null && !content.isEmpty()) {
             contentCache.put(id, content);
-            redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
+            //redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
             return content;
         }
 
