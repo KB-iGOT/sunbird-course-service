@@ -49,6 +49,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   val statusMap: Map[String, Int] = Map("In-Progress" -> 1, "Completed" -> 2, "Not-Started" -> 0)
   val redisCollectionIndex = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("redis_collection_index")))
     (ProjectUtil.getConfigValue("redis_collection_index")).toInt else 10
+  private val bpBatchStatsCacheIndex = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("bp_batch_stats_cache_index")))
+    ProjectUtil.getConfigValue("bp_batch_stats_cache_index").toInt else 2
+  private val bpBatchStatsCacheTtl = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("bp_batch_stats_cache_ttl")))
+    ProjectUtil.getConfigValue("bp_batch_stats_cache_ttl").toInt else 14400
   private val externalCourseEnrolDbInfo = Util.dbInfoMap.get(JsonKey.EXTERNAL_COURSES_ENROLMENT_DB)
   private val cassandraOperation = ServiceFactory.getInstance
   val jsonFields = Set[String]("lrcProgressDetails")
@@ -1088,6 +1092,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
       InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
       cacheUtil.delete(getCacheBatchKey(batchId))
+      incrementBatchApprovedCount(batchId, request.getRequestContext)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
     }
@@ -1190,6 +1195,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId, batchUserData)
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, programId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext, courseLanguage)
         upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
+        incrementBatchApprovedCount(batchId, request.getRequestContext)
         logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
         cacheUtil.delete(getCacheKey(userId))
         generatePreProcessorKafkaEvent(request, batchId, programId, userId)
@@ -1610,6 +1616,37 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case e: Exception =>
         logger.warn(null, s"Failed to fetch badge count for userId $userId: ${e.getMessage}", e)
         -1
+    }
+  }
+
+  /**
+   * Lazy-initialises and increments the "approved" field in the blended-program batch enrollment
+   * stats Redis hash. Key: bp:batch:enrollment:stats:{batchId}, field: "approved".
+   * Must be called after upsertEnrollment so the Cassandra row is already visible.
+   * Uses HSETNX for atomic lazy-init from Cassandra active-participant count on first write;
+   * subsequent writes use HINCRBY directly.
+   */
+  private def incrementBatchApprovedCount(batchId: String, requestContext: RequestContext): Unit = {
+    logger.info(requestContext, s"BatchStats: incrementBatchApprovedCount :: start :: batchId=$batchId")
+    val key = s"bp:batch:enrollment:stats:$batchId"
+    val jedis = cacheUtil.getConnection(bpBatchStatsCacheIndex)
+    try {
+      if (!jedis.hexists(key, "approved")) {
+        // Cache miss: initialise from Cassandra enrollment table (source of truth).
+        // Called post-upsert so the count includes the current user;
+        // subtract 1 so the unconditional HINCRBY below accounts for this enrollment.
+        val baseCount = Math.max(0L, userCoursesDao.countActiveParticipants(requestContext, batchId) - 1L)
+        jedis.hsetnx(key, "approved", baseCount.toString)
+        jedis.expire(key, bpBatchStatsCacheTtl.toLong)
+        logger.info(requestContext, s"BatchStats: Initialised approved cache for batchId=$batchId baseCount=$baseCount ttl=${bpBatchStatsCacheTtl}s")
+      }
+      val newCount = jedis.hincrBy(key, "approved", 1L)
+      logger.info(requestContext, s"BatchStats: Incremented approved count for batchId=$batchId newApprovedCount=$newCount")
+    } catch {
+      case e: Exception =>
+        logger.error(requestContext, s"BatchStats: Failed to update approved count for batchId=$batchId", e)
+    } finally {
+      jedis.close()
     }
   }
 }

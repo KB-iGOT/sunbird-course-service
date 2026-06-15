@@ -545,4 +545,26 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     return offsetFromRequest;
   }
 
+  @Override
+  public long countActiveParticipants(RequestContext requestContext, String batchId) {
+    logger.info(requestContext, "UserCourseDao:: countActiveParticipants:: batchId=" + batchId);
+    try {
+      Response response = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+          requestContext, KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP,
+          JsonKey.BATCH_ID, batchId,
+          Arrays.asList(JsonKey.ACTIVE));
+      List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+      if (CollectionUtils.isEmpty(rows)) {
+        logger.info(requestContext, "UserCourseDao:: countActiveParticipants:: No rows found for batchId=" + batchId);
+        return 0L;
+      }
+      long count = rows.stream().filter(row -> Boolean.TRUE.equals(row.get(JsonKey.ACTIVE))).count();
+      logger.info(requestContext, "UserCourseDao:: countActiveParticipants:: Active participant count for batchId=" + batchId + " is: " + count);
+      return count;
+    } catch (Exception e) {
+      logger.error(requestContext, "UserCourseDao:: countActiveParticipants:: Failed to count active participants for batchId=" + batchId, e);
+      return 0L;
+    }
+  }
+
 }

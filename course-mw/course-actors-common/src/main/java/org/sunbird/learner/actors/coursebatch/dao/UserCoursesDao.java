@@ -86,4 +86,6 @@ public interface UserCoursesDao {
   List<UserCourses> extendedReadAllV2(RequestContext requestContext, String userId, String courseId);
 
   Map<String, Object> getEventParticipantsForExternalTraining(RequestContext requestContext, Map<String, Object> request);
+
+  long countActiveParticipants(RequestContext requestContext, String batchId);
 }
