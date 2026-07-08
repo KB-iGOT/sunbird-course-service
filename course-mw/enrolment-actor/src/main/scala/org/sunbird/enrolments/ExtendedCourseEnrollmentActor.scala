@@ -325,45 +325,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {
-    val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED))
-    if (isNotifyUser) {
-      try {
-        val subCategory = if (actionType.equalsIgnoreCase("reenroll")) {
-          "ENROLLMENT_REENROLL"
-        } else {
-          "ENROLLMENT_UNENROLL"
-        }
-
-        val userName = new HelperMethodService().fetchUserFirstName(userId, requestContext)
-        val placeholders = new java.util.HashMap[String, AnyRef]()
-        placeholders.put("userName", userName)
-        placeholders.put("batchId", batchData.getBatchId)
-        placeholders.put("courseName", batchData.getName)
-        placeholders.put("enrollmentDate", new Timestamp(System.currentTimeMillis()))
-
-        val message = new java.util.HashMap[String, AnyRef]()
-        message.put(JsonKey.DATA, placeholders)
-        message.put(JsonKey.PLACE_HOLDERS, placeholders)
-
-        val helperMethodService = new HelperMethodService()
-        helperMethodService.sendNotification(
-          subCategory,
-          "UPDATE",
-          java.util.Arrays.asList(userId),
-          message
-        )
-
-        logger.info(requestContext,
-          s"notifyUserInAppOnly :: Sent $actionType in-app notification for userId=$userId, batchId=${batchData.getBatchId}")
-      } catch {
-        case e: Exception =>
-          logger.error(requestContext,
-            s"notifyUserInAppOnly :: Failed to send in-app notification: ${e.getMessage}", e)
-      }
-    }
-  }
-
   def list(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
@@ -2092,5 +2053,39 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     event.put(JsonKey.E_DATA, edata)
 
     InstructionEventGenerator.pushInstructionEvent(topic, event)
+  }
+
+  def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {
+    val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED))
+    if (isNotifyUser) {
+      try {
+        val subCategory = if (actionType.equalsIgnoreCase("reenroll")) {
+          JsonKey.ENROLLMENT_REENROLL
+        } else {
+          JsonKey.ENROLLMENT_UNENROLL
+        }
+        val placeholders = new java.util.HashMap[String, AnyRef]()
+        placeholders.put(JsonKey.COURSE_NAME, batchData.getName)
+
+        val message = new java.util.HashMap[String, AnyRef]()
+        message.put(JsonKey.DATA, placeholders)
+        message.put(JsonKey.PLACE_HOLDERS, placeholders)
+
+        val helperMethodService = new HelperMethodService()
+        helperMethodService.sendNotification(
+          subCategory,
+          JsonKey.ALERT,
+          java.util.Arrays.asList(userId),
+          message
+        )
+
+        logger.info(requestContext,
+          s"notifyUserInAppOnly :: Sent $actionType in-app notification for userId=$userId, batchId=${batchData.getBatchId}")
+      } catch {
+        case e: Exception =>
+          logger.error(requestContext,
+            s"notifyUserInAppOnly :: Failed to send in-app notification: ${e.getMessage}", e)
+      }
+    }
   }
 }
