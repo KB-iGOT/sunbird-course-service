@@ -2056,7 +2056,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {
-    val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_BATCH_NOTIFICATIONS_ENABLED))
+    val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED))
     if (isNotifyUser) {
       try {
         val subCategory = if (actionType.equalsIgnoreCase("reenroll")) {

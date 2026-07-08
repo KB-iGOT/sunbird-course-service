@@ -1338,5 +1338,7 @@ public final class JsonKey {
   public static final String DEV_USER_UNENROLMENT_EVENT_TOPIC = "dev_user_unenrolment_event";
   public static final String ENROLLMENT_REENROLL = "ENROLLMENT_REENROLL";
   public static final String ENROLLMENT_UNENROLL = "ENROLLMENT_UNENROLL";
+  public static final String SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED =
+          "sunbird_course_unenroll_and_reenroll_notification_enabled";
   private JsonKey() {}
 }
