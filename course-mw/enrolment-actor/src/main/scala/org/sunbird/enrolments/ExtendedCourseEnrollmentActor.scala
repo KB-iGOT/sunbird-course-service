@@ -2067,8 +2067,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         val placeholders = new java.util.HashMap[String, AnyRef]()
         placeholders.put(JsonKey.COURSE_NAME, batchData.getName)
 
+        val data = new java.util.HashMap[String, AnyRef]()
+        data.put(JsonKey.COURSE_NAME, batchData.getName)
+        data.put(JsonKey.COURSE_ID, batchData.getCourseId)
+        data.put(JsonKey.BATCH_ID, batchData.getBatchId)
+
         val message = new java.util.HashMap[String, AnyRef]()
-        message.put(JsonKey.DATA, placeholders)
+        message.put(JsonKey.DATA, data)
         message.put(JsonKey.PLACE_HOLDERS, placeholders)
 
         val helperMethodService = new HelperMethodService()
