@@ -2068,9 +2068,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         placeholders.put(JsonKey.COURSE_NAME, batchData.getName)
 
         val data = new java.util.HashMap[String, AnyRef]()
-        data.put(JsonKey.COURSE_NAME, batchData.getName)
-        data.put(JsonKey.COURSE_ID, batchData.getCourseId)
-        data.put(JsonKey.BATCH_ID, batchData.getBatchId)
+        data.put(JsonKey.ID, batchData.getCourseId)
 
         val message = new java.util.HashMap[String, AnyRef]()
         message.put(JsonKey.DATA, data)
