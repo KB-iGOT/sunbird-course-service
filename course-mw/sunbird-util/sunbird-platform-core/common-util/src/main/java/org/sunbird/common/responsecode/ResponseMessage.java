@@ -496,6 +496,7 @@ public interface ResponseMessage {
             "Enrollment End date is expired";
     String LEARNING_PATHWAY_BATCH_NOT_FOUND = "Learning pathway batch not found";
     String USER_ENROLLMENT_BATCH_DATA_NOT_FOUND = "USER_ENROLLMENT_BATCH_DATA_NOT_FOUND";
+    String USER_NOT_ELIGIBLE_FOR_REENROLLMENT = "User is not eligible to re-enrol into this course.";
 
   }
 
@@ -919,5 +920,6 @@ public interface ResponseMessage {
     String ENROLLMENT_END_DATE_EXPIRED_ERROR = "ENROLLMENT_END_DATE_END_ERROR";
     String LEARNING_PATHWAY_BATCH_NOT_FOUND = "LEARNING_PATHWAY_BATCH_NOT_FOUND";
     String USER_ENROLLMENT_BATCH_DATA_NOT_FOUND = "USER_ENROLLMENT_BATCH_DATA_NOT_FOUND";
+    String USER_NOT_ELIGIBLE_FOR_REENROLLMENT = "USER_NOT_ELIGIBLE_FOR_REENROLLMENT";
   }
 }
