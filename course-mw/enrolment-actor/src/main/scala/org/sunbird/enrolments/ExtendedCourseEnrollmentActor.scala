@@ -2116,27 +2116,48 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   private def getUserRootOrgAndRoles(userId: String, requestContext: RequestContext): (String, util.List[String]) = {
-    val response: Response = cassandraOperation.getRecordByIdentifier(
+    // Fetch rootOrgId from user table
+    val userResponse = cassandraOperation.getRecordByIdentifier(
       requestContext,
       JsonKey.KEYSPACE_SUNBIRD,
       JsonKey.TABLE_USER,
       userId,
-      util.Arrays.asList(JsonKey.ROOT_ORG_ID, JsonKey.ROLES)
+      util.Arrays.asList(JsonKey.ROOT_ORG_ID)
     )
-    val records = response.getResult
+    val userRecords = userResponse.getResult
       .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
       .asInstanceOf[util.List[util.Map[String, AnyRef]]]
 
-    if (CollectionUtils.isEmpty(records)) {
-      ("", new util.ArrayList[String]())
-    } else {
-      val userRow = records.get(0)
-      val rootOrgId = Option(userRow.get(JsonKey.ROOT_ORG_ID)).map(_.toString).getOrElse("")
-      val roles = Option(userRow.get(JsonKey.ROLES))
-        .map(_.asInstanceOf[util.List[String]])
-        .getOrElse(new util.ArrayList[String]())
-      (rootOrgId, roles)
+    val rootOrgId =
+      if (CollectionUtils.isEmpty(userRecords)) {
+        ""
+      } else {
+        Option(userRecords.get(0).get(JsonKey.ROOT_ORG_ID))
+          .map(_.toString)
+          .getOrElse("")
+      }
+
+    // Fetch roles from user_roles table (one row per role, not a list column)
+    val roleFilters = Map[String, AnyRef](JsonKey.USER_ID -> userId).asJava
+    val rolesResponse = cassandraOperation.getRecordsByProperties(
+      JsonKey.KEYSPACE_SUNBIRD,
+      JsonKey.TABLE_USER_ROLES,
+      roleFilters,
+      util.Arrays.asList(JsonKey.ROLE),
+      requestContext
+    )
+    val roleRecords = rolesResponse.getResult
+      .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+      .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+    val roles = new util.ArrayList[String]()
+
+    if (!CollectionUtils.isEmpty(roleRecords)) {
+      roleRecords.asScala.foreach { record =>
+        Option(record.get(JsonKey.ROLE)).foreach(role => roles.add(role.toString))
+      }
     }
+
+    (rootOrgId, roles)
   }
 
   private def isVolunteerUser(roles: util.List[String]): Boolean = {
