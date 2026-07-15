@@ -88,13 +88,4 @@ public interface UserCoursesDao {
   Map<String, Object> getEventParticipantsForExternalTraining(RequestContext requestContext, Map<String, Object> request);
 
   long countActiveParticipants(RequestContext requestContext, String batchId);
-
-  Response insertUnenrollmentHistory(RequestContext requestContext, Map<String, Object> userCoursesDetails);
-
-  List<UserCourses> extendedReadWithQuorum(RequestContext requestContext, String userId, String courseId);
-
-  Response updateExtendedEnrollV2WithLocalQuorum(RequestContext requestContext, String userId, String courseId, String batchId, Map<String, Object> updateAttributes);
-
-  UserCourses readWithLocalQuorum(RequestContext requestContext, String userId, String courseId, String batchId);
-
 }

@@ -40,7 +40,7 @@ public class CourseEnrollmentRequestValidator extends BaseRequestValidator {
 
   public CourseEnrollmentRequestValidator() {}
 
-  List<String> acceptedStatus = new ArrayList<>(Arrays.asList("In-Progress", "Completed", "Not-Started", "All","Unenrolled"));
+  List<String> acceptedStatus = new ArrayList<>(Arrays.asList("In-Progress", "Completed", "Not-Started", "All"));
 
   public void validateEnrollCourse(Request courseRequestDto) {
     commonValidations(courseRequestDto);

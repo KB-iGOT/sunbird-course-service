@@ -1,6 +1,5 @@
 package org.sunbird.learner.actors.coursebatch.dao.impl;
 
-import com.datastax.driver.core.ConsistencyLevel;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -34,7 +33,6 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   private static final String USER_ENROLMENTS = Util.dbInfoMap.get(JsonKey.USER_ENROLMENTS_DB).getTableName();
   private static final String ENROLMENT_BATCH_LOOKUP = Util.dbInfoMap.get(JsonKey.ENROLLMENT_BATCH_DB).getTableName();
   private static final String USER_ENROLMENTS_V2 = ExtendedUtil.dbInfoMap.get(JsonKey.USER_ENROLMENTS_V2_DB).getTableName();
-  private static final String USER_ENROLMENTS_HISTORY = ExtendedUtil.dbInfoMap.get(JsonKey.USER_ENROLMENTS_HISTORY_DB).getTableName();
   private static final String EXTERNAL_TRAINING_ENROLMENT_BATCH_LOOKUP = ExtendedUtil.dbInfoMap.get(JsonKey.EXTERNAL_TRAINING_ENROLLMENT_BATCH_DB).getTableName();
   public static UserCoursesDao getInstance() {
     if (userCoursesDao == null) {
@@ -567,64 +565,6 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       logger.error(requestContext, "UserCourseDao:: countActiveParticipants:: Failed to count active participants for batchId=" + batchId, e);
       return 0L;
     }
-  }
-
-  public Response insertUnenrollmentHistory(RequestContext requestContext, Map<String, Object> data) {
-    return cassandraOperation.insertRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_HISTORY, data);
-  }
-
-  public List<UserCourses> extendedReadWithQuorum(RequestContext requestContext, String userId, String courseId) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.USER_ID, userId);
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-
-    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, primaryKey, null, ConsistencyLevel.LOCAL_QUORUM);
-    List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-    if (CollectionUtils.isEmpty(userCoursesList)) {
-      return null;
-    }
-    try {
-      return mapper.convertValue(userCoursesList, new TypeReference<List<UserCourses>>() {
-      });
-    } catch (Exception e) {
-      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
-    }
-    return null;
-  }
-
-  @Override
-  public Response updateExtendedEnrollV2WithLocalQuorum(RequestContext requestContext, String userId, String courseId, String batchId, Map<String, Object> updateAttributes) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.USER_ID, userId);
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-    primaryKey.put(JsonKey.BATCH_ID, batchId);
-    Map<String, Object> updateList = new HashMap<>();
-    updateList.putAll(updateAttributes);
-    updateList.remove(JsonKey.BATCH_ID_KEY);
-    updateList.remove(JsonKey.COURSE_ID_KEY);
-    updateList.remove(JsonKey.USER_ID_KEY);
-    return cassandraOperation.updateRecord(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, updateList, primaryKey, ConsistencyLevel.LOCAL_QUORUM);
-
-  }
-
-  @Override
-  public UserCourses readWithLocalQuorum(RequestContext requestContext, String userId, String courseId, String batchId) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.USER_ID, userId);
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-    primaryKey.put(JsonKey.BATCH_ID, batchId);
-    Response response = cassandraOperation.getRecordByIdentifier(requestContext, KEYSPACE_NAME, USER_ENROLMENTS_V2, primaryKey, null, ConsistencyLevel.LOCAL_QUORUM);
-    List<Map<String, Object>> userCoursesList =
-            (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-    if (CollectionUtils.isEmpty(userCoursesList)) {
-      return null;
-    }
-    try {
-      return mapper.convertValue((Map<String, Object>) userCoursesList.get(0), UserCourses.class);
-    } catch (Exception e) {
-      logger.error(requestContext, "Failed to read user enrollments table. Exception: ", e);
-    }
-    return null;
   }
 
 }

@@ -1330,17 +1330,6 @@ public final class JsonKey {
   public static final String FUTURE_EVENT = "futureEvent";
   public static final String PAST_EVENT = "pastEvent";
   public static final String PRESENT_EVENT = "presentEvent";
-  public static final String COURSE_UNENROLL_ALLOWED_PRIMARY_CATEGORY = "course_unenroll_allowed_primary_category";
-  public static final String USER_ENROLMENTS_HISTORY_DB ="enrollment_history_by_action";
-  public static final String ACTION_DATE = "actionDate";
-  public static final String REASON ="reason";
-  public static final String COMMENT = "comment";
-  public static final String DEV_USER_UNENROLMENT_EVENT_TOPIC = "dev_user_unenrolment_event";
-  public static final String ENROLLMENT_REENROLL = "CONTENT_RE_ENROLLED";
-  public static final String ENROLLMENT_UNENROLL = "CONTENT_UN_ENROLLED";
-  public static final String SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED = "sunbird_course_unenroll_and_reenroll_notification_enabled";
-  public static final String ROLE_VOLUNTEER = "VOLUNTEER";
-  public static final String ORG_ELIGIBILITY_INDEX="org_eligibility_index";
-  public static final String TABLE_USER_ROLES = "user_roles";
+
   private JsonKey() {}
 }

@@ -1,6 +1,5 @@
 package org.sunbird.learner.actors.coursebatch.dao.impl;
 
-import com.datastax.driver.core.ConsistencyLevel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -243,35 +242,5 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
     }
     map.put(dateType, calendar.getTime());
     log.info("Updated date in map with key {}: {}", dateType, calendar.getTime());
-  }
-
-  @Override
-  public CourseBatch readByIdWithLocalQuorum(String courseId, String batchId, RequestContext requestContext) {
-
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-    primaryKey.put(JsonKey.BATCH_ID, batchId);
-
-    Response courseBatchResult =
-            cassandraOperation.getRecordByIdentifier(
-                    requestContext,
-                    courseBatchDb.getKeySpace(),
-                    courseBatchDb.getTableName(),
-                    primaryKey,
-                    null,
-                    ConsistencyLevel.LOCAL_QUORUM
-            );
-
-    List<Map<String, Object>> courseList =
-            (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
-
-    if (CollectionUtils.isEmpty(courseList)) {
-      throw new ProjectCommonException(
-              ResponseCode.invalidCourseBatchId.getErrorCode(),
-              ResponseCode.invalidCourseBatchId.getErrorMessage(),
-              ResponseCode.CLIENT_ERROR.getResponseCode());
-    }
-    courseList.get(0).remove(JsonKey.PARTICIPANT);
-    return mapper.convertValue(courseList.get(0), CourseBatch.class);
   }
 }

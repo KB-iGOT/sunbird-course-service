@@ -918,12 +918,6 @@ public enum ResponseCode {
     learningPathwayBatchNotFound(
           ResponseMessage.Key.LEARNING_PATHWAY_BATCH_NOT_FOUND,
           ResponseMessage.Message.LEARNING_PATHWAY_BATCH_NOT_FOUND),
-  enrollmentBatchDataNotFound(
-          ResponseMessage.Key.USER_ENROLLMENT_BATCH_DATA_NOT_FOUND,
-          ResponseMessage.Message.USER_ENROLLMENT_BATCH_DATA_NOT_FOUND),
-  userNotEligibleForReEnrollment(
-          ResponseMessage.Key.USER_NOT_ELIGIBLE_FOR_REENROLLMENT,
-          ResponseMessage.Message.USER_NOT_ELIGIBLE_FOR_REENROLLMENT),
 
   OK(200),
   CLIENT_ERROR(400),

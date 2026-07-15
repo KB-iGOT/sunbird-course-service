@@ -1,6 +1,5 @@
 package org.sunbird.learner.actors.coursebatch.dao.impl;
 
-import com.datastax.driver.core.ConsistencyLevel;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
@@ -106,50 +105,6 @@ public class BatchUserDaoImpl implements BatchUserDao{
         attributeMap = CassandraUtil.changeCassandraColumnMapping(attributeMap);
         return cassandraOperation.updateRecord(
                 requestContext, KEYSPACE_NAME, ENROLLMENT_BATCH, attributeMap, primaryKey);
-    }
-
-    @Override
-    public Response updateBatchLookupRecordWithLocalQuorum(RequestContext requestContext, String batchId, String userId, Map<String, Object> map,Map<String, Object> activeStatus) {
-        Map<String, Object> primaryKey = new HashMap<>();
-        primaryKey.put(JsonKey.BATCH_ID, batchId);
-        primaryKey.put(JsonKey.USER_ID, userId);
-        primaryKey.put(JsonKey.ENROLLED_DATE, map.get("enrolled_date"));
-        Map<String, Object> attributeMap = new HashMap<>();
-        attributeMap.put(JsonKey.ACTIVE, activeStatus.get(JsonKey.ACTIVE));
-        attributeMap = CassandraUtil.changeCassandraColumnMapping(attributeMap);
-        return cassandraOperation.updateRecord(
-                requestContext, KEYSPACE_NAME, ENROLLMENT_BATCH, attributeMap, primaryKey, ConsistencyLevel.LOCAL_QUORUM);
-    }
-
-    @Override
-    public BatchUser readWithLocalQuorum(RequestContext requestContext, String batchId, String userId) {
-        Map<String, Object> primaryKey = new HashMap<>();
-        primaryKey.put(JsonKey.BATCH_ID, batchId);
-        primaryKey.put(JsonKey.USER_ID, userId);
-
-        Response response = cassandraOperation.getRecordByIdentifier(
-                requestContext,
-                KEYSPACE_NAME,
-                ENROLLMENT_BATCH,
-                primaryKey,
-                null,
-                ConsistencyLevel.LOCAL_QUORUM);
-        try {
-            List<Map<String, Object>> batchUserList =
-                    (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-
-            if (CollectionUtils.isEmpty(batchUserList)) {
-                return null;
-            }
-            return mapper.readValue(
-                    mapper.writeValueAsString(batchUserList.get(0)),
-                    new TypeReference<BatchUser>() {
-                    });
-
-        } catch (Exception e) {
-            logger.error(requestContext, "Failed to read BatchUser Table. Exception: ", e);
-            return null;
-        }
     }
 }
 

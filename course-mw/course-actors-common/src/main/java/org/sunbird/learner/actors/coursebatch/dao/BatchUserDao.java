@@ -19,8 +19,6 @@ public interface BatchUserDao {
     Response insertBatchLookupRecord(RequestContext requestContext, Map<String, Object> userCoursesDetails);
 
     Response updateBatchLookupRecord(RequestContext requestContext, String courseId, String batchId, Map<String, Object> updateAttributes,Map<String, Object> activeStatus);
-    Response updateBatchLookupRecordWithLocalQuorum(RequestContext requestContext, String batchId, String userId, Map<String, Object> map,Map<String, Object> activeStatus);
-    BatchUser readWithLocalQuorum(RequestContext requestContext, String batchId, String userId);
 
 
 }

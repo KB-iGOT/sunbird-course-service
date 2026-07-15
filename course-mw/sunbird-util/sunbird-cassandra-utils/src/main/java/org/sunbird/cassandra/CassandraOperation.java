@@ -1,7 +1,6 @@
 /** */
 package org.sunbird.cassandra;
 
-import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.ResultSet;
 import com.google.common.util.concurrent.FutureCallback;
 import java.util.List;
@@ -309,8 +308,4 @@ public interface CassandraOperation {
   Response getRecordsByPropertiesWithoutFiltering(RequestContext requestContext, String keyspaceName, String tableName, String propertyName, Object propertyValue, List<String> fields);
 
   Response getUserRecordFromDB( String keyspaceName, String tableName,String userId, RequestContext requestContext);
-
-  Response getRecordByIdentifier(RequestContext requestContext, String keyspaceName, String tableName, Object key, List<String> fields, ConsistencyLevel consistencyLevel);
-
-  Response updateRecord(RequestContext requestContext, String keyspaceName, String tableName, Map<String, Object> updateAttributes, Map<String, Object> compositeKey, ConsistencyLevel consistencyLevel);
 }

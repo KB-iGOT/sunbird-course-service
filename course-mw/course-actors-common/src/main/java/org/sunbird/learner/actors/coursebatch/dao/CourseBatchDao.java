@@ -67,6 +67,4 @@ public interface CourseBatchDao {
     * Retrieves first available batch
     */
   public CourseBatch readFirstAvailableBatch(String courseId, RequestContext requestContext);
-
-  CourseBatch readByIdWithLocalQuorum(String courseId, String batchId, RequestContext requestContext);
 }
