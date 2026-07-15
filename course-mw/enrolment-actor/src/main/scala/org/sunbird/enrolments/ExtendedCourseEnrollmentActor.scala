@@ -6,7 +6,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.commons.collections4.{CollectionUtils, MapUtils}
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.cache.util.RedisCacheUtil
-import org.sunbird.common.{CassandraUtil, Constants}
+import org.sunbird.common.{CassandraUtil, Constants, ElasticSearchHelper}
 import org.sunbird.common.exception.ProjectCommonException
 import org.sunbird.common.models.response.Response
 import org.sunbird.common.models.util.ProjectUtil.{EnrolmentType, getConfigValue, isNull}
@@ -70,6 +70,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val badgeDbInfo = ExtendedUtil.dbInfoMap.get(ExtendedUtil.USER_BADGE_LOOKUP_DB)
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
+  private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -1870,6 +1871,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
     // Dedicated validation
     validateReEnrollment(batchData, enrolmentData)
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, courseId, request.getRequestContext)
     // Existing inactive enrollment
     val existingEnrolment = enrolmentData.asScala.find(_.getBatchId == batchId).orNull
 
@@ -2097,6 +2100,64 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           logger.error(requestContext,
             s"notifyUserInAppOnly :: Failed to send in-app notification: ${e.getMessage}", e)
       }
+    }
+  }
+
+  // Volunteers may re-enroll only into courses explicitly marked eligible for their root org
+  private def validateVolunteerEligibility(userId: String, courseId: String, requestContext: RequestContext): Unit = {
+    val (rootOrgId, roles) = getUserRootOrgAndRoles(userId, requestContext)
+    if (isVolunteerUser(roles) && !isCourseEligibleForOrg(rootOrgId, courseId, requestContext)) {
+      logger.warn(requestContext, s"Volunteer re-enrollment validation failed for userId=$userId, rootOrgId=$rootOrgId, courseId=$courseId", null)
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.userNotEligibleForReEnrollment,
+        ResponseCode.userNotEligibleForReEnrollment.getErrorMessage
+      )
+    }
+  }
+
+  private def getUserRootOrgAndRoles(userId: String, requestContext: RequestContext): (String, util.List[String]) = {
+    val response: Response = cassandraOperation.getRecordByIdentifier(
+      requestContext,
+      JsonKey.KEYSPACE_SUNBIRD,
+      JsonKey.TABLE_USER,
+      userId,
+      util.Arrays.asList(JsonKey.ROOT_ORG_ID, JsonKey.ROLES)
+    )
+    val records = response.getResult
+      .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+      .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+
+    if (CollectionUtils.isEmpty(records)) {
+      ("", new util.ArrayList[String]())
+    } else {
+      val userRow = records.get(0)
+      val rootOrgId = Option(userRow.get(JsonKey.ROOT_ORG_ID)).map(_.toString).getOrElse("")
+      val roles = Option(userRow.get(JsonKey.ROLES))
+        .map(_.asInstanceOf[util.List[String]])
+        .getOrElse(new util.ArrayList[String]())
+      (rootOrgId, roles)
+    }
+  }
+
+  private def isVolunteerUser(roles: util.List[String]): Boolean = {
+    !CollectionUtils.isEmpty(roles) &&
+      roles.asScala.exists(role => JsonKey.ROLE_VOLUNTEER.equalsIgnoreCase(role))
+  }
+
+  // Reads the org-eligibility document (same ES index used by sunbird-cb-ext) for rootOrgId;
+  // a missing document, or a courseId absent from its courseIds list, means the org is not eligible
+  private def isCourseEligibleForOrg(rootOrgId: String, courseId: String, requestContext: RequestContext): Boolean = {
+    val future = esService.getDataByIdentifier(requestContext, orgEligibilityIndex, rootOrgId)
+    val eligibility = ElasticSearchHelper.getResponseFromFuture(future).asInstanceOf[java.util.Map[String, AnyRef]]
+
+    if (MapUtils.isEmpty(eligibility)) {
+      logger.info(requestContext, s"No org eligibility data found for rootOrgId=$rootOrgId")
+      false
+    } else {
+      val courseIds = Option(eligibility.get(JsonKey.COURSE_IDS))
+        .map(_.asInstanceOf[util.List[String]])
+        .getOrElse(new util.ArrayList[String]())
+      !CollectionUtils.isEmpty(courseIds) && courseIds.contains(courseId)
     }
   }
 }

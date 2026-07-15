@@ -1339,5 +1339,7 @@ public final class JsonKey {
   public static final String ENROLLMENT_REENROLL = "CONTENT_RE_ENROLLED";
   public static final String ENROLLMENT_UNENROLL = "CONTENT_UN_ENROLLED";
   public static final String SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED = "sunbird_course_unenroll_and_reenroll_notification_enabled";
+  public static final String ROLE_VOLUNTEER = "VOLUNTEER";
+  public static final String ORG_ELIGIBILITY_INDEX="org_eligibility_index";
   private JsonKey() {}
 }
