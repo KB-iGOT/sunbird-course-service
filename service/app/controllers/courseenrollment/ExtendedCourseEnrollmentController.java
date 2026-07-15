@@ -453,4 +453,16 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 getAllRequestHeaders(httpRequest),
                 httpRequest);
     }
+
+    public CompletionStage<Result> getEnrolmentDictionary(Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "enrolmentDictionary",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    request.getRequest().put(JsonKey.USER_ID, request.getRequest().get(JsonKey.USER_ID));
+                    return null;
+                },
+                getAllRequestHeaders(httpRequest),
+                httpRequest);
+    }
 }

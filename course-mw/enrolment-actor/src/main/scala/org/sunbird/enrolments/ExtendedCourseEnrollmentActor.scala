@@ -105,6 +105,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "getParticipantsForExternalTrainingBatch" => fetchParticipantsForExternalTrainingBatch(request)
       case "unenrol" => unEnroll(request)
       case "reenrol" => reEnroll(request)
+      case "enrolmentDictionary" => enrolmentDictionary(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -2181,4 +2182,69 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       !CollectionUtils.isEmpty(courseIds) && courseIds.contains(courseId)
     }
   }
+  def enrolmentDictionary(request: Request): Unit = {
+    try {
+      val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+      val courseIds = request.get(JsonKey.IDENTIFIER)
+        .asInstanceOf[java.util.List[String]]
+
+      val distinctCourseIds = courseIds.asScala.distinct
+
+      logger.info(request.getRequestContext,
+        s"enrolmentDictionary :: userId=$userId courseIds=$distinctCourseIds")
+
+      if (StringUtils.isBlank(userId)) {
+        ProjectCommonException.throwClientErrorException(
+          ResponseCode.invalidRequestData, "userId is required")
+      }
+
+      if (CollectionUtils.isEmpty(distinctCourseIds)) {
+        ProjectCommonException.throwClientErrorException(
+          ResponseCode.invalidRequestData, "identifier list is required")
+      }
+
+      val result = distinctCourseIds.map { courseId =>
+        val courseContent = try {
+          if (StringUtils.isNotBlank(courseId))
+            getCourseContent(courseId)
+          else null
+        } catch {
+          case e: Exception =>
+            logger.error(request.getRequestContext,
+              s"Error fetching content for courseId=$courseId", e)
+            null
+        }
+
+        val contentInfo = new java.util.HashMap[String, AnyRef]()
+        if (contentInfo != null) {
+          contentInfo.put(JsonKey.COURSECATEGORY,
+            courseContent.getOrDefault(JsonKey.COURSECATEGORY, ""))
+          contentInfo.put(JsonKey.STATUS,
+            courseContent.getOrDefault(JsonKey.STATUS, ""))
+          contentInfo.put(JsonKey.PRIMARYCATEGORY,
+            courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, ""))
+        }
+
+        val responseMap = new java.util.HashMap[String, AnyRef]()
+        responseMap.put(JsonKey.IDENTIFIER, courseId)
+        responseMap.put(JsonKey.CONTENT, contentInfo)
+        responseMap
+      }.asJava
+
+      val resp = new Response()
+      resp.put(JsonKey.RESPONSE, result)
+      sender().tell(resp, self)
+
+    } catch {
+      case e: ProjectCommonException =>
+        logger.error(request.getRequestContext,
+          s"enrolmentDictionary :: ProjectCommonException :: ${e.getMessage}", e)
+        sender().tell(e, self)
+      case e: Exception =>
+        logger.error(request.getRequestContext,
+          s"enrolmentDictionary :: Exception :: ${e.getMessage}", e)
+        sender().tell(e, self)
+    }
+  }
+
 }
