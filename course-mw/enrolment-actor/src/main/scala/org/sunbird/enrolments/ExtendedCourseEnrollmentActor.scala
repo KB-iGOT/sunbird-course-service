@@ -133,6 +133,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (contentData.isEmpty || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
 
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, courseId, request.getRequestContext)
+
     // Validate batch access
     val batchData: CourseBatch = courseBatchDao.readById(courseId, batchId, request.getRequestContext)
     var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)
@@ -1260,6 +1263,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
         val primaryCategory=contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
+        // Volunteers may re-enroll only into courses eligible for their root org
+        validateVolunteerEligibility(userId, programId, request.getRequestContext)
         if(primaryCategory.equalsIgnoreCase(JsonKey.STANDALONE_ASSESSMENT)) {
           validateEnrolmentV2(batchData, enrolmentData, true,primaryCategory)
         }else{
