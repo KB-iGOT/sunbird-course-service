@@ -2125,8 +2125,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (isVolunteerUser(roles) && !isCourseEligibleForOrg(rootOrgId, courseId, requestContext)) {
       logger.warn(requestContext, s"Volunteer re-enrollment validation failed for userId=$userId, rootOrgId=$rootOrgId, courseId=$courseId", null)
       ProjectCommonException.throwClientErrorException(
-        ResponseCode.userNotEligibleForReEnrollment,
-        ResponseCode.userNotEligibleForReEnrollment.getErrorMessage
+        ResponseCode.userNotEligibleForEnrollment,
+        ResponseCode.userNotEligibleForEnrollment.getErrorMessage
       )
     }
   }
