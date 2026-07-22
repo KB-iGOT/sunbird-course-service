@@ -1774,7 +1774,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
       notifyUserInAppOnly(userId, batchData, "unenroll", request.getRequestContext)
-      val topic = ProjectUtil.getConfigValue(JsonKey.DEV_USER_UNENROLMENT_EVENT_TOPIC)
+      val topic = ProjectUtil.getConfigValue(JsonKey.USER_UNENROLMENT_EVENT_TOPIC)
       publishKarmaPointsReversalEvent(topic,userId,courseId,batchId,request.getRequestContext)
       cacheUtil.delete(getCacheBatchKey(batchId))
     } else {
