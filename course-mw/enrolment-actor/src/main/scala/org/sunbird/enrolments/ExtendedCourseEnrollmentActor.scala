@@ -1556,6 +1556,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val contentData = getContentReadAPIData(learningPathwayId, fieldList, request)
 
     validateLearningPathwayContent(contentData)
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, learningPathwayId, request.getRequestContext)
     val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
 
     val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
