@@ -150,6 +150,7 @@ public class CourseBatchManagementActor extends BaseActor {
             ProjectCommonException.throwClientErrorException(
               ResponseCode.currentBatchSizeInvalid, ResponseCode.currentBatchSizeInvalid.getErrorMessage());
       }
+      CourseBatchUtil.calculateBlendedProgramDuration(contentDetails, courseId, courseBatchId, actorMessage.getRequestContext());
     }
     Response result = courseBatchDao.create(actorMessage.getRequestContext(), courseBatch);
     result.put(JsonKey.BATCH_ID, courseBatchId);
@@ -238,6 +239,10 @@ public class CourseBatchManagementActor extends BaseActor {
     CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall, isExpired);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
+    String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
+    if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      CourseBatchUtil.syncBlendedProgramDurationCache(contentDetails, courseBatch.getCourseId(), batchId, actorMessage.getRequestContext());
+    }
     if (!isExpired && !isPrivateCall) {
           validateUserPermission(courseBatch, requestedBy);
           validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());

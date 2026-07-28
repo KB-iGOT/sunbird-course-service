@@ -301,6 +301,18 @@ class RedisCacheUtil {
         } finally returnConnection(jedis)
     }
 
+    def deleteKey(key: String): Unit = {
+        if (StringUtils.isNotBlank(key)) {
+            val jedis = getConnection
+            try jedis.del(key)
+            catch {
+                case e: Exception =>
+                    logger.error(null, "Exception Occurred While Deleting Record From Redis Cache for Identifier : " + key + " | Exception is : ", e)
+                    throw e
+            } finally returnConnection(jedis)
+        }
+    }
+
     /**
       * This method delete data from cache for all key/keys matched with given pattern
       *
