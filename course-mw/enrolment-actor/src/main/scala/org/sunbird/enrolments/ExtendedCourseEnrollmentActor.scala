@@ -72,8 +72,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
   private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
-  private val zeroDurationCourseCategories: Set[String] =
-    getConfigValue(JsonKey.ZERO_DURATION_COURSE_CATEGORIES).split(",").map(_.trim).toSet
+  private val learningHoursExcludedCourseCategories: Set[String] =
+    getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -659,7 +659,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private def calculateCategorySpecificDuration(courseCategory: String, courseContent: java.util.Map[String, AnyRef],
                                                 courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
     courseCategory match {
-      case category if zeroDurationCourseCategories.contains(category) => 0
+      case category if learningHoursExcludedCourseCategories.contains(category) => 0
       case JsonKey.BLENDED_PROGRAM => calculateBlendedProgramDuration(courseContent, courseDetails, actorMessage)
       case JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM => calculateCapProgramDuration(courseContent, courseDetails, actorMessage)
       case _ => CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)

@@ -65,8 +65,8 @@ public class CourseBatchUtil {
   private static CourseBatchDao courseBatchDao = new CourseBatchDaoImpl();
   private static ContentHierarchyDao contentHierarchyDao = new ContentHierarchyDaoImpl();
   private static RedisCacheUtil cacheUtil = new RedisCacheUtil();
-  private static final Pattern HR_REGEX = Pattern.compile("(\\d+)\\s*(?:hr|hour|h)s?", Pattern.CASE_INSENSITIVE);
-  private static final Pattern MIN_REGEX = Pattern.compile("(\\d+)\\s*(?:min|minute|m)s?", Pattern.CASE_INSENSITIVE);
+  private static final Pattern HOUR_REGEX = Pattern.compile("(\\d+)\\s*(?:hr|hour|h)s?", Pattern.CASE_INSENSITIVE);
+  private static final Pattern MINUTE_REGEX = Pattern.compile("(\\d+)\\s*(?:min|minute|m)s?", Pattern.CASE_INSENSITIVE);
 
   private CourseBatchUtil() {}
 
@@ -490,7 +490,7 @@ public class CourseBatchUtil {
   }
 
   private static Set<String> getAssessmentDurationCourseCategories() {
-    String categories = ProjectUtil.getConfigValue(JsonKey.ASSESSMENT_DURATION_COURSE_CATEGORIES);
+    String categories = ProjectUtil.getConfigValue(JsonKey.LEARNING_HOURS_ASSESSMENT_COURSE_CATEGORIES);
 
     if (StringUtils.isBlank(categories)) {
       return Collections.emptySet();
@@ -546,12 +546,12 @@ public class CourseBatchUtil {
 
     int seconds = 0;
 
-    Matcher matcher = HR_REGEX.matcher(duration);
+    Matcher matcher = HOUR_REGEX.matcher(duration);
     if (matcher.find()) {
       seconds += NumberUtils.toInt(matcher.group(1), 0) * 3600;
     }
 
-    matcher = MIN_REGEX.matcher(duration);
+    matcher = MINUTE_REGEX.matcher(duration);
     if (matcher.find()) {
       seconds += NumberUtils.toInt(matcher.group(1), 0) * 60;
     }
