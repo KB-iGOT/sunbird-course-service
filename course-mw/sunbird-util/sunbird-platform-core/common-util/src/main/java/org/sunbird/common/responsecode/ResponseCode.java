@@ -924,6 +924,9 @@ public enum ResponseCode {
   userNotEligibleForReEnrollment(
           ResponseMessage.Key.USER_NOT_ELIGIBLE_FOR_REENROLLMENT,
           ResponseMessage.Message.USER_NOT_ELIGIBLE_FOR_REENROLLMENT),
+  eventUserNotEligibleForEnrollment(
+          ResponseMessage.Key.EVENT_USER_NOT_ELIGIBLE_FOR_ENROLLMENT,
+          ResponseMessage.Message.EVENT_USER_NOT_ELIGIBLE_FOR_ENROLLMENT),
 
   OK(200),
   CLIENT_ERROR(400),

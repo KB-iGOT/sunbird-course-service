@@ -361,13 +361,13 @@ public class EventsActor extends BaseActor {
                                 && Boolean.TRUE.equals(additionalProperties.get(JsonKey.IS_BHARAT_KALP_MEMBER));
                 if (!isBharatKalpMember) {
                     ProjectCommonException.throwClientErrorException(
-                            ResponseCode.userNotEligibleForEnrollment,
-                            ResponseCode.userNotEligibleForEnrollment.getErrorMessage());
+                            ResponseCode.eventUserNotEligibleForEnrollment,
+                            ResponseCode.eventUserNotEligibleForEnrollment.getErrorMessage());
                 }
             } else {
                 ProjectCommonException.throwClientErrorException(
-                        ResponseCode.userNotEligibleForEnrollment,
-                        ResponseCode.userNotEligibleForEnrollment.getErrorMessage());
+                        ResponseCode.eventUserNotEligibleForEnrollment,
+                        ResponseCode.eventUserNotEligibleForEnrollment.getErrorMessage());
             }
 
         }
