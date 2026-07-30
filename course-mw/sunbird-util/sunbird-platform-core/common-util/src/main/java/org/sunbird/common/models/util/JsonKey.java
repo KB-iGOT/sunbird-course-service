@@ -1344,5 +1344,8 @@ public final class JsonKey {
   public static final String TABLE_USER_ROLES = "user_roles";
   public static final String ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX = "enrolment_dictionary_cache_key_prefix";
   public static final String ENROLMENT_DICTIONARY_CACHE_TTL = "enrolment_dictionary_cache_ttl";
+  public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
+  public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
+  public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
   private JsonKey() {}
 }

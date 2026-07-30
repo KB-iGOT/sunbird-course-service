@@ -1,6 +1,8 @@
 package org.sunbird.learner.actors.coursebatch;
 
 import akka.actor.ActorRef;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -345,6 +347,30 @@ public class EventsActor extends BaseActor {
         Map<String, String> headers =
                 (Map<String, String>) request.getContext().get(JsonKey.HEADER);
         Map<String, Object> contentDetails = getContentDetails(request.getRequestContext(),eventId, headers);
+        List<String> bharatKalpEventResourceType = Arrays.asList(
+                PropertiesCache.getInstance().getProperty(JsonKey.BHARAT_KALP_EVENT_RESOURCE_TYPE).split(","));
+        if (bharatKalpEventResourceType.contains(contentDetails.get(JsonKey.RESOURCE_TYPE))) {
+            Map<String, Object> userInfo = userOrgService.getUserDetailsById(userId, request.getRequestContext());
+            String profileDetailsStr = (String) userInfo.get(JsonKey.PROFILE_DETAILS);
+            if (StringUtils.isNotBlank(profileDetailsStr)) {
+                Map<String, Object> profileDetails = new ObjectMapper().readValue(profileDetailsStr, new TypeReference<Map<String, Object>>() {
+                });
+                Map<String, Object> additionalProperties = (Map<String, Object>) profileDetails.get(JsonKey.ADDITIONAL_PROPERTIES);
+                boolean isBharatKalpMember =
+                        MapUtils.isNotEmpty(additionalProperties)
+                                && Boolean.TRUE.equals(additionalProperties.get(JsonKey.IS_BHARAT_KALP_MEMBER));
+                if (!isBharatKalpMember) {
+                    ProjectCommonException.throwClientErrorException(
+                            ResponseCode.userNotEligibleForEnrollment,
+                            ResponseCode.userNotEligibleForEnrollment.getErrorMessage());
+                }
+            } else {
+                ProjectCommonException.throwClientErrorException(
+                        ResponseCode.userNotEligibleForEnrollment,
+                        ResponseCode.userNotEligibleForEnrollment.getErrorMessage());
+            }
+
+        }
 
         EventBatch batchData = eventBatchDao.readById(eventId, batchId, request.getRequestContext());
         UserEvents enrolmentData = userEventsDao.read(request.getRequestContext(), userId, eventId, batchId);
