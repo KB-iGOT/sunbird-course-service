@@ -19,7 +19,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -72,8 +72,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
   private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
-  private val learningHoursExcludedCourseCategories: Set[String] =
-    getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -616,10 +614,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           coursesInProgress += 1
         }
       } else {
-        val certificatesIssue = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
+        var hoursSpentOnCourses: Int = 0
+        val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
         if (certificatesIssue.nonEmpty) {
-          val courseCategory = courseContent.getOrDefault(JsonKey.COURSECATEGORY, "").asInstanceOf[String]
-          hoursSpentOnCompletedCourses += calculateCategorySpecificDuration(courseCategory, courseContent, courseDetails, actorMessage)
+          if (null != courseContent.get(JsonKey.DURATION)) {
+            hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+          }
+          hoursSpentOnCompletedCourses += hoursSpentOnCourses
           certificateIssued += 1
         }
       }
@@ -654,35 +655,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails.put(JsonKey.KARMA_POINTS, totalUserKarmaPoints.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.ADD_INFO, addInfo.asInstanceOf[AnyRef])
     enrolmentCourseDetails
-  }
-
-  private def calculateCategorySpecificDuration(courseCategory: String, courseContent: java.util.Map[String, AnyRef],
-                                                courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
-    courseCategory match {
-      case category if learningHoursExcludedCourseCategories.contains(category) => 0
-      case JsonKey.BLENDED_PROGRAM => calculateBlendedProgramDuration(courseContent, courseDetails, actorMessage)
-      case JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM => calculateCapProgramDuration(courseContent, courseDetails, actorMessage)
-      case _ => CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
-    }
-  }
-
-  private def calculateBlendedProgramDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
-    val courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
-    val batchId = courseDetails.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]
-    CourseBatchUtil.calculateBlendedProgramDuration(courseContent, courseId, batchId, actorMessage.getRequestContext)
-  }
-
-  private def calculateCapProgramDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
-    val courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
-    val programDuration = CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
-    if (StringUtils.isBlank(courseId)) return programDuration
-
-    val hierarchyMap = CourseBatchUtil.getRedisHierarchyMap(courseId)
-    val children = CourseBatchUtil.getCourseChildren(courseId, hierarchyMap, courseContent, actorMessage.getRequestContext)
-
-    if (CollectionUtils.isEmpty(children)) return programDuration
-    val childrenSum = children.asScala.iterator.map(c => CourseBatchUtil.getDurationAsInt(c, JsonKey.DURATION)).sum
-    math.max(0, programDuration - childrenSum)
   }
 
   def getUserEnrolmentExternalCourseInfo(externalEnrolmentFinalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request) = {
