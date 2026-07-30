@@ -173,6 +173,11 @@ public class CourseBatchManagementActor extends BaseActor {
   //  updateBatchCount(courseBatch);
       String courseName = StringUtils.defaultIfBlank((String) contentDetails.get(JsonKey.NAME), "");
       updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+
+      if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      CourseBatchUtil.calculateBlendedProgramDuration(contentDetails, courseBatch.getCourseId(), courseBatchId, actorMessage.getRequestContext());
+    }
+
     if (courseNotificationActive()) {
       batchOperationNotifier(actorMessage, courseBatch, null);
     }
@@ -238,6 +243,7 @@ public class CourseBatchManagementActor extends BaseActor {
     CourseBatch courseBatch = getUpdateCourseBatch(actorMessage.getRequestContext(), request, oldBatch,isPrivateCall, isExpired);
     courseBatch.setUpdatedDate(ProjectUtil.getTimeStamp());
     Map<String, Object> contentDetails = getContentDetails(actorMessage.getRequestContext(),courseBatch.getCourseId(), headers);
+    String primaryCategory = (String) contentDetails.getOrDefault(JsonKey.PRIMARYCATEGORY, "");
     if (!isExpired && !isPrivateCall) {
           validateUserPermission(courseBatch, requestedBy);
           validateContentOrg(actorMessage.getRequestContext(), courseBatch.getCreatedFor());
@@ -261,6 +267,10 @@ public class CourseBatchManagementActor extends BaseActor {
     TelemetryUtil.addTargetObjectRollUp(rollUp, targetObject);
     TelemetryUtil.telemetryProcessingCall(courseBatchMap, targetObject, correlatedObject, actorMessage.getContext());
     updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+
+    if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      CourseBatchUtil.syncBlendedProgramDurationCache(contentDetails, courseBatch.getCourseId(), batchId, actorMessage.getRequestContext());
+    }
 
     sender().tell(result, self());
     if (courseNotificationActive()) {

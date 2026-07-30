@@ -1347,5 +1347,14 @@ public final class JsonKey {
   public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
   public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
   public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
+  public static final String COMPREHENSIVE_ASSESSMENT_PROGRAM = "Comprehensive Assessment Program";
+  public static final String OFFLINE_SESSION = "Offline";
+  public static final String SESSION_DETAILS_V2 = "sessionDetails_v2";
+  public static final String SESSION_TYPE = "sessionType";
+  public static final String SESSION_DURATION = "sessionDuration";
+  public static final String BLENDED = "bp";
+  public static final String LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES = "learning_hours_excluded_course_categories";
+  public static final String EXPECTED_DURATION = "expectedDuration";
+  public static final String LEARNING_HOURS_ASSESSMENT_COURSE_CATEGORIES = "learning_hours_assessment_course_categories";
   private JsonKey() {}
 }
