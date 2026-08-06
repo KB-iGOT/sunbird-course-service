@@ -2332,6 +2332,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                                courseContent: java.util.Map[String, AnyRef]
                              ): java.util.HashMap[String, AnyRef] = {
 
+
     val contentMap = new java.util.HashMap[String, AnyRef]()
 
     val courseCategory =
@@ -2383,8 +2384,5 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         contentMap.put(JsonKey.CHILD_NODES, childNodes)
       }
     }
-
-    contentMap
-  }
-
+  
 }
