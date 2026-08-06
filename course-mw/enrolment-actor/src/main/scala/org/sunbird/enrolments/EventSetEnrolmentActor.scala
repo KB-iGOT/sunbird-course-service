@@ -77,6 +77,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
       notifyUser(userId, batchData, JsonKey.ADD)
     })
     cacheUtil.delete(getCacheKey(userId))
+    cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
     sender().tell(successResponse(), self)
   }
 
@@ -102,6 +103,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     })
     logger.info(request.getRequestContext, "EventSetEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
     cacheUtil.delete(getCacheKey(userId))
+    cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
     sender().tell(successResponse(), self)
   }
 
@@ -176,6 +178,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     val request: java.util.Map[String, AnyRef] = Map[String, AnyRef](JsonKey.USER_ID -> userId, JsonKey.COURSE_ID -> courseId, JsonKey.BATCH_ID -> batchId, JsonKey.COURSE_ENROLL_DATE -> data.get(JsonKey.COURSE_ENROLL_DATE), JsonKey.ACTIVE -> data.get(JsonKey.ACTIVE)).asJava
     TelemetryUtil.telemetryProcessingCall(request, targetedObject, correlationObject, contextMap, "enrol")
   }
+  def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue("enrolment_dictionary_cache_key_prefix")}"
 
   def getCacheKey(userId: String) = s"$userId:user-enrolments"
 

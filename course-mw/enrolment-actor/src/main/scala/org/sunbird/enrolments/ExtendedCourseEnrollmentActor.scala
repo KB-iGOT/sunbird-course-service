@@ -19,7 +19,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -72,6 +72,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
   private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
+  private val learningHoursExcludedCourseCategories: Set[String] =
+    getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
+  private val learningHoursProgramCourseCategories: Set[String] =
+    getConfigValue(JsonKey.LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES).split(",").map(_.trim).filter(_.nonEmpty).toSet
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -132,6 +136,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
     if (contentData.isEmpty || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
+
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, courseId, request.getRequestContext)
 
     // Validate batch access
     val batchData: CourseBatch = courseBatchDao.readById(courseId, batchId, request.getRequestContext)
@@ -611,13 +618,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           coursesInProgress += 1
         }
       } else {
-        var hoursSpentOnCourses: Int = 0
-        val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
+        val certificatesIssue = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
         if (certificatesIssue.nonEmpty) {
-          if (null != courseContent.get(JsonKey.DURATION)) {
-            hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
-          }
-          hoursSpentOnCompletedCourses += hoursSpentOnCourses
+          val courseCategory = courseContent.getOrDefault(JsonKey.COURSECATEGORY, "").asInstanceOf[String]
+          hoursSpentOnCompletedCourses += calculateCategorySpecificDuration(courseCategory, courseContent, courseDetails, actorMessage)
           certificateIssued += 1
         }
       }
@@ -652,6 +656,44 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails.put(JsonKey.KARMA_POINTS, totalUserKarmaPoints.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.ADD_INFO, addInfo.asInstanceOf[AnyRef])
     enrolmentCourseDetails
+  }
+
+  private def calculateCategorySpecificDuration(courseCategory: String, courseContent: java.util.Map[String, AnyRef],
+                                                courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    courseCategory match {
+      case category if learningHoursExcludedCourseCategories.contains(category) => 0
+      case JsonKey.BLENDED_PROGRAM => calculateBlendedProgramDuration(courseContent, courseDetails, actorMessage)
+      case JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM => calculateCapProgramDuration(courseContent, courseDetails, actorMessage)
+      case category if learningHoursProgramCourseCategories.contains(category) => calculateProgramCourseDuration(courseContent, courseDetails, actorMessage)
+      case _ => CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
+    }
+  }
+
+  private def calculateBlendedProgramDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    val courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+    val batchId = courseDetails.getOrDefault(JsonKey.BATCH_ID, "").asInstanceOf[String]
+    CourseBatchUtil.calculateBlendedProgramDuration(courseContent, courseId, batchId, actorMessage.getRequestContext)
+  }
+
+  private def calculateCapProgramDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    val courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+    val programDuration = CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
+    if (StringUtils.isBlank(courseId)) return programDuration
+
+    val hierarchyMap = CourseBatchUtil.getRedisHierarchyMap(courseId)
+    val children = CourseBatchUtil.getCourseChildren(courseId, hierarchyMap, courseContent, actorMessage.getRequestContext)
+
+    if (CollectionUtils.isEmpty(children)) return programDuration
+    val childrenSum = children.asScala.iterator.map(c => CourseBatchUtil.getDurationAsInt(c, JsonKey.DURATION)).sum
+    math.max(0, programDuration - childrenSum)
+  }
+
+  private def calculateProgramCourseDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    var courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+    if (StringUtils.isBlank(courseId) && courseContent != null) {
+      courseId = courseContent.getOrDefault(JsonKey.IDENTIFIER, "").asInstanceOf[String]
+    }
+    CourseBatchUtil.calculateProgramCourseDuration(courseContent, courseId, actorMessage.getRequestContext)
   }
 
   def getUserEnrolmentExternalCourseInfo(externalEnrolmentFinalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request) = {
@@ -958,6 +1000,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (!isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
     val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, programId, request.getRequestContext)
     val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
     val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
     val verifyBatchType: Boolean = Option(request.getContext.get("verifyBatchType").asInstanceOf[Boolean]).getOrElse(false)
@@ -1258,6 +1302,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
         val primaryCategory=contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
+        // Volunteers may re-enroll only into courses eligible for their root org
+        validateVolunteerEligibility(userId, programId, request.getRequestContext)
         if(primaryCategory.equalsIgnoreCase(JsonKey.STANDALONE_ASSESSMENT)) {
           validateEnrolmentV2(batchData, enrolmentData, true,primaryCategory)
         }else{
@@ -1549,6 +1595,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val contentData = getContentReadAPIData(learningPathwayId, fieldList, request)
 
     validateLearningPathwayContent(contentData)
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, learningPathwayId, request.getRequestContext)
     val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
 
     val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
@@ -1767,7 +1815,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
       notifyUserInAppOnly(userId, batchData, "unenroll", request.getRequestContext)
-      val topic = ProjectUtil.getConfigValue(JsonKey.DEV_USER_UNENROLMENT_EVENT_TOPIC)
+      val topic = ProjectUtil.getConfigValue(JsonKey.USER_UNENROLMENT_EVENT_TOPIC)
       publishKarmaPointsReversalEvent(topic,userId,courseId,batchId,request.getRequestContext)
       cacheUtil.delete(getCacheBatchKey(batchId))
     } else {

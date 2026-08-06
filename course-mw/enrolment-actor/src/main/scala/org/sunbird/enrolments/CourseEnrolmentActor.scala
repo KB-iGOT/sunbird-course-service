@@ -27,7 +27,7 @@ import org.sunbird.learner.actors.group.dao.impl.GroupDaoImpl
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
 import org.sunbird.cache.util.RedisCacheUtil
-import org.sunbird.common.CassandraUtil
+import org.sunbird.common.{CassandraUtil, Constants, ElasticSearchHelper}
 import org.sunbird.common.models.util.ProjectUtil
 import org.sunbird.helper.ServiceFactory
 import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
@@ -40,7 +40,6 @@ import scala.collection.JavaConverters._
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import scala.util.Try
-import org.sunbird.common.Constants
 
 class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") courseBatchNotificationActorRef: ActorRef
                                     )(implicit val  cacheUtil: RedisCacheUtil ) extends BaseEnrolmentActor {
@@ -63,6 +62,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         (ProjectUtil.getConfigValue("redis_collection_index")).toInt else 10
     private val DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd")
     private val pageDbInfo = Util.dbInfoMap.get(JsonKey.USER_KARMA_POINTS_DB)
+    private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
     private val cassandraOperation = ServiceFactory.getInstance
     val jsonFields = Set[String]("lrcProgressDetails")
     private val mapper = new ObjectMapper
@@ -110,6 +110,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
         validateEnrolmentV3(batchData, enrolmentData, true)
+        validateVolunteerEligibility(userId, courseId, request.getRequestContext)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
         val existingEnrolmentForTheBatch: UserCourses = enrolmentData.find(_.getBatchId == batchId).orNull
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, existingEnrolmentForTheBatch, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
@@ -118,6 +119,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
@@ -152,6 +154,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId,courseId, batchId, data, dataBatch, false, request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.REMOVE)
@@ -189,6 +192,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
@@ -493,6 +497,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
 
     def getCacheKey(userId: String) = s"$userId:user-enrolments"
 
+    def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue("enrolment_dictionary_cache_key_prefix")}"
+
     def getCachedEnrolmentList(userId: String, handleEmptyCache: () => Response): Response = {
         val key = getCacheKey(userId)
         val responseString = cacheUtil.get(key)
@@ -658,6 +664,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
         logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
         cacheUtil.delete(getCacheKey(userId))
+        cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
         generatePreProcessorKafkaEvent(request,batchId, programId, userId)
         sender().tell(successResponse(), self)
         generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
@@ -754,6 +761,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
         } catch {
@@ -915,6 +923,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
                 upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
                 logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
                 cacheUtil.delete(getCacheKey(userId))
+                cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
                 generatePreProcessorKafkaEvent(request, batchId, programId, userId)
                 generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
                 notifyUser(userId, batchData, JsonKey.ADD)
@@ -1054,6 +1063,85 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
     }
 
     def getCacheBatchKey(batchId: String) = s"$batchId:active-participants-count"
+
+    // Volunteers may re-enroll only into courses explicitly marked eligible for their root org
+    private def validateVolunteerEligibility(userId: String, courseId: String, requestContext: RequestContext): Unit = {
+        val (rootOrgId, roles) = getUserRootOrgAndRoles(userId, requestContext)
+        if (isVolunteerUser(roles) && !isCourseEligibleForOrg(rootOrgId, courseId, requestContext)) {
+            logger.warn(requestContext, s"Volunteer re-enrollment validation failed for userId=$userId, rootOrgId=$rootOrgId, courseId=$courseId", null)
+            ProjectCommonException.throwClientErrorException(
+                ResponseCode.userNotEligibleForEnrollment,
+                ResponseCode.userNotEligibleForEnrollment.getErrorMessage
+            )
+        }
+    }
+
+    private def getUserRootOrgAndRoles(userId: String, requestContext: RequestContext): (String, util.List[String]) = {
+        // Fetch rootOrgId from user table
+        val userResponse = cassandraOperation.getRecordByIdentifier(
+            requestContext,
+            JsonKey.KEYSPACE_SUNBIRD,
+            JsonKey.TABLE_USER,
+            userId,
+            util.Arrays.asList(JsonKey.ROOT_ORG_ID)
+        )
+        val userRecords = userResponse.getResult
+          .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+          .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+
+        val rootOrgId =
+            if (CollectionUtils.isEmpty(userRecords)) {
+                ""
+            } else {
+                Option(userRecords.get(0).get(JsonKey.ROOT_ORG_ID))
+                  .map(_.toString)
+                  .getOrElse("")
+            }
+
+        // Fetch roles from user_roles table (one row per role, not a list column)
+        val roleFilters = Map[String, AnyRef](JsonKey.USER_ID -> userId).asJava
+        val rolesResponse = cassandraOperation.getRecordsByProperties(
+            JsonKey.KEYSPACE_SUNBIRD,
+            JsonKey.TABLE_USER_ROLES,
+            roleFilters,
+            util.Arrays.asList(JsonKey.ROLE),
+            requestContext
+        )
+        val roleRecords = rolesResponse.getResult
+          .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+          .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+        val roles = new util.ArrayList[String]()
+
+        if (!CollectionUtils.isEmpty(roleRecords)) {
+            roleRecords.asScala.foreach { record =>
+                Option(record.get(JsonKey.ROLE)).foreach(role => roles.add(role.toString))
+            }
+        }
+
+        (rootOrgId, roles)
+    }
+
+    private def isVolunteerUser(roles: util.List[String]): Boolean = {
+        !CollectionUtils.isEmpty(roles) &&
+          roles.asScala.exists(role => JsonKey.ROLE_VOLUNTEER.equalsIgnoreCase(role))
+    }
+
+    // Reads the org-eligibility document (same ES index used by sunbird-cb-ext) for rootOrgId;
+    // a missing document, or a courseId absent from its courseIds list, means the org is not eligible
+    private def isCourseEligibleForOrg(rootOrgId: String, courseId: String, requestContext: RequestContext): Boolean = {
+        val future = esService.getDataByIdentifier(requestContext, orgEligibilityIndex, rootOrgId)
+        val eligibility = ElasticSearchHelper.getResponseFromFuture(future).asInstanceOf[java.util.Map[String, AnyRef]]
+
+        if (MapUtils.isEmpty(eligibility)) {
+            logger.info(requestContext, s"No org eligibility data found for rootOrgId=$rootOrgId")
+            false
+        } else {
+            val courseIds = Option(eligibility.get(JsonKey.COURSE_IDS))
+              .map(_.asInstanceOf[util.List[String]])
+              .getOrElse(new util.ArrayList[String]())
+            !CollectionUtils.isEmpty(courseIds) && courseIds.contains(courseId)
+        }
+    }
 
 }
 
