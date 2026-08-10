@@ -1737,8 +1737,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val courseId: String = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
     val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
     val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
-    val reason: util.List[String] = Option(request.get(JsonKey.REASON)).map(_.asInstanceOf[util.List[String]]).getOrElse(new util.ArrayList[String]())
-    val comment: String = Option(request.get(JsonKey.COMMENT)).map(_.asInstanceOf[String]).getOrElse("")
+    val reason: util.List[String] = Option(request.get(JsonKey.REASONS)).map(_.asInstanceOf[util.List[String]]).getOrElse(new util.ArrayList[String]())
+    if (reason == null || reason.isEmpty) {
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.errorMandatoryParamsEmpty,
+        MessageFormat.format(ResponseCode.errorMandatoryParamsEmpty.getErrorMessage, JsonKey.REASONS)
+      )
+    }
+    val comment: String = Option(request.get(JsonKey.COMMENTS)).map(_.asInstanceOf[String]).getOrElse("")
     logger.info(request.asInstanceOf[Request].getRequestContext, "ExtendedCourseEnrollmentActor Request for un-enroll recieved, UserId : " + userId + ", courseId : " + courseId + ", batchId : " + batchId)
     val batchData: CourseBatch = courseBatchDao.readByIdWithLocalQuorum(courseId, batchId, request.getRequestContext)
     val enrolmentData: UserCourses = userCoursesDao.readWithLocalQuorum(request.getRequestContext, userId, courseId, batchId)

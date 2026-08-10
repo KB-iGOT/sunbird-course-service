@@ -1347,5 +1347,7 @@ public final class JsonKey {
   public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
   public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
   public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
+  public static final String REASONS ="reasons";
+  public static final String COMMENTS = "comments";
   private JsonKey() {}
 }
