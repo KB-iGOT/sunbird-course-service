@@ -301,7 +301,7 @@ public class EventManagementActor extends BaseActor {
                 eventsEnrolled++;
 
                 String lrcProgressDetails = (String) eventDetails.get(JsonKey.LRC_PROGRESS_DETAILS);
-                if (StringUtils.isNotBlank(lrcProgressDetails)) {
+                if (eventDetails.get(JsonKey.ISSUED_CERTIFICATES) != null && StringUtils.isNotBlank(lrcProgressDetails)) {
                     try {
                         JsonNode progressJson = mapper.readTree(lrcProgressDetails);
                         if (progressJson.hasNonNull(JsonKey.DURATION)) {
