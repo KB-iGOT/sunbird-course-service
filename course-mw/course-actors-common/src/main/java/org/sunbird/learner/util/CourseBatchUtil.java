@@ -393,18 +393,106 @@ public class CourseBatchUtil {
         continue;
       }
 
-      String category = String.valueOf(node.getOrDefault(JsonKey.PRIMARYCATEGORY, ""));
-      if (assessmentCategories.contains(category)) {
-        totalDuration += getDurationAsInt(node, JsonKey.EXPECTED_DURATION);
+      String courseCategory = String.valueOf(node.getOrDefault(JsonKey.COURSECATEGORY, ""));
+      if (JsonKey.COURSE.equalsIgnoreCase(courseCategory)) {
+        continue;
       }
 
-      List<Map<String, Object>> children = (List<Map<String, Object>>) node.get(JsonKey.CHILDREN);
-      if (CollectionUtils.isNotEmpty(children)) {
-        totalDuration += calculateProgramChildrenDuration(children, assessmentCategories);
+      String primaryCategory = String.valueOf(node.getOrDefault(JsonKey.PRIMARYCATEGORY, ""));
+      if (assessmentCategories.contains(primaryCategory) || assessmentCategories.contains(courseCategory)) {
+        totalDuration += getDurationAsInt(node, JsonKey.EXPECTED_DURATION);
+      } else {
+        int durationVal = getDurationAsInt(node, JsonKey.DURATION);
+        if (durationVal > 0) {
+          totalDuration += durationVal;
+        }
       }
     }
 
     return totalDuration;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static int calculateLearningPathwayDuration(String courseId, RequestContext requestContext) {
+
+    Map<String, Object> contentMap = getRedisHierarchyMap(courseId);
+
+    if (MapUtils.isEmpty(contentMap)) {
+      return 0;
+    }
+
+    int totalDuration = 0;
+
+    // Process milestone assessment duration
+    List<Map<String, Object>> milestones = (List<Map<String, Object>>) contentMap.get(JsonKey.MILESTONES_V1);
+
+    if (CollectionUtils.isNotEmpty(milestones)) {
+      for (Map<String, Object> milestone : milestones) {
+        if (MapUtils.isEmpty(milestone)) {
+          continue;
+        }
+
+        Map<String, Object> assessmentDetail = (Map<String, Object>) milestone.get(JsonKey.ASSESSMENT_DETAIL);
+
+        if (MapUtils.isNotEmpty(assessmentDetail)) {
+          int duration = getDurationAsInt(assessmentDetail, JsonKey.DURATION);
+          if (duration == 0) {
+            duration = getDurationAsInt(assessmentDetail, JsonKey.EXPECTED_DURATION);
+          }
+          totalDuration += duration;
+        }
+      }
+    }
+
+    // Process preliminary assessment
+    String preliminaryAssessmentId = (String) contentMap.get(JsonKey.PRELIMINARY_ASSESSMENT);
+    if (StringUtils.isNotBlank(preliminaryAssessmentId)) {
+      totalDuration += getPreliminaryAssessmentDuration(preliminaryAssessmentId, requestContext);
+    }
+    return totalDuration;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static int getPreliminaryAssessmentDuration(String assessmentId, RequestContext requestContext) {
+
+    try {
+      int ttl = NumberUtils.toInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL), 0);
+
+      String cacheResponse = cacheUtil.getUsingIndex(assessmentId, null, ttl, 0);
+
+      if (StringUtils.isNotBlank(cacheResponse) && !StringUtils.equals(StringUtils.trim(cacheResponse), "{}")) {
+
+        Map<String, Object> assessmentData = mapper.readValue(cacheResponse, Map.class);
+
+        int duration = getDurationAsInt(assessmentData, JsonKey.EXPECTED_DURATION);
+
+        if (duration == 0) {
+          duration = getDurationAsInt(assessmentData, JsonKey.DURATION);
+        }
+
+        if (duration > 0) {
+          return duration;
+        }
+      }
+    } catch (Exception e) {
+      logger.debug(requestContext, "Error reading preliminaryAssessment from Redis for id: " + assessmentId);
+    }
+
+    // Redis miss/failure → Content API
+    try {
+      Map<String, Object> assessmentContent = ContentCacheHandlerV2.getInstance().getContent(assessmentId);
+
+      int duration = getDurationAsInt(assessmentContent, JsonKey.EXPECTED_DURATION);
+
+      if (duration == 0) {
+        duration = getDurationAsInt(assessmentContent, JsonKey.DURATION);
+      }
+      return duration;
+
+    } catch (Exception e) {
+      logger.warn(requestContext, "Error fetching preliminaryAssessment content for id: " + assessmentId, e);
+      return 0;
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -469,11 +557,16 @@ public class CourseBatchUtil {
         continue;
       }
 
+      String courseCategory = String.valueOf(node.getOrDefault(JsonKey.COURSECATEGORY, ""));
+      if (JsonKey.COURSE.equalsIgnoreCase(courseCategory)) {
+        continue;
+      }
+
       String category = String.valueOf(node.getOrDefault(JsonKey.PRIMARYCATEGORY, ""));
 
       if (JsonKey.LEARNING_RESOURCE.equalsIgnoreCase(category)) {
         totalDuration += getDurationAsInt(node, JsonKey.DURATION);
-      } else if (assessmentCategories.contains(category)) {
+      } else if (assessmentCategories.contains(category) || assessmentCategories.contains(courseCategory)) {
         totalDuration += getDurationAsInt(node, JsonKey.EXPECTED_DURATION);
       }
 

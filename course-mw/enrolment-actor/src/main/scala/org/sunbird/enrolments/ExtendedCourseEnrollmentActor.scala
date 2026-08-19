@@ -664,6 +664,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case category if learningHoursExcludedCourseCategories.contains(category) => 0
       case JsonKey.BLENDED_PROGRAM => calculateBlendedProgramDuration(courseContent, courseDetails, actorMessage)
       case JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM => calculateCapProgramDuration(courseContent, courseDetails, actorMessage)
+      case JsonKey.LEARNING_PATHWAY => calculateLearningPathwayDuration(courseContent, courseDetails, actorMessage)
       case category if learningHoursProgramCourseCategories.contains(category) => calculateProgramCourseDuration(courseContent, courseDetails, actorMessage)
       case _ => CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
     }
@@ -686,6 +687,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (CollectionUtils.isEmpty(children)) return programDuration
     val childrenSum = children.asScala.iterator.map(c => CourseBatchUtil.getDurationAsInt(c, JsonKey.DURATION)).sum
     math.max(0, programDuration - childrenSum)
+  }
+
+  private def calculateLearningPathwayDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    var courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+    if (StringUtils.isBlank(courseId) && courseContent != null) {
+      courseId = courseContent.getOrDefault(JsonKey.IDENTIFIER, "").asInstanceOf[String]
+    }
+    CourseBatchUtil.calculateLearningPathwayDuration(courseId, actorMessage.getRequestContext)
   }
 
   private def calculateProgramCourseDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {

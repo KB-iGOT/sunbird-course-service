@@ -1362,5 +1362,7 @@ public final class JsonKey {
   public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
   public static final String REASONS ="reasons";
   public static final String COMMENTS = "comments";
+  public static final String ASSESSMENT_DETAIL = "assessmentDetail";
+  public static final String PRELIMINARY_ASSESSMENT = "preliminaryAssessment";
   private JsonKey() {}
 }
