@@ -301,7 +301,8 @@ public class EventManagementActor extends BaseActor {
                 eventsCompleted++;
                 eventsEnrolled++;
 
-                if (eventDetails.get(JsonKey.ISSUED_CERTIFICATES) != null && StringUtils.isNotBlank(eventId)) {
+                if (CollectionUtils.isNotEmpty((Collection<?>) eventDetails.get(JsonKey.ISSUED_CERTIFICATES))
+                        && StringUtils.isNotBlank(eventId)) {
                     Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
                     if (MapUtils.isNotEmpty(eventMetadata) && eventMetadata.containsKey(JsonKey.DURATION)) {
                         int durationInMinutes = parseDurationValue(String.valueOf(eventMetadata.get(JsonKey.DURATION)));
