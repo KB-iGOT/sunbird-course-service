@@ -25,7 +25,7 @@ import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.stream.Collectors;
-
+import com.fasterxml.jackson.core.type.TypeReference;
 
 public class EventManagementActor extends BaseActor {
 
@@ -295,20 +295,17 @@ public class EventManagementActor extends BaseActor {
         for (Map<String, Object> eventDetails : finalEnrolment) {
 
             boolean isCompleted = Integer.valueOf(2).equals(eventDetails.get(JsonKey.STATUS));
+            String eventId = (String) eventDetails.get(JsonKey.CONTENT_ID);
 
             if (isCompleted) {
                 eventsCompleted++;
                 eventsEnrolled++;
 
-                String lrcProgressDetails = (String) eventDetails.get(JsonKey.LRC_PROGRESS_DETAILS);
-                if (eventDetails.get(JsonKey.ISSUED_CERTIFICATES) != null && StringUtils.isNotBlank(lrcProgressDetails)) {
-                    try {
-                        JsonNode progressJson = mapper.readTree(lrcProgressDetails);
-                        if (progressJson.hasNonNull(JsonKey.DURATION)) {
-                            hoursSpentOnEvents += parseDurationValue(progressJson.get(JsonKey.DURATION).asText());
-                        }
-                    } catch (Exception e) {
-                        logger.error(request.getRequestContext(), "Error parsing progressDetails JSON", e);
+                if (eventDetails.get(JsonKey.ISSUED_CERTIFICATES) != null && StringUtils.isNotBlank(eventId)) {
+                    Map<String, Object> eventMetadata = getEventMetadata(request, eventId);
+                    if (MapUtils.isNotEmpty(eventMetadata) && eventMetadata.containsKey(JsonKey.DURATION)) {
+                        int durationInMinutes = parseDurationValue(String.valueOf(eventMetadata.get(JsonKey.DURATION)));
+                        hoursSpentOnEvents += (durationInMinutes * 60);
                     }
                 }
                 continue;
@@ -319,11 +316,12 @@ public class EventManagementActor extends BaseActor {
                 continue;
             }
 
-            String eventId = (String) eventDetails.get(JsonKey.CONTENT_ID);
-            Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
+            if (StringUtils.isNotBlank(eventId)) {
+                Map<String, Object> eventMetadata = getEventMetadata(request, eventId);
 
-            if (MapUtils.isNotEmpty(eventMetadata) && JsonKey.LIVE.equalsIgnoreCase((String) eventMetadata.get(JsonKey.STATUS))) {
-                eventsEnrolled++;
+                if (MapUtils.isNotEmpty(eventMetadata) && JsonKey.LIVE.equalsIgnoreCase((String) eventMetadata.get(JsonKey.STATUS))) {
+                    eventsEnrolled++;
+                }
             }
         }
 
@@ -332,6 +330,24 @@ public class EventManagementActor extends BaseActor {
         addInfo.put(JsonKey.HOURS_SPENT, hoursSpentOnEvents);
 
         return addInfo;
+    }
+
+    private Map<String, Object> getEventMetadata(Request request, String eventId) {
+
+        try {
+            String cacheResponse = redisCache.getCache(eventId);
+
+            if (StringUtils.isNotBlank(cacheResponse)) {
+                Map<String, Object> data = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
+
+                if (MapUtils.isNotEmpty(data)) {
+                    return data;
+                }
+            }
+        } catch (Exception e) {
+            logger.debug(request.getRequestContext(), "Error reading event data from Redis for eventId: " + eventId);
+        }
+        return eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
     }
 
     private void eventEnrollmentListForUserBasedOnEventTypes(Request request) throws Exception {
