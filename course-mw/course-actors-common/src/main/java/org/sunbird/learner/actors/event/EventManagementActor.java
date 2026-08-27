@@ -302,7 +302,7 @@ public class EventManagementActor extends BaseActor {
                 eventsEnrolled++;
 
                 if (eventDetails.get(JsonKey.ISSUED_CERTIFICATES) != null && StringUtils.isNotBlank(eventId)) {
-                    Map<String, Object> eventMetadata = getEventMetadata(request, eventId);
+                    Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
                     if (MapUtils.isNotEmpty(eventMetadata) && eventMetadata.containsKey(JsonKey.DURATION)) {
                         int durationInMinutes = parseDurationValue(String.valueOf(eventMetadata.get(JsonKey.DURATION)));
                         hoursSpentOnEvents += (durationInMinutes * 60);
@@ -317,7 +317,7 @@ public class EventManagementActor extends BaseActor {
             }
 
             if (StringUtils.isNotBlank(eventId)) {
-                Map<String, Object> eventMetadata = getEventMetadata(request, eventId);
+                Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
 
                 if (MapUtils.isNotEmpty(eventMetadata) && JsonKey.LIVE.equalsIgnoreCase((String) eventMetadata.get(JsonKey.STATUS))) {
                     eventsEnrolled++;
@@ -330,24 +330,6 @@ public class EventManagementActor extends BaseActor {
         addInfo.put(JsonKey.HOURS_SPENT, hoursSpentOnEvents);
 
         return addInfo;
-    }
-
-    private Map<String, Object> getEventMetadata(Request request, String eventId) {
-
-        try {
-            String cacheResponse = redisCache.getCache(eventId);
-
-            if (StringUtils.isNotBlank(cacheResponse)) {
-                Map<String, Object> data = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
-
-                if (MapUtils.isNotEmpty(data)) {
-                    return data;
-                }
-            }
-        } catch (Exception e) {
-            logger.debug(request.getRequestContext(), "Error reading event data from Redis for eventId: " + eventId);
-        }
-        return eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
     }
 
     private void eventEnrollmentListForUserBasedOnEventTypes(Request request) throws Exception {
