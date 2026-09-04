@@ -2139,7 +2139,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     event.put(JsonKey.ACTOR, actor)
     event.put(JsonKey.E_DATA, edata)
 
-    InstructionEventGenerator.pushInstructionEvent(topic, event)
+    InstructionEventGenerator.pushInstructionEventWithEnvelope("", topic, "UNENROLMENT", event)
   }
 
   def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {

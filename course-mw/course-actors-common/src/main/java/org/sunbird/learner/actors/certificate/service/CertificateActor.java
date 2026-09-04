@@ -131,50 +131,26 @@ public class CertificateActor extends BaseActor {
    */
   private void pushInstructionEvent(
       String batchId, String courseId, List<String> userIds, boolean reIssue, long reissueDateTime) throws Exception {
-    Map<String, Object> data = new HashMap<>();
-
-    data.put(
-        CourseJsonKey.ACTOR,
-        new HashMap<String, Object>() {
-          {
-            put(JsonKey.ID, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorId());
-            put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorType());
+    Map<String, Object> edata = new HashMap<String, Object>() {
+      {
+        if (CollectionUtils.isNotEmpty(userIds)) {
+          put(JsonKey.USER_IDs, userIds);
+        }
+        put(JsonKey.COURSE_ID, courseId);
+        put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
+        put("completedLanguage", "en");
+        put(JsonKey.BATCH_ID, batchId);
+        put(CourseJsonKey.ITERATION, 1);
+        if (reIssue) {
+          put(CourseJsonKey.REISSUE, true);
+          if (reissueDateTime > 0) {
+            put(CourseJsonKey.REISSUE_DATE, reissueDateTime);
           }
-        });
-
-    String id = OneWayHashing.encryptVal(batchId + CourseJsonKey.UNDERSCORE + courseId);
-    data.put(
-        CourseJsonKey.OBJECT,
-        new HashMap<String, Object>() {
-          {
-            put(JsonKey.ID, id);
-            put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getType());
-          }
-        });
-
-    data.put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
-
-    data.put(
-        CourseJsonKey.E_DATA,
-        new HashMap<String, Object>() {
-          {
-            if (CollectionUtils.isNotEmpty(userIds)) {
-              put(JsonKey.USER_IDs, userIds);
-            }
-            put(JsonKey.BATCH_ID, batchId);
-            put(JsonKey.COURSE_ID, courseId);
-            put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
-            put(CourseJsonKey.ITERATION, 1);
-            if (reIssue) {
-              put(CourseJsonKey.REISSUE, true);
-              if (reissueDateTime > 0) {
-                put(CourseJsonKey.REISSUE_DATE, reissueDateTime);
-              }
-            }
-          }
-        });
+        }
+      }
+    };
     String topic = ProjectUtil.getConfigValue("kafka_topics_certificate_instruction");
-    InstructionEventGenerator.pushInstructionEvent(batchId, topic, data);
+    InstructionEventGenerator.pushFlatEnvelopeEvent(batchId, topic, "COURSE_COMPLETION", edata);
   }
 
   private void issueEventCertificate(Request request) {

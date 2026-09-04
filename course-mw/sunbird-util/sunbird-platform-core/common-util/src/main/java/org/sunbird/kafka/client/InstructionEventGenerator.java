@@ -104,7 +104,12 @@ public class InstructionEventGenerator {
   }
   public static void createCourseEnrolmentEvent(String key, String topic, Map<String, Object> data)
           throws Exception {
-    String courseEnrolEvent = formEventData(data);
+    createCourseEnrolmentEvent(key, topic, "FIRST_ENROLMENT", data);
+  }
+
+  public static void createCourseEnrolmentEvent(String key, String topic, String eventType, Map<String, Object> data)
+          throws Exception {
+    String courseEnrolEvent = formEventData(eventType, data);
     if (StringUtils.isBlank(courseEnrolEvent)) {
       throw new ProjectCommonException(
               "BE_JOB_REQUEST_EXCEPTION",
@@ -122,15 +127,20 @@ public class InstructionEventGenerator {
     }
   }
 
-  private static String formEventData(Map<String, Object> data) {
+  private static String formEventData(String eventType, Map<String, Object> data) {
     Map<String, Object> eData = new HashMap<>();
 
     if (MapUtils.isNotEmpty((Map) data.get("edata"))) {
       eData.putAll((Map) data.get("edata"));
     }
 
+    Map<String, Object> innerData = new HashMap<>();
+    innerData.put("edata", eData);
+
     Map<String, Object> formattedData = new HashMap<>();
-    formattedData.put("edata", eData);
+    formattedData.put("eventType", eventType);
+    formattedData.put("data", innerData);
+    formattedData.put("version", 2);
 
     String jsonMessage = null;
     try {
@@ -153,6 +163,63 @@ public class InstructionEventGenerator {
     if (StringUtils.isNotBlank(topic)) {
       if (StringUtils.isNotBlank(key)) KafkaClient.send(key, message, topic);
       else KafkaClient.send(message, topic);
+    } else {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Invalid topic id.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+  }
+
+  public static void pushInstructionEventWithEnvelope(String key, String topic, String eventType, Map<String, Object> data)
+          throws Exception {
+    String beJobRequestEvent = generateInstructionEventMetadata(data);
+    if (StringUtils.isBlank(beJobRequestEvent)) {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Event is not generated properly.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    Map<String, Object> envelope = new HashMap<>();
+    envelope.put("eventType", eventType);
+    envelope.put("data", mapper.readValue(beJobRequestEvent, Map.class));
+    envelope.put("version", 2);
+    String envelopedEvent = mapper.writeValueAsString(envelope);
+    if (StringUtils.isNotBlank(topic)) {
+      if (StringUtils.isNotBlank(key)) KafkaClient.send(key, envelopedEvent, topic);
+      else KafkaClient.send(envelopedEvent, topic);
+    } else {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Invalid topic id.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+  }
+
+  public static void pushFlatEnvelopeEvent(String key, String topic, String eventType, Map<String, Object> edata)
+          throws Exception {
+    Map<String, Object> message = new HashMap<>();
+    message.put("eid", beJobRequesteventId);
+    message.put("ets", System.currentTimeMillis());
+    message.put("mid", "LP." + System.currentTimeMillis() + "." + UUID.randomUUID());
+    message.put("eventType", eventType);
+    message.put("edata", edata);
+
+    String jsonMessage = null;
+    try {
+      jsonMessage = mapper.writeValueAsString(message);
+    } catch (Exception e) {
+      ProjectLogger.log("Error creating JSON message: " + e.getMessage(), e);
+    }
+    if (StringUtils.isBlank(jsonMessage)) {
+      throw new ProjectCommonException(
+              "BE_JOB_REQUEST_EXCEPTION",
+              "Event is not generated properly.",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    if (StringUtils.isNotBlank(topic)) {
+      if (StringUtils.isNotBlank(key)) KafkaClient.send(key, jsonMessage, topic);
+      else KafkaClient.send(jsonMessage, topic);
     } else {
       throw new ProjectCommonException(
               "BE_JOB_REQUEST_EXCEPTION",
