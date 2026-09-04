@@ -174,7 +174,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.BATCH_ID, batchId)
       dataMap.put("edata", requestMap)
       val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-      InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+      InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
     }
@@ -1215,7 +1215,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.BATCH_ID,batchId)
       dataMap.put("edata",requestMap)
       val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-      InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+      InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
       cacheUtil.delete(getCacheBatchKey(batchId))
       incrementBatchApprovedCount(batchId, request.getRequestContext)
     } else {
@@ -2004,7 +2004,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.BATCH_ID,batchId)
       dataMap.put(JsonKey.E_DATA,requestMap)
       val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-      InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+      InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(
         ResponseCode.accessDeniedToEnrolOrUnenrolCourse,
@@ -2139,7 +2139,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     event.put(JsonKey.ACTOR, actor)
     event.put(JsonKey.E_DATA, edata)
 
-    InstructionEventGenerator.pushInstructionEventWithEnvelope("", topic, "UNENROLMENT", event)
+    InstructionEventGenerator.pushInstructionEventWithEnvelope(userId, topic, "UNENROLMENT", event)
   }
 
   def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {

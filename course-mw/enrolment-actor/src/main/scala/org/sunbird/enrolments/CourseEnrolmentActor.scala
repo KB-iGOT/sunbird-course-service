@@ -130,7 +130,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             requestMap.put(JsonKey.BATCH_ID,batchId)
             dataMap.put("edata",requestMap)
             val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
             cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
@@ -203,7 +203,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             requestMap.put(JsonKey.BATCH_ID,batchId)
             dataMap.put("edata",requestMap)
             val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
             cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
