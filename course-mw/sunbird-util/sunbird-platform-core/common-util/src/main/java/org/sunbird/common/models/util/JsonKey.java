@@ -1370,5 +1370,9 @@ public final class JsonKey {
   public static final String EVENT_TYPE_COURSE_COMPLETION = "COURSE_COMPLETION";
   public static final String COMPLETED_LANGUAGE = "completedLanguage";
   public static final String DEFAULT_COMPLETED_LANGUAGE = "en";
+  public static final String EVENT_TYPE_EVENT_ATTENDED = "EVENT_ATTENDED";
+  public static final String BE_JOB_REQUEST_EXCEPTION = "BE_JOB_REQUEST_EXCEPTION";
+  public static final String EVENT_NOT_GENERATED_PROPERLY = "Event is not generated properly.";
+  public static final String INVALID_TOPIC_ID = "Invalid topic id.";
   private JsonKey() {}
 }

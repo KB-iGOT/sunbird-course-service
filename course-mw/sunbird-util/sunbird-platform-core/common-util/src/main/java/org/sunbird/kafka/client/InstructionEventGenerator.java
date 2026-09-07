@@ -8,6 +8,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.models.util.ProjectLogger;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.telemetry.dto.TelemetryBJREvent;
@@ -141,7 +142,7 @@ public class InstructionEventGenerator {
     Map<String, Object> formattedData = new HashMap<>();
     formattedData.put(JsonKey.EVENT_TYPE, eventType);
     formattedData.put(JsonKey.DATA, innerData);
-    formattedData.put(JsonKey.VERSION, 2);
+    formattedData.put(JsonKey.VERSION, Integer.parseInt(ProjectUtil.getConfigValue("kafka_event_envelope_version")));
 
     String jsonMessage = null;
     try {
@@ -177,22 +178,22 @@ public class InstructionEventGenerator {
     String beJobRequestEvent = generateInstructionEventMetadata(data);
     if (StringUtils.isBlank(beJobRequestEvent)) {
       throw new ProjectCommonException(
-              "BE_JOB_REQUEST_EXCEPTION",
-              "Event is not generated properly.",
+              JsonKey.BE_JOB_REQUEST_EXCEPTION,
+              JsonKey.EVENT_NOT_GENERATED_PROPERLY,
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
     Map<String, Object> envelope = new HashMap<>();
     envelope.put(JsonKey.EVENT_TYPE, eventType);
     envelope.put(JsonKey.DATA, mapper.readValue(beJobRequestEvent, Map.class));
-    envelope.put(JsonKey.VERSION, 2);
+    envelope.put(JsonKey.VERSION, Integer.parseInt(ProjectUtil.getConfigValue("kafka_event_envelope_version")));
     String envelopedEvent = mapper.writeValueAsString(envelope);
     if (StringUtils.isNotBlank(topic)) {
       if (StringUtils.isNotBlank(key)) KafkaClient.send(key, envelopedEvent, topic);
       else KafkaClient.send(envelopedEvent, topic);
     } else {
       throw new ProjectCommonException(
-              "BE_JOB_REQUEST_EXCEPTION",
-              "Invalid topic id.",
+              JsonKey.BE_JOB_REQUEST_EXCEPTION,
+              JsonKey.INVALID_TOPIC_ID,
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
@@ -214,8 +215,8 @@ public class InstructionEventGenerator {
     }
     if (StringUtils.isBlank(jsonMessage)) {
       throw new ProjectCommonException(
-              "BE_JOB_REQUEST_EXCEPTION",
-              "Event is not generated properly.",
+              JsonKey.BE_JOB_REQUEST_EXCEPTION,
+              JsonKey.EVENT_NOT_GENERATED_PROPERLY,
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
     if (StringUtils.isNotBlank(topic)) {
@@ -223,8 +224,8 @@ public class InstructionEventGenerator {
       else KafkaClient.send(jsonMessage, topic);
     } else {
       throw new ProjectCommonException(
-              "BE_JOB_REQUEST_EXCEPTION",
-              "Invalid topic id.",
+              JsonKey.BE_JOB_REQUEST_EXCEPTION,
+              JsonKey.INVALID_TOPIC_ID,
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
   }
