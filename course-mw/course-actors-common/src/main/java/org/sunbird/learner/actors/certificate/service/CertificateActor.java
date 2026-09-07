@@ -138,7 +138,7 @@ public class CertificateActor extends BaseActor {
         }
         put(JsonKey.COURSE_ID, courseId);
         put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
-        put("completedLanguage", "en");
+        put(JsonKey.COMPLETED_LANGUAGE, JsonKey.DEFAULT_COMPLETED_LANGUAGE);
         put(JsonKey.BATCH_ID, batchId);
         put(CourseJsonKey.ITERATION, 1);
         if (reIssue) {
@@ -150,7 +150,7 @@ public class CertificateActor extends BaseActor {
       }
     };
     String topic = ProjectUtil.getConfigValue("kafka_topics_certificate_instruction");
-    InstructionEventGenerator.pushFlatEnvelopeEvent(batchId, topic, "COURSE_COMPLETION", edata);
+    InstructionEventGenerator.pushFlatEnvelopeEvent(batchId, topic, JsonKey.EVENT_TYPE_COURSE_COMPLETION, edata);
   }
 
   private void issueEventCertificate(Request request) {

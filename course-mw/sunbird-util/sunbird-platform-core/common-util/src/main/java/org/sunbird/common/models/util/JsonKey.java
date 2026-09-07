@@ -1364,5 +1364,11 @@ public final class JsonKey {
   public static final String COMMENTS = "comments";
   public static final String ASSESSMENT_DETAIL = "assessmentDetail";
   public static final String PRELIMINARY_ASSESSMENT = "preliminaryAssessment";
+  public static final String EVENT_TYPE = "eventType";
+  public static final String EVENT_TYPE_FIRST_ENROLMENT = "FIRST_ENROLMENT";
+  public static final String EVENT_TYPE_UNENROLMENT = "UNENROLMENT";
+  public static final String EVENT_TYPE_COURSE_COMPLETION = "COURSE_COMPLETION";
+  public static final String COMPLETED_LANGUAGE = "completedLanguage";
+  public static final String DEFAULT_COMPLETED_LANGUAGE = "en";
   private JsonKey() {}
 }

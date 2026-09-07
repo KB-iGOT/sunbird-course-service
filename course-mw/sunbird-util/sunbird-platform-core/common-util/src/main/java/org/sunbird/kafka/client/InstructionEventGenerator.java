@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.common.exception.ProjectCommonException;
+import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.ProjectLogger;
 import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.telemetry.dto.TelemetryBJREvent;
@@ -104,7 +105,7 @@ public class InstructionEventGenerator {
   }
   public static void createCourseEnrolmentEvent(String key, String topic, Map<String, Object> data)
           throws Exception {
-    createCourseEnrolmentEvent(key, topic, "FIRST_ENROLMENT", data);
+    createCourseEnrolmentEvent(key, topic, JsonKey.EVENT_TYPE_FIRST_ENROLMENT, data);
   }
 
   public static void createCourseEnrolmentEvent(String key, String topic, String eventType, Map<String, Object> data)
@@ -135,12 +136,12 @@ public class InstructionEventGenerator {
     }
 
     Map<String, Object> innerData = new HashMap<>();
-    innerData.put("edata", eData);
+    innerData.put(JsonKey.E_DATA, eData);
 
     Map<String, Object> formattedData = new HashMap<>();
-    formattedData.put("eventType", eventType);
-    formattedData.put("data", innerData);
-    formattedData.put("version", 2);
+    formattedData.put(JsonKey.EVENT_TYPE, eventType);
+    formattedData.put(JsonKey.DATA, innerData);
+    formattedData.put(JsonKey.VERSION, 2);
 
     String jsonMessage = null;
     try {
@@ -181,9 +182,9 @@ public class InstructionEventGenerator {
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
     Map<String, Object> envelope = new HashMap<>();
-    envelope.put("eventType", eventType);
-    envelope.put("data", mapper.readValue(beJobRequestEvent, Map.class));
-    envelope.put("version", 2);
+    envelope.put(JsonKey.EVENT_TYPE, eventType);
+    envelope.put(JsonKey.DATA, mapper.readValue(beJobRequestEvent, Map.class));
+    envelope.put(JsonKey.VERSION, 2);
     String envelopedEvent = mapper.writeValueAsString(envelope);
     if (StringUtils.isNotBlank(topic)) {
       if (StringUtils.isNotBlank(key)) KafkaClient.send(key, envelopedEvent, topic);
@@ -202,8 +203,8 @@ public class InstructionEventGenerator {
     message.put("eid", beJobRequesteventId);
     message.put("ets", System.currentTimeMillis());
     message.put("mid", "LP." + System.currentTimeMillis() + "." + UUID.randomUUID());
-    message.put("eventType", eventType);
-    message.put("edata", edata);
+    message.put(JsonKey.EVENT_TYPE, eventType);
+    message.put(JsonKey.E_DATA, edata);
 
     String jsonMessage = null;
     try {
