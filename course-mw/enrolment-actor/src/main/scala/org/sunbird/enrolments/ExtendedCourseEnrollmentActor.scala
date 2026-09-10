@@ -46,6 +46,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd")
   var contentHierarchyDao: ContentHierarchyDaoImpl = new ContentHierarchyDaoImpl()
   private val pageDbInfo = Util.dbInfoMap.get(JsonKey.USER_KARMA_POINTS_DB)
+  private val karmaCoinWalletDbInfo = Util.dbInfoMap.get(JsonKey.USER_KARMA_COIN_WALLET_DB)
   var isRetiredCoursesIncludedInEnrolList = false
   val statusMap: Map[String, Int] = Map("In-Progress" -> 1, "Completed" -> 2, "Not-Started" -> 0)
   val redisCollectionIndex = if (StringUtils.isNotBlank(ProjectUtil.getConfigValue("redis_collection_index")))
@@ -649,12 +650,28 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val objectMapper = new ObjectMapper().registerModule(DefaultScalaModule)
       addInfo = objectMapper.readValue(addInfoString, classOf[util.Map[String, AnyRef]])
     }
+    val userKarmaCoinWallet = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+      actorMessage.getRequestContext,
+      karmaCoinWalletDbInfo.getKeySpace,
+      karmaCoinWalletDbInfo.getTableName,
+      JsonKey.USER_ID,
+      userId,
+      util.Arrays.asList(JsonKey.TOTAL_EARNED, JsonKey.TOTAL_REDEEMED)
+    )
+    val walletResponse: java.util.List[util.Map[String, AnyRef]] = userKarmaCoinWallet.get(JsonKey.RESPONSE).asInstanceOf[java.util.List[util.Map[String, AnyRef]]]
+    val walletBalance: Int = walletResponse.asScala.collectFirst {
+      case record: util.Map[String, AnyRef] if record.containsKey(JsonKey.TOTAL_EARNED) =>
+        val totalEarned = record.get(JsonKey.TOTAL_EARNED).asInstanceOf[Integer].toInt
+        val totalRedeemed = Option(record.get(JsonKey.TOTAL_REDEEMED)).map(_.asInstanceOf[Integer].toInt).getOrElse(0)
+        totalEarned - totalRedeemed
+    }.getOrElse(0)
     val enrolmentCourseDetails = new util.HashMap[String, AnyRef]()
     enrolmentCourseDetails.put(JsonKey.TIME_SPENT_ON_COMPLETED_COURSES, hoursSpentOnCompletedCourses.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.CERITFICATES_ISSUED, certificateIssued.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.COURSES_IN_PROGRESS, coursesInProgress.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.KARMA_POINTS, totalUserKarmaPoints.asInstanceOf[AnyRef])
     enrolmentCourseDetails.put(JsonKey.ADD_INFO, addInfo.asInstanceOf[AnyRef])
+    enrolmentCourseDetails.put(JsonKey.WALLET_BALANCE, walletBalance.asInstanceOf[AnyRef])
     enrolmentCourseDetails
   }
 
@@ -2388,7 +2405,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
       }
     }
-
     if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase(courseCategory) && courseContent != null) {
 
       val childNodes = courseContent.get(JsonKey.CHILD_NODES)

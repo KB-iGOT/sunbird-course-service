@@ -1135,6 +1135,10 @@ public final class JsonKey {
   public static final String USER_KARMA_POINTS_DB = "user_karma_points_summary";
   public static final String USER_KARMA_TOTAL_POINTS = "total_points";
   public static final String ADD_INFO = "addinfo";
+  public static final String USER_KARMA_COIN_WALLET_DB = "user_karma_coin_wallet";
+  public static final String TOTAL_EARNED = "total_earned";
+  public static final String TOTAL_REDEEMED = "total_redeemed";
+  public static final String WALLET_BALANCE = "walletBalance";
   public static final String USERID_LIST="userIdList";
   public static final String LRC_PROGRESS_DETAILS = "lrcProgressDetails";
   public static final String USERS_COUNT = "system.count(userid)";
