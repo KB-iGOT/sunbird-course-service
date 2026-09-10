@@ -738,7 +738,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
     "version": 2
     }""".replaceAll("\n","")
     if(pushTokafkaEnabled){
-      val topic = ProjectUtil.getConfigValue("user_claim_event_karma_point")
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
       KafkaClient.send(userId, event, topic)
     }
   }
