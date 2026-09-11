@@ -130,27 +130,27 @@ public class CertificateActor extends BaseActor {
    * @throws Exception
    */
   private void pushInstructionEvent(
-          String batchId, String courseId, List<String> userIds, boolean reIssue, long reissueDateTime) throws Exception {
+      String batchId, String courseId, List<String> userIds, boolean reIssue, long reissueDateTime) throws Exception {
     Map<String, Object> data = new HashMap<>();
 
     data.put(
-            CourseJsonKey.ACTOR,
-            new HashMap<String, Object>() {
-              {
-                put(JsonKey.ID, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorId());
-                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorType());
-              }
-            });
+        CourseJsonKey.ACTOR,
+        new HashMap<String, Object>() {
+          {
+            put(JsonKey.ID, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorId());
+            put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorType());
+          }
+        });
 
     String id = OneWayHashing.encryptVal(batchId + CourseJsonKey.UNDERSCORE + courseId);
     data.put(
-            CourseJsonKey.OBJECT,
-            new HashMap<String, Object>() {
-              {
-                put(JsonKey.ID, id);
-                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getType());
-              }
-            });
+        CourseJsonKey.OBJECT,
+        new HashMap<String, Object>() {
+          {
+            put(JsonKey.ID, id);
+            put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getType());
+          }
+        });
 
     data.put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
 
