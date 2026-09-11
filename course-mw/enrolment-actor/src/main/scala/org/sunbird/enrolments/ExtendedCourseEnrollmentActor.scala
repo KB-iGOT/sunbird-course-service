@@ -174,7 +174,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.USER_ID, userId)
       requestMap.put(JsonKey.BATCH_ID, batchId)
       dataMap.put("edata", requestMap)
-      val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
       InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
@@ -1231,7 +1231,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.USER_ID,userId)
       requestMap.put(JsonKey.BATCH_ID,batchId)
       dataMap.put("edata",requestMap)
-      val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
       InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
       cacheUtil.delete(getCacheBatchKey(batchId))
       incrementBatchApprovedCount(batchId, request.getRequestContext)
@@ -1847,7 +1847,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
       notifyUserInAppOnly(userId, batchData, "unenroll", request.getRequestContext)
-      val topic = ProjectUtil.getConfigValue(JsonKey.USER_UNENROLMENT_EVENT_TOPIC)
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
       publishKarmaPointsReversalEvent(topic,userId,courseId,batchId,request.getRequestContext)
       cacheUtil.delete(getCacheBatchKey(batchId))
     } else {
@@ -2020,7 +2020,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       requestMap.put(JsonKey.USER_ID,userId)
       requestMap.put(JsonKey.BATCH_ID,batchId)
       dataMap.put(JsonKey.E_DATA,requestMap)
-      val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
       InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(
