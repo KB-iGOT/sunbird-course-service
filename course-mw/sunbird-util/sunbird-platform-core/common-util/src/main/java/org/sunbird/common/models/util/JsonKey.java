@@ -1349,6 +1349,14 @@ public final class JsonKey {
   public static final String ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX = "enrolment_dictionary_cache_key_prefix";
   public static final String ENROLMENT_DICTIONARY_CACHE_TTL = "enrolment_dictionary_cache_ttl";
   public static final String COMPREHENSIVE_ASSESSMENT_PROGRAM = "Comprehensive Assessment Program";
+  // Config key holding the primaryCategory value that gates the mandatory-course-completion
+  // check (see ExtendedCourseEnrollmentActor.validateMandatoryCourseCompletion) - kept distinct
+  // from COMPREHENSIVE_ASSESSMENT_PROGRAM since it identifies a separately-tagged category.
+  public static final String COMPREHENSIVE_ASSESSMENT_CATEGORY_CONFIG = "comprehensive_assessment_category";
+  // cb-ext-course-service base URL + path for the CbPlan user-dictionary lookup, used to
+  // resolve CA eligibility and mandatory-course list (see CbPlanUtil).
+  public static final String CB_EXT_COURSE_SERVICE_BASE_URL = "cb_ext_course_service_base_url";
+  public static final String CB_PLAN_USER_DICTIONARY_URL = "/cbplan/v4/user/dictionary";
   public static final String OFFLINE_SESSION = "Offline";
   public static final String SESSION_DETAILS_V2 = "sessionDetails_v2";
   public static final String SESSION_TYPE = "sessionType";
