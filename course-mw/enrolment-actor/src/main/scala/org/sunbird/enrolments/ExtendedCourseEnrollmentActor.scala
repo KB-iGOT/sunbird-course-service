@@ -19,7 +19,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, CbPlanUtil, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -117,6 +117,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "unenrol" => unEnroll(request)
       case "reenrol" => reEnroll(request)
       case "enrolmentDictionary" => enrolmentDictionary(request)
+      case "validateMandatoryCourseCompletion" => validateMandatoryCourseCompletion(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -178,6 +179,49 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
+    }
+  }
+
+  // Standalone, additive validation: checks whether a user is eligible for (linked via a
+  // CbPlan to) a Comprehensive Assessment do_id, and if so, whether they've completed that
+  // plan's mandatory prerequisite courses. Does not enroll, and does not touch
+  // enroll/unenroll/reenroll. The content-category check is a fast no-op guard - the actual
+  // eligibility/mandatory-course data always comes from cb-ext-course-service's CbPlan
+  // dictionary, never from content metadata.
+  def validateMandatoryCourseCompletion(request: Request): Unit = {
+    val doId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
+    val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    val contentData = getContentReadAPIData(doId, List(JsonKey.COURSECATEGORY), request)
+    val courseCategory = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+    val configuredCategory = getConfigValue(JsonKey.COMPREHENSIVE_ASSESSMENT_CATEGORY_CONFIG)
+    if (StringUtils.isBlank(configuredCategory) || !configuredCategory.equalsIgnoreCase(courseCategory)) {
+      // Not a Comprehensive Assessment do_id under this check - nothing to enforce.
+      sender().tell(successResponse(), self)
+    } else {
+      val headers = request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]()).asInstanceOf[util.Map[String, String]]
+      val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
+      val plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
+      if (plan == null) {
+        logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: no eligible CbPlan found for userId=$userId, doId=$doId", null)
+        ProjectCommonException.throwClientErrorException(
+          ResponseCode.notEligibleForAssessment,
+          ResponseCode.notEligibleForAssessment.getErrorMessage
+        )
+      } else {
+        val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
+        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
+          userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
+            .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+        if (incompleteCourseIds.nonEmpty) {
+          logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
+          ProjectCommonException.throwClientErrorException(
+            ResponseCode.mandatoryCoursesNotCompleted,
+            ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
+          )
+        } else {
+          sender().tell(successResponse(), self)
+        }
+      }
     }
   }
 

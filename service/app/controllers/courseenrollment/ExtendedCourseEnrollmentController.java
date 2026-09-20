@@ -171,6 +171,25 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 httpRequest);
     }
 
+    public CompletionStage<Result> validateMandatoryCourseCompletion(String doId, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "validateMandatoryCourseCompletion",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.COURSE_ID, doId);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
     public CompletionStage<Result> enrolmentUserInfoStats(String uid, Http.Request httpRequest) {
         return handleRequest(extendedCourseEnrolmentActor, "enrolmentInfoStats",
                 httpRequest.body().asJson(),
