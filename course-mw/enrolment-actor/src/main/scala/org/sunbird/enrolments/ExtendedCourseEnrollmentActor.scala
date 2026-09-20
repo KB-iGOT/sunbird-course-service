@@ -15,6 +15,7 @@ import org.sunbird.common.request.{Request, RequestContext}
 import org.sunbird.common.responsecode.ResponseCode
 import org.sunbird.helper.ServiceFactory
 import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
+import org.sunbird.learner.actors.accesssettings.AccessSettingsUtil
 import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
@@ -183,11 +184,12 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   // Standalone, additive validation: checks whether a user is eligible for (linked via a
-  // CbPlan to) a Comprehensive Assessment do_id, and if so, whether they've completed that
-  // plan's mandatory prerequisite courses. Does not enroll, and does not touch
-  // enroll/unenroll/reenroll. The content-category check is a fast no-op guard - the actual
-  // eligibility/mandatory-course data always comes from cb-ext-course-service's CbPlan
-  // dictionary, never from content metadata.
+  // CbPlan to) a Comprehensive Assessment do_id, and if so, validates every mandatory
+  // prerequisite course under that plan in two stages: (1) the user must be eligible per that
+  // course's own access_setting_rules_v2 rules, and (2) the user must have completed it. Does
+  // not enroll, and does not touch enroll/unenroll/reenroll. The content-category check is a
+  // fast no-op guard - the actual eligibility/mandatory-course data always comes from
+  // cb-ext-course-service's CbPlan dictionary, never from content metadata.
   def validateMandatoryCourseCompletion(request: Request): Unit = {
     val doId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
@@ -209,17 +211,29 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         )
       } else {
         val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
-        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
-          userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
-            .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
-        if (incompleteCourseIds.nonEmpty) {
-          logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
+        val ineligibleCourseIds = mandatoryCourseIds.filterNot(courseId => {
+          val mandatoryCourseContentData = getContentReadAPIData(courseId, List(JsonKey.ACCESS_SETTINGS_ENABLED), request)
+          AccessSettingsUtil.isUserEligibleForAccessSettings(request.getRequestContext, mandatoryCourseContentData, courseId, userId)
+        })
+        if (ineligibleCourseIds.nonEmpty) {
+          logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: user not eligible per access settings for mandatory courses, userId=$userId, doId=$doId, courses=${ineligibleCourseIds.mkString(",")}", null)
           ProjectCommonException.throwClientErrorException(
-            ResponseCode.mandatoryCoursesNotCompleted,
-            ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
+            ResponseCode.mandatoryCoursesAccessRestricted,
+            ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
           )
         } else {
-          sender().tell(successResponse(), self)
+          val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
+            userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
+              .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+          if (incompleteCourseIds.nonEmpty) {
+            logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
+            ProjectCommonException.throwClientErrorException(
+              ResponseCode.mandatoryCoursesNotCompleted,
+              ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
+            )
+          } else {
+            sender().tell(successResponse(), self)
+          }
         }
       }
     }

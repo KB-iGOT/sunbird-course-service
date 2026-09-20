@@ -481,6 +481,7 @@ public interface ResponseMessage {
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND_COURSE = "This course has been created for select learners, please keep your profile updated to ensure such selective content/s if meant for you can be enrolled.";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND_PROGRAM = "This program has been created for select learners, please keep your profile updated to ensure such selective content/s if meant for you can be enrolled.";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "User is not eligible to enrol into this course.";
+    String MANDATORY_COURSES_ACCESS_RESTRICTED = "You are not eligible for one or more mandatory courses required for this assessment.";
     String MANDATORY_COURSES_NOT_COMPLETED = "Please complete all mandatory courses before attempting this assessment.";
     String NOT_ELIGIBLE_FOR_ASSESSMENT = "You are not eligible to attempt this comprehensive assessment.";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "Invalid completion percentage, completion percentage should not be greater than 100.";
@@ -909,6 +910,7 @@ public interface ResponseMessage {
     String COURSE_NOT_FOUND = "COURSE_NOT_FOUND";
     String ACCESS_RULES_ENABLED_BUT_NOT_FOUND = "ACCESS_RULES_ENABLED_BUT_NOT_FOUND";
     String USER_NOT_ELIGIBLE_FOR_ENROLLMENT = "USER_NOT_ELIGIBLE_FOR_ENROLLMENT";
+    String MANDATORY_COURSES_ACCESS_RESTRICTED = "MANDATORY_COURSES_ACCESS_RESTRICTED";
     String MANDATORY_COURSES_NOT_COMPLETED = "MANDATORY_COURSES_NOT_COMPLETED";
     String NOT_ELIGIBLE_FOR_ASSESSMENT = "NOT_ELIGIBLE_FOR_ASSESSMENT";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "INVALID_COMPLETION_PERCENTAGE_ERROR";
