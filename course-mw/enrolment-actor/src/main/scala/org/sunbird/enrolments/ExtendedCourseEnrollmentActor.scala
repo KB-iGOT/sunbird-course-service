@@ -119,6 +119,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case "reenrol" => reEnroll(request)
       case "enrolmentDictionary" => enrolmentDictionary(request)
       case "validateMandatoryCourseCompletion" => validateMandatoryCourseCompletion(request)
+      case "autoEnrollComprehensiveAssessment" => autoEnrollComprehensiveAssessment(request)
       case _ => ProjectCommonException.throwClientErrorException(ResponseCode.invalidRequestData,
         ResponseCode.invalidRequestData.getErrorMessage)
     }
@@ -183,6 +184,73 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
+  // Single-hop Comprehensive Assessment auto-enrollment: validates CbPlan eligibility and
+  // mandatory-course completion, then auto-resolves a batch and enrolls - all in one call, no
+  // round-trip to another service required. Unlike validateMandatoryCourseCompletion (which is
+  // CA-category-agnostic, a no-op for non-CA content), this endpoint is CA-only: a category
+  // mismatch is a hard error, since there's no generic fallback at this path. Mirrors enroll()'s
+  // tail (batch resolution via validateEnrolmentV3, upsert, telemetry, notification, kafka
+  // event) as its own block rather than refactoring enroll() itself - same convention already
+  // used by enrollProgram/enrollBlendedProgram in this file.
+  def autoEnrollComprehensiveAssessment(request: Request): Unit = {
+    val doId = request.get(JsonKey.COURSE_ID).asInstanceOf[String]
+    val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    val recentLangOpt = Option(request.get(JsonKey.RECENT_LANGUAGE).asInstanceOf[String])
+
+    val contentData = getContentReadAPIData(doId, List(JsonKey.COURSECATEGORY, JsonKey.PRIMARYCATEGORY, JsonKey.IDENTIFIER), request)
+    val courseCategory = contentData.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+    val configuredCategory = getConfigValue(JsonKey.COMPREHENSIVE_ASSESSMENT_CATEGORY_CONFIG)
+    if (StringUtils.isBlank(configuredCategory) || !configuredCategory.equalsIgnoreCase(courseCategory)) {
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, doId)
+    }
+
+    val headers = request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]()).asInstanceOf[util.Map[String, String]]
+    validateCbPlanEligibilityAndMandatoryCourses(userId, doId, headers, request)
+
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, doId, request.getRequestContext)
+
+    val batchData: CourseBatch = courseBatchDao.readFirstAvailableBatch(doId, request.getRequestContext)
+    val batchId = batchData.getBatchId
+    logger.info(request.getRequestContext, s"autoEnrollComprehensiveAssessment :: resolved batchId=$batchId for doId=$doId, userId=$userId")
+
+    var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, doId)
+    if (CollectionUtils.isEmpty(enrolmentData)) enrolmentData = new util.ArrayList[UserCourses]()
+    val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
+    validateEnrolmentV3(batchData, enrolmentData, true)
+
+    val dataBatch = createBatchUserMapping(batchId, userId, batchUserData)
+    val existingEnrolmentForTheBatch = enrolmentData.asScala.find(_.getBatchId == batchId).orNull
+    val recentLang: String = recentLangOpt.getOrElse("")
+    val requestId: String = request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String]
+    val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, doId, batchId, existingEnrolmentForTheBatch, requestId, request.getRequestContext, recentLang)
+
+    val hasAccess = ContentUtil.getContentRead(doId, headers)
+    if (hasAccess) {
+      upsertEnrollment(userId, doId, batchId, data, dataBatch, existingEnrolmentForTheBatch == null, request.getRequestContext)
+      cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
+      val resp = successResponse()
+      resp.put(JsonKey.BATCH_ID, batchId)
+      sender().tell(resp, self)
+      logger.info(request.getRequestContext, s"autoEnrollComprehensiveAssessment :: enrollment successful | doId=$doId, batchId=$batchId, userId=$userId")
+
+      generateTelemetryAudit(userId, doId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
+      val recentLanguage = data.getOrDefault(JsonKey.RECENT_LANGUAGE, "").asInstanceOf[String]
+      notifyUser(userId, batchData, JsonKey.ADD, recentLanguage)
+      val dataMap = new java.util.HashMap[String, AnyRef]
+      val requestMap = new java.util.HashMap[String, AnyRef]
+      requestMap.put(JsonKey.COURSE_ID, doId)
+      requestMap.put(JsonKey.USER_ID, userId)
+      requestMap.put(JsonKey.BATCH_ID, batchId)
+      dataMap.put("edata", requestMap)
+      val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
+      InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
+    } else {
+      ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, doId)
+    }
+  }
+
   // Standalone, additive validation: checks whether a user is eligible for (linked via a
   // CbPlan to) a Comprehensive Assessment do_id, and if so, validates every mandatory
   // prerequisite course under that plan in two stages: (1) the user must be eligible per that
@@ -201,39 +269,46 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(successResponse(), self)
     } else {
       val headers = request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]()).asInstanceOf[util.Map[String, String]]
-      val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
-      val plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
-      if (plan == null) {
-        logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: no eligible CbPlan found for userId=$userId, doId=$doId", null)
+      validateCbPlanEligibilityAndMandatoryCourses(userId, doId, headers, request)
+      sender().tell(successResponse(), self)
+    }
+  }
+
+  // Core CbPlan eligibility + mandatory-course validation, extracted so both the standalone
+  // validateMandatoryCourseCompletion endpoint and autoEnrollComprehensiveAssessment share one
+  // implementation. Throws ProjectCommonException on failure; returns normally on success -
+  // callers decide how to respond (reply directly, or continue on to enroll).
+  private def validateCbPlanEligibilityAndMandatoryCourses(userId: String, doId: String, headers: util.Map[String, String], request: Request): Unit = {
+    val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
+    val plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
+    if (plan == null) {
+      logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: no eligible CbPlan found for userId=$userId, doId=$doId", null)
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.notEligibleForAssessment,
+        ResponseCode.notEligibleForAssessment.getErrorMessage
+      )
+    } else {
+      val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
+      val ineligibleCourseIds = mandatoryCourseIds.filterNot(courseId => {
+        val mandatoryCourseContentData = getContentReadAPIData(courseId, List(JsonKey.ACCESS_SETTINGS_ENABLED), request)
+        AccessSettingsUtil.isUserEligibleForAccessSettings(request.getRequestContext, mandatoryCourseContentData, courseId, userId)
+      })
+      if (ineligibleCourseIds.nonEmpty) {
+        logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: user not eligible per access settings for mandatory courses, userId=$userId, doId=$doId, courses=${ineligibleCourseIds.mkString(",")}", null)
         ProjectCommonException.throwClientErrorException(
-          ResponseCode.notEligibleForAssessment,
-          ResponseCode.notEligibleForAssessment.getErrorMessage
+          ResponseCode.mandatoryCoursesAccessRestricted,
+          ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
         )
       } else {
-        val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
-        val ineligibleCourseIds = mandatoryCourseIds.filterNot(courseId => {
-          val mandatoryCourseContentData = getContentReadAPIData(courseId, List(JsonKey.ACCESS_SETTINGS_ENABLED), request)
-          AccessSettingsUtil.isUserEligibleForAccessSettings(request.getRequestContext, mandatoryCourseContentData, courseId, userId)
-        })
-        if (ineligibleCourseIds.nonEmpty) {
-          logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: user not eligible per access settings for mandatory courses, userId=$userId, doId=$doId, courses=${ineligibleCourseIds.mkString(",")}", null)
+        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
+          userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
+            .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+        if (incompleteCourseIds.nonEmpty) {
+          logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
           ProjectCommonException.throwClientErrorException(
-            ResponseCode.mandatoryCoursesAccessRestricted,
-            ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
+            ResponseCode.mandatoryCoursesNotCompleted,
+            ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
           )
-        } else {
-          val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
-            userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
-              .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
-          if (incompleteCourseIds.nonEmpty) {
-            logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
-            ProjectCommonException.throwClientErrorException(
-              ResponseCode.mandatoryCoursesNotCompleted,
-              ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
-            )
-          } else {
-            sender().tell(successResponse(), self)
-          }
         }
       }
     }
