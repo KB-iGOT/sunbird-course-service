@@ -20,7 +20,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, CbPlanUtil, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, CbPlanLookupException, CbPlanUtil, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -279,8 +279,18 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   // implementation. Throws ProjectCommonException on failure; returns normally on success -
   // callers decide how to respond (reply directly, or continue on to enroll).
   private def validateCbPlanEligibilityAndMandatoryCourses(userId: String, doId: String, headers: util.Map[String, String], request: Request): Unit = {
-    val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
-    val plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
+    var plan: util.Map[String, Object] = null
+    try {
+      val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
+      plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
+    } catch {
+      case e: CbPlanLookupException =>
+        logger.error(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CbPlan lookup failed for userId=$userId, doId=$doId", e)
+        ProjectCommonException.throwServerErrorException(
+          ResponseCode.assessmentEligibilityCheckFailed,
+          ResponseCode.assessmentEligibilityCheckFailed.getErrorMessage
+        )
+    }
     if (plan == null) {
       logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: no eligible CbPlan found for userId=$userId, doId=$doId", null)
       ProjectCommonException.throwClientErrorException(

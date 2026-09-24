@@ -894,6 +894,9 @@ public enum ResponseCode {
   notEligibleForAssessment(
       ResponseMessage.Key.NOT_ELIGIBLE_FOR_ASSESSMENT,
       ResponseMessage.Message.NOT_ELIGIBLE_FOR_ASSESSMENT),
+  assessmentEligibilityCheckFailed(
+      ResponseMessage.Key.ASSESSMENT_ELIGIBILITY_CHECK_FAILED,
+      ResponseMessage.Message.ASSESSMENT_ELIGIBILITY_CHECK_FAILED),
   invalidCompletionPercentage(
           ResponseMessage.Key.INVALID_COMPLETION_PERCENTAGE_ERROR,
           ResponseMessage.Message.INVALID_COMPLETION_PERCENTAGE_ERROR),

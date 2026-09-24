@@ -484,6 +484,7 @@ public interface ResponseMessage {
     String MANDATORY_COURSES_ACCESS_RESTRICTED = "You are not eligible for one or more mandatory courses required for this assessment.";
     String MANDATORY_COURSES_NOT_COMPLETED = "Please complete all mandatory courses before attempting this assessment.";
     String NOT_ELIGIBLE_FOR_ASSESSMENT = "You are not eligible to attempt this comprehensive assessment.";
+    String ASSESSMENT_ELIGIBILITY_CHECK_FAILED = "Unable to verify your eligibility for this assessment right now. Please try again later.";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "Invalid completion percentage, completion percentage should not be greater than 100.";
     String BATCH_NOT_FOUND = "Batch not found for the given course id.";
     String BATCH_ID_MISSING_ERROR = "Please provide program id.";
@@ -913,6 +914,7 @@ public interface ResponseMessage {
     String MANDATORY_COURSES_ACCESS_RESTRICTED = "MANDATORY_COURSES_ACCESS_RESTRICTED";
     String MANDATORY_COURSES_NOT_COMPLETED = "MANDATORY_COURSES_NOT_COMPLETED";
     String NOT_ELIGIBLE_FOR_ASSESSMENT = "NOT_ELIGIBLE_FOR_ASSESSMENT";
+    String ASSESSMENT_ELIGIBILITY_CHECK_FAILED = "ASSESSMENT_ELIGIBILITY_CHECK_FAILED";
     String INVALID_COMPLETION_PERCENTAGE_ERROR = "INVALID_COMPLETION_PERCENTAGE_ERROR";
     String BATCH_NOT_FOUND = "BATCH_NOT_FOUND";
     String BATCH_ID_MISSING_ERROR = "BATCH_ID_REQUIRED_ERROR";

@@ -31,7 +31,9 @@ public final class CbPlanUtil {
   /**
    * Fetches the calling user's CbPlan dictionary. The user is derived server-side by
    * cb-ext-course-service from the forwarded auth token, so {@code headers} must contain
-   * x-authenticated-user-token. Returns an empty map on any failure (fail-closed).
+   * x-authenticated-user-token. Throws {@link CbPlanLookupException} if the call fails or the
+   * response can't be parsed - callers must not treat this the same as a legitimate empty
+   * dictionary (that would misreport a system failure as "not eligible").
    */
   @SuppressWarnings("unchecked")
   public static Map<String, Object> getCbPlanDictionary(
@@ -43,19 +45,23 @@ public final class CbPlanUtil {
       String response = HttpUtil.sendPostRequest(url, "{\"request\":{}}", headers);
       if (response == null || response.isEmpty()) {
         logger.error(requestContext, "CbPlanUtil: empty response from CbPlan dictionary API", null);
-        return new HashMap<>();
+        throw new CbPlanLookupException("Empty response from CbPlan dictionary API", null);
       }
       return mapper.readValue(response, Map.class);
+    } catch (CbPlanLookupException e) {
+      throw e;
     } catch (Exception e) {
       logger.error(requestContext, "CbPlanUtil: error fetching CbPlan dictionary", e);
-      return new HashMap<>();
+      throw new CbPlanLookupException("Failed to fetch CbPlan dictionary", e);
     }
   }
 
   /**
    * Scans every plan year's aparPlanList/nonAparPlanList (each a Map keyed by planId) for the
-   * plan whose comprehensiveAssessment identifier equals doId. Returns null if none found (or on
-   * a malformed response) - fail-closed, meaning "not eligible".
+   * plan whose comprehensiveAssessment identifier equals doId. Returns null if none found - a
+   * legitimate "not eligible" outcome. Throws {@link CbPlanLookupException} if the (already
+   * successfully-fetched) dictionary has an unexpected/unparseable structure - that's a system
+   * failure, not "not eligible".
    */
   @SuppressWarnings("unchecked")
   public static Map<String, Object> findPlanForComprehensiveAssessment(
@@ -78,6 +84,7 @@ public final class CbPlanUtil {
       }
     } catch (Exception e) {
       logger.error(null, "CbPlanUtil: error parsing CbPlan dictionary response", e);
+      throw new CbPlanLookupException("Malformed CbPlan dictionary response", e);
     }
     return null;
   }

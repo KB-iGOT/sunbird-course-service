@@ -43,22 +43,18 @@ public class CbPlanUtilTest {
     assertTrue(result.containsKey("result"));
   }
 
-  @Test
-  public void getCbPlanDictionary_emptyResponse_returnsEmptyMap() throws Exception {
+  @Test(expected = CbPlanLookupException.class)
+  public void getCbPlanDictionary_emptyResponse_throwsLookupException() throws Exception {
     when(HttpUtil.sendPostRequest(anyString(), anyString(), any())).thenReturn("");
 
-    Map<String, Object> result = CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
-
-    assertTrue(result.isEmpty());
+    CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
   }
 
-  @Test
-  public void getCbPlanDictionary_httpUtilThrows_failsClosedToEmptyMap() throws Exception {
+  @Test(expected = CbPlanLookupException.class)
+  public void getCbPlanDictionary_httpUtilThrows_throwsLookupException() throws Exception {
     when(HttpUtil.sendPostRequest(anyString(), anyString(), any())).thenThrow(new RuntimeException("timeout"));
 
-    Map<String, Object> result = CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
-
-    assertTrue(result.isEmpty());
+    CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
   }
 
   // ---------- findPlanForComprehensiveAssessment ----------
@@ -100,6 +96,16 @@ public class CbPlanUtilTest {
     Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
 
     assertNull(found);
+  }
+
+  @Test(expected = CbPlanLookupException.class)
+  public void findPlanForComprehensiveAssessment_malformedYearEntry_throwsLookupException() {
+    Map<String, Object> result = new HashMap<>();
+    result.put("2026-27", "not-a-map"); // yearEntry cast will fail
+    Map<String, Object> dictionary = new HashMap<>();
+    dictionary.put("result", result);
+
+    CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
   }
 
   // ---------- getMandatoryCourseIds ----------
