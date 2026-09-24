@@ -67,7 +67,6 @@ public final class CbPlanUtil {
     } catch (CbPlanLookupException e) {
       throw e;
     } catch (Exception e) {
-      logger.info(requestContext, "CbPlanUtil: error fetching CA eligibility :" + e.getMessage());
       logger.error(requestContext, "CbPlanUtil: error fetching CA eligibility", e);
       throw new CbPlanLookupException("Failed to fetch CA eligibility", e);
     }
