@@ -1,6 +1,7 @@
 package org.sunbird.learner.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,72 +32,33 @@ public class CbPlanUtilTest {
     PowerMockito.mockStatic(HttpUtil.class);
   }
 
-  // ---------- getCbPlanDictionary ----------
+  // ---------- fetchComprehensiveAssessmentEligibility ----------
 
   @Test
-  public void getCbPlanDictionary_success_parsesResponse() throws Exception {
-  https://github.com/KB-iGOT/sunbird-course-service/pull/439/conflict?name=course-mw%252Fcourse-actors-common%252Fsrc%252Ftest%252Fjava%252Forg%252Fsunbird%252Flearner%252Futil%252FCbPlanUtilTest.java&base_oid=875d1b2e6190249deceacb51e490b6a418e72bc6&head_oid=4696da852dbb960be77bdf5baa9a8de00bc488b3  when(HttpUtil.sendPostRequest(anyString(), anyString(), any()))
-        .thenReturn("{\"result\":{\"2026-27\":{\"aparPlanCount\":1}}}");
+  public void fetchComprehensiveAssessmentEligibility_eligible_parsesResult() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenReturn(
+        "{\"result\":{\"eligible\":true,\"mandatoryCourses\":[\"do_mandatory_1\",\"do_mandatory_2\"]}}");
 
-    Map<String, Object> result = CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
+    Map<String, Object> result =
+        CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
 
-    assertTrue(result.containsKey("result"));
-  }
-
-  @Test(expected = CbPlanLookupException.class)
-  public void getCbPlanDictionary_emptyResponse_throwsLookupException() throws Exception {
-    when(HttpUtil.sendPostRequest(anyString(), anyString(), any())).thenReturn("");
-
-    CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
-  }
-
-  @Test(expected = CbPlanLookupException.class)
-  public void getCbPlanDictionary_httpUtilThrows_throwsLookupException() throws Exception {
-    when(HttpUtil.sendPostRequest(anyString(), anyString(), any())).thenThrow(new RuntimeException("timeout"));
-
-    CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
-  }
-
-  // ---------- findPlanForComprehensiveAssessment ----------
-
-  @Test
-  public void findPlanForComprehensiveAssessment_matchInAparPlanList() {
-    Map<String, Object> plan = planWithCA("do_ca_1");
-    Map<String, Object> dictionary = dictionaryWith("aparPlanList", plan);
-
-    Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
-
-    assertEquals(plan, found);
+    assertEquals(Boolean.TRUE, result.get("eligible"));
+    List<String> mandatoryCourses = (List<String>) result.get("mandatoryCourses");
+    assertEquals(2, mandatoryCourses.size());
+    assertTrue(mandatoryCourses.contains("do_mandatory_1"));
+    assertTrue(mandatoryCourses.contains("do_mandatory_2"));
   }
 
   @Test
-  public void findPlanForComprehensiveAssessment_matchInNonAparPlanList() {
-    Map<String, Object> plan = planWithCA("do_ca_2");
-    Map<String, Object> dictionary = dictionaryWith("nonAparPlanList", plan);
+  public void fetchComprehensiveAssessmentEligibility_notEligible_parsesResult() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenReturn(
+        "{\"result\":{\"eligible\":false,\"mandatoryCourses\":[]}}");
 
-    Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_2");
+    Map<String, Object> result =
+        CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
 
-    assertEquals(plan, found);
-  }
-
-  @Test
-  public void findPlanForComprehensiveAssessment_noMatch_returnsNull() {
-    Map<String, Object> plan = planWithCA("do_ca_other");
-    Map<String, Object> dictionary = dictionaryWith("aparPlanList", plan);
-
-    Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_not_present");
-
-    assertNull(found);
-  }
-
-  @Test
-  public void findPlanForComprehensiveAssessment_missingResultKey_returnsNullNotException() {
-    Ma
-  @Test(expectedp<String, Object> dictionary = new HashMap<>();
-
-    Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
-
-    assertNull(found);
+    assertEquals(Boolean.FALSE, result.get("eligible"));
+    assertTrue(((List<String>) result.get("mandatoryCourses")).isEmpty());
   }
  = CbPlanLookupException.class)
   public void findPlanForComprehensiveAssessment_malformedYearEntry_throwsLookupException() {
@@ -108,58 +70,31 @@ public class CbPlanUtilTest {
     CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
   }
 
-  // ---------- getMandatoryCourseIds ----------
+  @Test(expected = CbPlanLookupException.class)
+  public void fetchComprehensiveAssessmentEligibility_emptyResponse_throwsLookupException() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenReturn("");
 
-  @Test
-  public void getMandatoryCourseIds_extractsOnlyMandatoryEntries() {
-    Map<String, Object> plan = new HashMap<>();
-    List<Object> contentList = new ArrayList<>();
-    contentList.add(contentEntry("do_mandatory_1", true));
-    contentList.add(contentEntry("do_optional_1", false));
-    contentList.add(contentEntry("do_mandatory_2", true));
-    plan.put("contentList", contentList);
-
-    List<String> mandatoryIds = CbPlanUtil.getMandatoryCourseIds(plan);
-
-    assertEquals(2, mandatoryIds.size());
-    assertTrue(mandatoryIds.contains("do_mandatory_1"));
-    assertTrue(mandatoryIds.contains("do_mandatory_2"));
+    CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
   }
 
-  @Test
-  public void getMandatoryCourseIds_noContentList_returnsEmptyList() {
-    Map<String, Object> plan = new HashMap<>();
+  @Test(expected = CbPlanLookupException.class)
+  public void fetchComprehensiveAssessmentEligibility_httpUtilThrows_throwsLookupException() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenThrow(new RuntimeException("timeout"));
 
-    List<String> mandatoryIds = CbPlanUtil.getMandatoryCourseIds(plan);
-
-    assertTrue(mandatoryIds.isEmpty());
+    CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
   }
 
-  // ---------- fixtures ----------
+  @Test(expected = CbPlanLookupException.class)
+  public void fetchComprehensiveAssessmentEligibility_missingResultKey_throwsLookupException() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenReturn("{\"id\":\"user.cbplan.eligibility\"}");
 
-  private Map<String, Object> planWithCA(String caId) {
-    Map<String, Object> plan = new HashMap<>();
-    plan.put("comprehensiveAssessment", caId);
-    return plan;
+    CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
   }
 
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> dictionaryWith(String listKey, Map<String, Object> plan) {
-    Map<String, Object> planMap = new HashMap<>();
-    planMap.put("plan1", plan);
-    Map<String, Object> yearEntry = new HashMap<>();
-    yearEntry.put(listKey, planMap);
-    Map<String, Object> result = new HashMap<>();
-    result.put("2026-27", yearEntry);
-    Map<String, Object> dictionary = new HashMap<>();
-    dictionary.put("result", result);
-    return dictionary;
-  }
+  @Test(expected = CbPlanLookupException.class)
+  public void fetchComprehensiveAssessmentEligibility_nonMapResult_throwsLookupException() throws Exception {
+    when(HttpUtil.sendGetRequest(anyString(), any())).thenReturn("{\"result\":\"not-a-map\"}");
 
-  private Map<String, Object> contentEntry(String identifier, boolean mandatory) {
-    Map<String, Object> entry = new HashMap<>();
-    entry.put("identifier", identifier);
-    entry.put("mandatory", mandatory);
-    return entry;
+    CbPlanUtil.fetchComprehensiveAssessmentEligibility("do_ca_1", new HashMap<>(), null);
   }
 }

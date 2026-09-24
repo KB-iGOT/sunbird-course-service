@@ -1353,10 +1353,12 @@ public final class JsonKey {
   // check (see ExtendedCourseEnrollmentActor.validateMandatoryCourseCompletion) - kept distinct
   // from COMPREHENSIVE_ASSESSMENT_PROGRAM since it identifies a separately-tagged category.
   public static final String COMPREHENSIVE_ASSESSMENT_CATEGORY_CONFIG = "comprehensive_assessment_category";
-  // cb-ext-course-service base URL + path for the CbPlan user-dictionary lookup, used to
+  // cb-ext-course-service base URL + path for the CA eligibility lookup, used to
   // resolve CA eligibility and mandatory-course list (see CbPlanUtil).
   public static final String CB_EXT_COURSE_SERVICE_BASE_URL = "cb_ext_course_service_base_url";
-  public static final String CB_PLAN_USER_DICTIONARY_URL = "/cbplan/v4/user/dictionary";
+  // {doId} is a literal placeholder, substituted via String.replace in CbPlanUtil - not a format string.
+  public static final String CB_PLAN_USER_ELIGIBILITY_URL = "/cbplan/v4/user/assessment/eligibility/{doId}";
+  public static final String CB_PLAN_DO_ID_PLACEHOLDER = "{doId}";
   public static final String OFFLINE_SESSION = "Offline";
   public static final String SESSION_DETAILS_V2 = "sessionDetails_v2";
   public static final String SESSION_TYPE = "sessionType";

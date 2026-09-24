@@ -279,26 +279,27 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   // implementation. Throws ProjectCommonException on failure; returns normally on success -
   // callers decide how to respond (reply directly, or continue on to enroll).
   private def validateCbPlanEligibilityAndMandatoryCourses(userId: String, doId: String, headers: util.Map[String, String], request: Request): Unit = {
-    var plan: util.Map[String, Object] = null
+    var eligibilityResult: util.Map[String, Object] = null
     try {
-      val dictionary = CbPlanUtil.getCbPlanDictionary(headers, request.getRequestContext)
-      plan = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, doId)
+      eligibilityResult = CbPlanUtil.fetchComprehensiveAssessmentEligibility(doId, headers, request.getRequestContext)
+      logger.info(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CA eligibility lookup result for userId=$userId, doId=$doId: $eligibilityResult")
     } catch {
       case e: CbPlanLookupException =>
-        logger.error(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CbPlan lookup failed for userId=$userId, doId=$doId", e)
+        logger.error(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CA eligibility lookup failed for userId=$userId, doId=$doId", e)
         ProjectCommonException.throwServerErrorException(
           ResponseCode.assessmentEligibilityCheckFailed,
           ResponseCode.assessmentEligibilityCheckFailed.getErrorMessage
         )
     }
-    if (plan == null) {
+    val eligible = java.lang.Boolean.TRUE.equals(eligibilityResult.get("eligible"))
+    if (!eligible) {
       logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: no eligible CbPlan found for userId=$userId, doId=$doId", null)
       ProjectCommonException.throwClientErrorException(
         ResponseCode.notEligibleForAssessment,
         ResponseCode.notEligibleForAssessment.getErrorMessage
       )
     } else {
-      val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
+      val mandatoryCourseIds = eligibilityResult.get("mandatoryCourses").asInstanceOf[util.List[String]].asScala
       val ineligibleCourseIds = mandatoryCourseIds.filterNot(courseId => {
         val mandatoryCourseContentData = getContentReadAPIData(courseId, List(JsonKey.ACCESS_SETTINGS_ENABLED), request)
         AccessSettingsUtil.isUserEligibleForAccessSettings(request.getRequestContext, mandatoryCourseContentData, courseId, userId)
@@ -310,30 +311,15 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
         )
       } else {
-        val mandatoryCourseIds = CbPlanUtil.getMandatoryCourseIds(plan).asScala
-        val ineligibleCourseIds = mandatoryCourseIds.filterNot(courseId => {
-          val mandatoryCourseContentData = getContentReadAPIData(courseId, List(JsonKey.ACCESS_SETTINGS_ENABLED), request)
-          AccessSettingsUtil.isUserEligibleForAccessSettings(request.getRequestContext, mandatoryCourseContentData, courseId, userId)
-        })
-        if (ineligibleCourseIds.nonEmpty) {
-          logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: user not eligible per access settings for mandatory courses, userId=$userId, doId=$doId, courses=${ineligibleCourseIds.mkString(",")}", null)
+        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
+          userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
+            .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+        if (incompleteCourseIds.nonEmpty) {
+          logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
           ProjectCommonException.throwClientErrorException(
-            ResponseCode.mandatoryCoursesAccessRestricted,
-            ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
+            ResponseCode.mandatoryCoursesNotCompleted,
+            ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
           )
-        } else {
-          val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
-            userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
-              .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
-          if (incompleteCourseIds.nonEmpty) {
-            logger.warn(request.getRequestContext, s"validateMandatoryCourseCompletion :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
-            ProjectCommonException.throwClientErrorException(
-              ResponseCode.mandatoryCoursesNotCompleted,
-              ResponseCode.mandatoryCoursesNotCompleted.getErrorMessage
-            )
-          } else {
-            sender().tell(successResponse(), self)
-          }
         }
       }
     }
