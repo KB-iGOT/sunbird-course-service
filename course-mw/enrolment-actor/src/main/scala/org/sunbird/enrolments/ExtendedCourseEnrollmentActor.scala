@@ -282,6 +282,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     var eligibilityResult: util.Map[String, Object] = null
     try {
       eligibilityResult = CbPlanUtil.fetchComprehensiveAssessmentEligibility(doId, headers, request.getRequestContext)
+      logger.info(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CA eligibility lookup result for userId=$userId, doId=$doId: $eligibilityResult")
     } catch {
       case e: CbPlanLookupException =>
         logger.error(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: CA eligibility lookup failed for userId=$userId, doId=$doId", e)
