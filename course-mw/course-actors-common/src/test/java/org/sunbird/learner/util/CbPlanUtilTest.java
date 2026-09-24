@@ -35,7 +35,7 @@ public class CbPlanUtilTest {
 
   @Test
   public void getCbPlanDictionary_success_parsesResponse() throws Exception {
-    when(HttpUtil.sendPostRequest(anyString(), anyString(), any()))
+  https://github.com/KB-iGOT/sunbird-course-service/pull/439/conflict?name=course-mw%252Fcourse-actors-common%252Fsrc%252Ftest%252Fjava%252Forg%252Fsunbird%252Flearner%252Futil%252FCbPlanUtilTest.java&base_oid=875d1b2e6190249deceacb51e490b6a418e72bc6&head_oid=4696da852dbb960be77bdf5baa9a8de00bc488b3  when(HttpUtil.sendPostRequest(anyString(), anyString(), any()))
         .thenReturn("{\"result\":{\"2026-27\":{\"aparPlanCount\":1}}}");
 
     Map<String, Object> result = CbPlanUtil.getCbPlanDictionary(new HashMap<>(), null);
@@ -91,14 +91,14 @@ public class CbPlanUtilTest {
 
   @Test
   public void findPlanForComprehensiveAssessment_missingResultKey_returnsNullNotException() {
-    Map<String, Object> dictionary = new HashMap<>();
+    Ma
+  @Test(expectedp<String, Object> dictionary = new HashMap<>();
 
     Map<String, Object> found = CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
 
     assertNull(found);
   }
-
-  @Test(expected = CbPlanLookupException.class)
+ = CbPlanLookupException.class)
   public void findPlanForComprehensiveAssessment_malformedYearEntry_throwsLookupException() {
     Map<String, Object> result = new HashMap<>();
     result.put("2026-27", "not-a-map"); // yearEntry cast will fail
