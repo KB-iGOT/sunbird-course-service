@@ -43,9 +43,8 @@ public final class CbPlanUtil {
     try {
       String url =
           ProjectUtil.getConfigValue(JsonKey.CB_EXT_COURSE_SERVICE_BASE_URL)
-              + "cbplan/v4/user/assessment/"
-              + doId
-              + "/eligibility";
+              + JsonKey.CB_PLAN_USER_ELIGIBILITY_URL.replace(
+                  JsonKey.CB_PLAN_DO_ID_PLACEHOLDER, doId);
       String response = HttpUtil.sendGetRequest(url, headers);
       if (response == null || response.isEmpty()) {
         logger.error(
