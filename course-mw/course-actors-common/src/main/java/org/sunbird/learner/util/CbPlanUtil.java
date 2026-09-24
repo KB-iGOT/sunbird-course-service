@@ -52,6 +52,10 @@ public final class CbPlanUtil {
             requestContext, "CbPlanUtil: empty response from CA eligibility API", null);
         throw new CbPlanLookupException("Empty response from CA eligibility API", null);
       }
+      logger.info(
+          requestContext,
+          "CbPlanUtil: Successfully reached cb-ext-course-service CA eligibility API for doId="
+              + doId);
       Map<String, Object> parsed = mapper.readValue(response, Map.class);
       Object result = parsed.get(JsonKey.RESULT);
       logger.info(requestContext, "result :" + result);

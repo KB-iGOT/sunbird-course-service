@@ -311,9 +311,11 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           ResponseCode.mandatoryCoursesAccessRestricted.getErrorMessage
         )
       } else {
-        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId =>
-          userCoursesDao.readV2(request.getRequestContext, userId, courseId).asScala
-            .exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue))
+        val incompleteCourseIds = mandatoryCourseIds.filterNot(courseId => {
+          val enrolments = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)
+          CollectionUtils.isNotEmpty(enrolments) &&
+            enrolments.asScala.exists(_.getStatus == ProjectUtil.ProgressStatus.COMPLETED.getValue)
+        })
         if (incompleteCourseIds.nonEmpty) {
           logger.warn(request.getRequestContext, s"validateCbPlanEligibilityAndMandatoryCourses :: mandatory courses incomplete for userId=$userId, doId=$doId, pending=${incompleteCourseIds.mkString(",")}", null)
           ProjectCommonException.throwClientErrorException(
