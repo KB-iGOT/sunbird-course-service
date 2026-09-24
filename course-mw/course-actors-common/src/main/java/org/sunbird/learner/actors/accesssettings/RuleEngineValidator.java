@@ -34,6 +34,12 @@ public class RuleEngineValidator {
     }
 
     public boolean evaluateRules(Map<String, String> userAttributes, List<UserGroup> rules) {
+        // Fails closed: a null/empty rule list means there's nothing for the user to pass -
+        // matches the pre-existing "no rules found" behavior of an empty (non-null) list rather
+        // than throwing, since Jackson deserializes a missing JSON field to null, not [].
+        if (rules == null || rules.isEmpty()) {
+            return false;
+        }
         try {
             ObjectMapper om = new ObjectMapper();
             logger.info(null, "RuleEngineValidator::evaluateRules... rules: " + om.writeValueAsString(rules)
@@ -47,12 +53,15 @@ public class RuleEngineValidator {
             // let's treat that
             boolean isRuleSuccess = true;
             logger.info(null, "Validating rule: " + rule.getUserGroupId());
-            for (UserGroupCriteria criteria : rule.getUserGroupCriteriaList()) {
-                logger.info(null, "Validating criteriaKey: " + criteria.getCriteriaKey() + ", with Value: " + criteria.getCriteriaValue());
-                if (!criteria.evaluate(userAttributes)) {
-                    // User is not passed this criteria, skip this and continue to next userGroup rule.
-                    isRuleSuccess = false;
-                    break;
+            List<UserGroupCriteria> criteriaList = rule.getUserGroupCriteriaList();
+            if (criteriaList != null) {
+                for (UserGroupCriteria criteria : criteriaList) {
+                    logger.info(null, "Validating criteriaKey: " + criteria.getCriteriaKey() + ", with Value: " + criteria.getCriteriaValue());
+                    if (!criteria.evaluate(userAttributes)) {
+                        // User is not passed this criteria, skip this and continue to next userGroup rule.
+                        isRuleSuccess = false;
+                        break;
+                    }
                 }
             }
             if (isRuleSuccess) {

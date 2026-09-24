@@ -40,6 +40,31 @@ public class RuleEngineValidatorTest {
   }
 
   @Test
+  public void nullRules_returnsFalseNotException() {
+    Map<String, String> userAttrs = new HashMap<>();
+    userAttrs.put("rootorgid", "ORG_001");
+
+    boolean result = RuleEngineValidator.getInstance().evaluateRules(userAttrs, null);
+
+    assertFalse(result);
+  }
+
+  @Test
+  public void nullCriteriaListOnRule_treatedAsNoCriteria_returnsTrue() {
+    Map<String, String> userAttrs = new HashMap<>();
+    userAttrs.put("rootorgid", "ORG_001");
+
+    UserGroup groupWithNullCriteria = new UserGroup();
+    groupWithNullCriteria.setUserGroupId("group-null-criteria");
+    groupWithNullCriteria.setUserGroupCriteriaList(null);
+
+    boolean result = RuleEngineValidator.getInstance()
+        .evaluateRules(userAttrs, Collections.singletonList(groupWithNullCriteria));
+
+    assertTrue(result);
+  }
+
+  @Test
   public void singleGroup_allCriteriaMatch_returnsTrue() {
     Map<String, String> userAttrs = new HashMap<>();
     userAttrs.put("rootorgid", "ORG_001");
