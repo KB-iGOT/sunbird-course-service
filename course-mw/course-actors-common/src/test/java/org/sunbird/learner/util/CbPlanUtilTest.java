@@ -60,6 +60,15 @@ public class CbPlanUtilTest {
     assertEquals(Boolean.FALSE, result.get("eligible"));
     assertTrue(((List<String>) result.get("mandatoryCourses")).isEmpty());
   }
+ = CbPlanLookupException.class)
+  public void findPlanForComprehensiveAssessment_malformedYearEntry_throwsLookupException() {
+    Map<String, Object> result = new HashMap<>();
+    result.put("2026-27", "not-a-map"); // yearEntry cast will fail
+    Map<String, Object> dictionary = new HashMap<>();
+    dictionary.put("result", result);
+
+    CbPlanUtil.findPlanForComprehensiveAssessment(dictionary, "do_ca_1");
+  }
 
   @Test(expected = CbPlanLookupException.class)
   public void fetchComprehensiveAssessmentEligibility_emptyResponse_throwsLookupException() throws Exception {
