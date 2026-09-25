@@ -230,9 +230,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       upsertEnrollment(userId, doId, batchId, data, dataBatch, existingEnrolmentForTheBatch == null, request.getRequestContext)
       cacheUtil.delete(getCacheKey(userId))
       cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
-      val resp = successResponse()
-      resp.put(JsonKey.BATCH_ID, batchId)
-      sender().tell(resp, self)
+      sender().tell(autoEnrollmentResponse(batchData), self)
       logger.info(request.getRequestContext, s"autoEnrollComprehensiveAssessment :: enrollment successful | doId=$doId, batchId=$batchId, userId=$userId")
 
       generateTelemetryAudit(userId, doId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
@@ -249,6 +247,34 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, doId)
     }
+  }
+
+  private def autoEnrollmentResponse(batchData: CourseBatch): Response = {
+    val batch = new util.HashMap[String, AnyRef]()
+    batch.put("createdFor", batchData.getCreatedFor)
+    batch.put("endDate", formatBatchDate(batchData.getEndDate))
+    batch.put("name", batchData.getName)
+    batch.put("batchId", batchData.getBatchId)
+    batch.put("enrollmentType", batchData.getEnrollmentType)
+    batch.put("enrollmentEndDate", formatBatchDate(batchData.getEnrollmentEndDate))
+    batch.put("startDate", formatBatchDate(batchData.getStartDate))
+    batch.put("status", batchData.getStatus)
+    batch.put("batchAttributes",
+      Option(batchData.getBatchAttributes).getOrElse(new util.HashMap[String, Object]()))
+
+    val content = new util.ArrayList[util.Map[String, AnyRef]]()
+    content.add(batch)
+    val response = new util.HashMap[String, AnyRef]()
+    response.put("count", Integer.valueOf(content.size()))
+    response.put("content", content)
+
+    val result = new Response()
+    result.put("response", response)
+    result
+  }
+
+  private def formatBatchDate(date: Date): String = {
+    Option(date).map(DATE_FORMAT.format).orNull
   }
 
   // Standalone, additive validation: checks whether a user is eligible for (linked via a
