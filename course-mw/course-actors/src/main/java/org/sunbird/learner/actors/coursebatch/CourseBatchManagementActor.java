@@ -714,9 +714,16 @@ public class CourseBatchManagementActor extends BaseActor {
 
   private void getParticipants(Request actorMessage) {
     Map<String, Object> request =
-            (Map<String, Object>) actorMessage.getRequest().get(JsonKey.BATCH);
-    request.putIfAbsent(JsonKey.LIMIT, Constants.DEFAULT_LIMIT);
-    request.putIfAbsent(JsonKey.CURRENT_OFFSET, 0);
+        (Map<String, Object>) actorMessage.getRequest().get(JsonKey.BATCH);
+    if(null == request.get(JsonKey.ACTIVE)) {
+      request.put(JsonKey.ACTIVE, true);
+    }
+    if(null == request.get(JsonKey.LIMIT)) {
+      request.put(JsonKey.LIMIT, Constants.DEFAULT_LIMIT);
+    }
+    if(null == request.get(JsonKey.OFFSET)) {
+      request.put(JsonKey.OFFSET, 0);
+    }
     Map<String, Object> result = userCoursesService.getParticipantsListByPage(actorMessage.getRequestContext(), request);
     Response response = new Response();
     response.put(JsonKey.BATCH, result);
