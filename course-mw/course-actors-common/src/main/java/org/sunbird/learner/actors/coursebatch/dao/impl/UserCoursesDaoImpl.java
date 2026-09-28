@@ -186,120 +186,108 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
   @Override
   public Map<String, Object> getBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request) {
-      logger.info(requestContext, "UserCourseDao:: getBatchParticipantsByPage:: Received request:: " + request);
-      Map<String, Object> queryMap = new HashMap<>();
-      queryMap.put(JsonKey.BATCH_ID, (String) request.get(JsonKey.BATCH_ID));
-      Map<String, Object> result = new HashMap<>();
-      List<String> userList = new ArrayList<>();
+    logger.info(requestContext, "UserCourseDao:: getBatchParticipantsByPage:: Received request:: " + request);
+    Map<String, Object> queryMap = new HashMap<>();
+    queryMap.put(JsonKey.BATCH_ID, (String) request.get(JsonKey.BATCH_ID));
+    Map<String, Object> result = new HashMap<>();
+    List<String> userList = new ArrayList<>();
 
-      Boolean active = (Boolean) request.get(JsonKey.ACTIVE);
-      Integer limit = (Integer) request.get(JsonKey.LIMIT);
-      if (limit == null || limit <= 0) {
-          limit = Constants.DEFAULT_LIMIT;
+    Integer limit = (Integer) request.get(JsonKey.LIMIT);
+    if (limit == null || limit <= 0) {
+      limit = Constants.DEFAULT_LIMIT;
+    }
+    Integer currentOffset = (Integer) request.get(JsonKey.CURRENT_OFFSET);
+    if (currentOffset == null || currentOffset < 0) {
+      currentOffset = 0;
+    }
+
+    String pageId = (String) request.get(JsonKey.PAGE_ID);
+    long userCount = 0L;
+    Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+            requestContext,
+            KEYSPACE_NAME,
+            ENROLMENT_BATCH_LOOKUP,
+            JsonKey.BATCH_ID,
+            request.get(JsonKey.BATCH_ID),
+            Arrays.asList(JsonKey.USER_ID, JsonKey.ACTIVE)
+    );
+
+    List<Map<String, Object>> batchUsers =
+            (List<Map<String, Object>>) res.get(JsonKey.RESPONSE);
+
+    if (CollectionUtils.isNotEmpty(batchUsers)) {
+      userCount = batchUsers.size();
+    }
+
+    logger.info(requestContext, "Total enrolment in the batch : " + request.get(JsonKey.BATCH_ID) + " is: " + userCount);
+    int offset = currentOffset;
+    String currentPageId = pageId;
+    String nextPageId = null;
+    boolean dataAvailable = true;
+    while (dataAvailable && userList.size() < limit) {
+      String pageStartId = currentPageId;
+
+      Response response = cassandraOperation.getRecordByIdentifierWithPage(requestContext,
+              KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, queryMap, null, currentPageId, limit);
+
+      List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
+      nextPageId = (String) response.get(JsonKey.PAGE_ID);
+
+      if (CollectionUtils.isEmpty(userCoursesList)) {
+        dataAvailable = false;
+        nextPageId = null;
+        break;
       }
-      Integer currentOffset = (Integer) request.get(JsonKey.CURRENT_OFFSET);
-      if (currentOffset == null || currentOffset < 0) {
-          currentOffset = 0;
-      }
+      int recordsConsumedFromCurrentPage = 0;
+      for (Map<String, Object> userCourse : userCoursesList) {
+        if (offset > 0) {
+          offset--;
+          recordsConsumedFromCurrentPage++;
+          continue;
+        }
 
-      String pageId = (String) request.get(JsonKey.PAGE_ID);
-      long userCount = 0L;
-      Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-              requestContext,
-              KEYSPACE_NAME,
-              ENROLMENT_BATCH_LOOKUP,
-              JsonKey.BATCH_ID,
-              request.get(JsonKey.BATCH_ID),
-              Arrays.asList(JsonKey.USER_ID, JsonKey.ACTIVE)
-      );
+        userList.add((String) userCourse.get(JsonKey.USER_ID));
 
-      List<Map<String, Object>> batchUsers =
-              (List<Map<String, Object>>) res.get(JsonKey.RESPONSE);
+        recordsConsumedFromCurrentPage++;
 
-      if (CollectionUtils.isNotEmpty(batchUsers)) {
-          if (Boolean.TRUE.equals(active)) {
-              userCount = batchUsers.stream().filter(row -> Boolean.TRUE.equals(row.get(JsonKey.ACTIVE))).count();
+        if (userList.size() == limit) {
 
-          } else if (Boolean.FALSE.equals(active)) {
-              userCount = batchUsers.stream().filter(row -> Boolean.FALSE.equals(row.get(JsonKey.ACTIVE))).count();
+          if (recordsConsumedFromCurrentPage < userCoursesList.size()) {
+
+            nextPageId = pageStartId;
+            offset = recordsConsumedFromCurrentPage;
 
           } else {
-              userCount = batchUsers.size();
+            nextPageId = nextPageId;
+            offset = 0;
           }
+          break;
+        }
       }
+      if (userList.size() < limit) {
 
-      logger.info(requestContext, "Total enrolment in the batch : " + request.get(JsonKey.BATCH_ID) + " is: " + userCount);
-      int offset = currentOffset;
-      String currentPageId = pageId;
-      String nextPageId = null;
-      boolean dataAvailable = true;
-      while (dataAvailable && userList.size() < limit) {
-          String pageStartId = currentPageId;
+        if (StringUtils.isNotBlank(nextPageId)
+                && !nextPageId.equals(pageStartId)) {
 
-          Response response = cassandraOperation.getRecordByIdentifierWithPage(requestContext,
-                  KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, queryMap, null, currentPageId, limit);
+          currentPageId = nextPageId;
+          offset = 0;
 
-          List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-          nextPageId = (String) response.get(JsonKey.PAGE_ID);
-
-          if (CollectionUtils.isEmpty(userCoursesList)) {
-              dataAvailable = false;
-              nextPageId = null;
-              break;
-          }
-          int recordsConsumedFromCurrentPage = 0;
-          for (Map<String, Object> userCourse : userCoursesList) {
-              if (offset > 0) {
-                  offset--;
-                  recordsConsumedFromCurrentPage++;
-                  continue;
-              }
-
-              Boolean rowActive = (Boolean) userCourse.get(JsonKey.ACTIVE);
-              if (active == null || active.equals(rowActive)) {
-
-                  userList.add((String) userCourse.get(JsonKey.USER_ID));
-              }
-              recordsConsumedFromCurrentPage++;
-
-              if (userList.size() == limit) {
-
-                  if (recordsConsumedFromCurrentPage < userCoursesList.size()) {
-
-                      nextPageId = pageStartId;
-                      offset = recordsConsumedFromCurrentPage;
-
-                  } else {
-                      nextPageId = nextPageId;
-                      offset = 0;
-                  }
-                  break;
-              }
-          }
-          if (userList.size() < limit) {
-
-              if (StringUtils.isNotBlank(nextPageId)
-                      && !nextPageId.equals(pageStartId)) {
-
-                  currentPageId = nextPageId;
-                  offset = 0;
-
-              } else {
-                  dataAvailable = false;
-              }
-          } else {
-              break;
-          }
-      }
-      if (StringUtils.isNotBlank(nextPageId)) {
-          result.put(JsonKey.PAGE_ID, nextPageId);
+        } else {
+          dataAvailable = false;
+        }
       } else {
-          result.put(JsonKey.PAGE_ID, null);
+        break;
       }
-      result.put(JsonKey.COUNT, userCount);
-      result.put(JsonKey.CURRENT_OFFSET, currentOffset);
-      result.put(JsonKey.PARTICIPANTS, userList);
-      return result;
+    }
+    if (StringUtils.isNotBlank(nextPageId)) {
+      result.put(JsonKey.PAGE_ID, nextPageId);
+    } else {
+      result.put(JsonKey.PAGE_ID, null);
+    }
+    result.put(JsonKey.COUNT, userCount);
+    result.put(JsonKey.CURRENT_OFFSET, currentOffset);
+    result.put(JsonKey.PARTICIPANTS, userList);
+    return result;
   }
 
 
