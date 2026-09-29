@@ -313,4 +313,5 @@ public interface CassandraOperation {
   Response getRecordByIdentifier(RequestContext requestContext, String keyspaceName, String tableName, Object key, List<String> fields, ConsistencyLevel consistencyLevel);
 
   Response updateRecord(RequestContext requestContext, String keyspaceName, String tableName, Map<String, Object> updateAttributes, Map<String, Object> compositeKey, ConsistencyLevel consistencyLevel);
+
 }
