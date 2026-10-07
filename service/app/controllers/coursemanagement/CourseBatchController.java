@@ -14,6 +14,7 @@ import java.util.concurrent.CompletionStage;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.*;
 import org.sunbird.common.models.util.ProjectUtil.EsType;
 import org.sunbird.common.request.Request;
@@ -112,16 +113,24 @@ public class CourseBatchController extends BaseController {
   }
 
   public CompletionStage<Result> getParticipants(Http.Request httpRequest) {
-    return handleRequest(
-        courseBatchActorRef,
-        ActorOperations.GET_PARTICIPANTS.getValue(),
-        httpRequest.body().asJson(),
-        (request) -> {
-          new CourseBatchRequestValidator().validateGetParticipantsRequest((Request) request);
-          return null;
-        },
-        getAllRequestHeaders(httpRequest),
-        httpRequest);
+    try {
+      Request request =
+          createAndInitRequest(
+              ActorOperations.GET_PARTICIPANTS.getValue(),
+              httpRequest.body().asJson(),
+              httpRequest);
+      new CourseBatchRequestValidator().validateGetParticipantsRequest(request);
+      Response response = new Response();
+      Map<String, Object> result = new HashMap<>();
+      result.put(JsonKey.COUNT, 0);
+      result.put(JsonKey.PARTICIPANTS, new ArrayList<String>());
+      result.put(JsonKey.PAGE_ID, "");
+      result.put(JsonKey.CURRENT_OFFSET, 0);
+      response.put(JsonKey.BATCH, result);
+      return CompletableFuture.completedFuture(createSuccessResponse(httpRequest, response));
+    } catch (Exception e) {
+      return CompletableFuture.completedFuture(createCommonExceptionResponse(e, httpRequest));
+    }
   }
 
     public CompletionStage<Result> updateStartBatchesStatus(Http.Request httpRequest) {
