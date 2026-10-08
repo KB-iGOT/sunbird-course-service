@@ -62,6 +62,10 @@ public class CourseBatchController extends BaseController {
         httpRequest);
   }
 
+  public CompletionStage<Result> publicGetBatch(String batchId, Http.Request httpRequest) {
+    return getBatch(batchId, httpRequest);
+  }
+
   public CompletionStage<Result> updateBatch(Http.Request httpRequest) {
     return handleRequest(
         courseBatchActorRef,
