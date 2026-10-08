@@ -1375,6 +1375,22 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
     request.put(JsonKey.RECENT_LANGUAGE, courseLanguage)
     val batchData: CourseBatch = courseBatchDao.readById( courseId, batchId, request.getRequestContext)
+    val allEnrolmentsForCourse: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)
+    // KB-15880: if the user has an active enrolment in a different batch of this same course, either
+    // auto-unenrol them from it (if that batch has ended without them completing it) so they can join
+    // this new batch, or block the enrolment (if the other batch is still active/ongoing).
+    Option(allEnrolmentsForCourse).map(_.asScala).getOrElse(Seq.empty)
+      .find(e => e.isActive && e.getBatchId != batchId)
+      .foreach { otherActiveEnrolment =>
+        val otherBatchData: CourseBatch = courseBatchDao.readById(courseId, otherActiveEnrolment.getBatchId, request.getRequestContext)
+        if (null != otherBatchData && isBatchEnded(otherBatchData) && otherActiveEnrolment.getStatus < ProjectUtil.ProgressStatus.COMPLETED.getValue) {
+          logger.info(request.getRequestContext, "CourseEnrolmentActor :: enrollBlendedProgram :: auto-unenrolling userId: " + userId +
+            " from ended, incomplete batchId: " + otherActiveEnrolment.getBatchId + " of courseId: " + courseId + " to allow re-enrolment into batchId: " + batchId)
+          deactivateStaleEnrolment(userId, courseId, otherActiveEnrolment, request.getRequestContext)
+        } else {
+          ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch, ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch.getErrorMessage)
+        }
+      }
     val enrolmentData: UserCourses = userCoursesDao.read(request.getRequestContext, userId, courseId, batchId)
     val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
     validateEnrolment(batchData, enrolmentData, true, true)
@@ -1494,7 +1510,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                 enrolmentData = enrolment;
               }
             } else if (enrolment.isActive) {
-              ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch);
+              val otherBatchData: CourseBatch = courseBatchDao.readByIdWithLocalQuorum(programId, enrolment.getBatchId, request.getRequestContext)
+              if (null != otherBatchData && isBatchEnded(otherBatchData) && enrolment.getStatus < ProjectUtil.ProgressStatus.COMPLETED.getValue) {
+                logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: auto-unenrolling userId: " + userId +
+                  " from ended, incomplete batchId: " + enrolment.getBatchId + " of courseId: " + programId + " to allow re-enrolment into batchId: " + batchId)
+                deactivateStaleEnrolment(userId, programId, enrolment, request.getRequestContext)
+              } else {
+                ProjectCommonException.throwClientErrorException(ResponseCode.userAlreadyEnrolledCourseWithDifferentBatch);
+              }
             }
           }
         }
@@ -1968,6 +1991,22 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     } finally {
       jedis.close()
     }
+  }
+
+  private def isBatchEnded(batchData: CourseBatch): Boolean = {
+    (batchData.getStatus == 2) || (batchData.getEndDate != null && LocalDateTime.now().isAfter(
+      LocalDate.parse(DATE_FORMAT.format(batchData.getEndDate), DateTimeFormatter.ofPattern("yyyy-MM-dd")).atTime(LocalTime.MAX)))
+  }
+
+  // KB-15880: deactivates a stale enrolment in an ended, incomplete batch so the user can re-enrol
+  // into a different batch of the same course. Mirrors unEnroll's persistence call but skips its
+  // reason/comment validation and history/karma side-effects, since this is a system-driven swap, not a user-initiated unenrolment.
+  private def deactivateStaleEnrolment(userId: String, courseId: String, enrolment: UserCourses, requestContext: RequestContext): Unit = {
+    val batchUserData: BatchUser = batchUserDao.read(requestContext, enrolment.getBatchId, userId)
+    val dataBatch: util.Map[String, AnyRef] = if (null != batchUserData) createBatchUserMapping(enrolment.getBatchId, userId, batchUserData) else new util.HashMap[String, AnyRef]()
+    val data: util.Map[String, AnyRef] = new util.HashMap[String, AnyRef]()
+    data.put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.INACTIVE.getValue.asInstanceOf[AnyRef])
+    upsertEnrollment(userId, courseId, enrolment.getBatchId, data, dataBatch, false, requestContext, useLocalQuorum = true)
   }
 
   def unEnroll(request: Request): Unit = {
