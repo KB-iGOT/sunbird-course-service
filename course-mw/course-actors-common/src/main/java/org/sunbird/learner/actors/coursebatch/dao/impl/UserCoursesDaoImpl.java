@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.logstash.logback.encoder.org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.Constants;
@@ -628,8 +629,8 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   }
 
 
-  public Map<String, Object> getBatchParticipantsByPageV2(RequestContext requestContext, Map<String, Object> request) {
-    logger.info(requestContext, "UserCourseDao:: getBatchParticipantsByPage:: Received request:: " + request);
+  public Map<String, Object> getProgramBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request) {
+    logger.info(requestContext, "UserCourseDao:: getProgramBatchParticipantsByPage:: Received request:: " + request);
     Map<String, Object> queryMap = new HashMap<>();
     queryMap.put(JsonKey.BATCH_ID, (String) request.get(JsonKey.BATCH_ID));
     Map<String, Object> result = new HashMap<>();
@@ -646,6 +647,8 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
     String pageId = (String) request.get(JsonKey.PAGE_ID);
     long userCount = 0L;
+    long activeTrueCount = 0L;
+    long activeFalseCount = 0L;
     Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
             requestContext,
             KEYSPACE_NAME,
@@ -660,8 +663,16 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
     if (CollectionUtils.isNotEmpty(batchUsers)) {
       userCount = batchUsers.size();
-    }
+      Map<Boolean, Long> userCountMap = batchUsers.stream()
+              .filter(user -> user.get(JsonKey.ACTIVE) != null)
+              .collect(Collectors.groupingBy(
+                      user -> Boolean.TRUE.equals(user.get(JsonKey.ACTIVE)),
+                      Collectors.counting()
+              ));
 
+      activeTrueCount = userCountMap.getOrDefault(true, 0L);
+      activeFalseCount = userCountMap.getOrDefault(false, 0L);
+    }
     logger.info(requestContext, "Total enrolment in the batch : " + request.get(JsonKey.BATCH_ID) + " is: " + userCount);
     int offset = currentOffset;
     String currentPageId = pageId;
@@ -704,7 +715,6 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
             offset = recordsConsumedFromCurrentPage;
 
           } else {
-            nextPageId = nextPageId;
             offset = 0;
           }
           break;
@@ -730,7 +740,9 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     } else {
       result.put(JsonKey.PAGE_ID, null);
     }
-    result.put(JsonKey.COUNT, userCount);
+    result.put("totalCount", userCount);
+    result.put("activeCount", activeTrueCount);
+    result.put("inactiveCount", activeFalseCount);
     result.put(JsonKey.CURRENT_OFFSET, currentOffset);
     result.put(JsonKey.PARTICIPANTS, userList);
     return result;

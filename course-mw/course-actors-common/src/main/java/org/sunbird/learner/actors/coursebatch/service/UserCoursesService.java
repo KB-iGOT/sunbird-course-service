@@ -127,7 +127,7 @@ public class UserCoursesService {
     return userCourseDao.getEventParticipantsForExternalTraining(requestContext, request);
   }
 
-  public Map<String, Object> getParticipantsListByPageV2(RequestContext requestContext, Map<String, Object> request) {
-    return userCourseDao.getBatchParticipantsByPageV2(requestContext, request);
+  public Map<String, Object> getProgramBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request) {
+    return userCourseDao.getProgramBatchParticipantsByPage(requestContext, request);
   }
 }
