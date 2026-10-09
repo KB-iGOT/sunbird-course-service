@@ -97,6 +97,6 @@ public interface UserCoursesDao {
 
   UserCourses readWithLocalQuorum(RequestContext requestContext, String userId, String courseId, String batchId);
 
-  Map<String, Object> getBatchParticipantsByPageV2(RequestContext requestContext, Map<String, Object> request);
+  Map<String, Object> getProgramBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request);
 
 }

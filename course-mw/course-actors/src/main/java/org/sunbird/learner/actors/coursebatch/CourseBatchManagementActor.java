@@ -101,8 +101,8 @@ public class CourseBatchManagementActor extends BaseActor {
       case "getParticipants":
         getParticipants(request);
         break;
-      case "getParticipantsV2":
-        getParticipantsV2(request);
+      case "getProgramBatchParticipants":
+        getProgramBatchParticipants(request);
         break;
       case "updateStartBatchesStatus":
         updateStartBatchesStatus(request);
@@ -1421,12 +1421,12 @@ public class CourseBatchManagementActor extends BaseActor {
                 .collect(Collectors.toSet());
     }
 
-  private void getParticipantsV2(Request actorMessage) {
+  private void getProgramBatchParticipants(Request actorMessage) {
     Map<String, Object> request =
             (Map<String, Object>) actorMessage.getRequest().get(JsonKey.BATCH);
     request.putIfAbsent(JsonKey.LIMIT, Constants.DEFAULT_LIMIT);
     request.putIfAbsent(JsonKey.CURRENT_OFFSET, 0);
-    Map<String, Object> result = userCoursesService.getParticipantsListByPageV2(actorMessage.getRequestContext(), request);
+    Map<String, Object> result = userCoursesService.getProgramBatchParticipantsByPage(actorMessage.getRequestContext(), request);
     Response response = new Response();
     response.put(JsonKey.BATCH, result);
     sender().tell(response, self());

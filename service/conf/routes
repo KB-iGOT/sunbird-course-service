@@ -67,7 +67,7 @@ PATCH 	 /v1/course/batch/update				@controllers.coursemanagement.CourseBatchCont
 GET		 /v1/course/batch/read/:batchId			@controllers.coursemanagement.CourseBatchController.getBatch(batchId:String, request: play.mvc.Http.Request)
 POST     /v1/course/batch/search                @controllers.coursemanagement.CourseBatchController.search(request: play.mvc.Http.Request)
 POST	 /v1/batch/participants/list			@controllers.coursemanagement.CourseBatchController.getParticipants(request: play.mvc.Http.Request)
-POST	 /v2/batch/participants/list			@controllers.coursemanagement.CourseBatchController.getParticipantsV2(request: play.mvc.Http.Request)
+POST	 /program/v1/batch/participants/list	@controllers.coursemanagement.CourseBatchController.getProgramBatchParticipants(request: play.mvc.Http.Request)
 
 POST 	 /v1/activate-started/course/batches/status		@controllers.coursemanagement.CourseBatchController.updateStartBatchesStatus(request: play.mvc.Http.Request)
 
