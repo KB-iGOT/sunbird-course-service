@@ -633,7 +633,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
   public Map<String, Object> getProgramBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request) {
     logger.info(requestContext, "UserCourseDao:: getProgramBatchParticipantsByPage:: Received request:: " + request);
-    final int MAX_RECORDS = 10000;
+    final int MAX_PAGINATION_RECORDS = 10000;
     final int MAX_LIMIT = 100;
     final int MAX_FETCH_SIZE = 1000;
     Map<String, Object> queryMap = new HashMap<>();
@@ -656,14 +656,14 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
       currentOffset = 0;
     }
 
-    if (currentOffset >= MAX_RECORDS) {
+    if (currentOffset >= MAX_PAGINATION_RECORDS) {
       throw new ProjectCommonException(
               ResponseCode.invalidRequestData.getErrorCode(),
-              "Pagination is supported only for the first " + MAX_RECORDS + " records",
+              "Pagination is supported only for the first " + MAX_PAGINATION_RECORDS + " records",
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
-    if (currentOffset + limit > MAX_RECORDS) {
-      limit = MAX_RECORDS - currentOffset;
+    if (currentOffset + limit > MAX_PAGINATION_RECORDS) {
+      limit = MAX_PAGINATION_RECORDS - currentOffset;
     }
 
     long userCount = 0L;
