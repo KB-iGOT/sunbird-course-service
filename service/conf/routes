@@ -68,7 +68,7 @@ GET		 /v1/course/batch/read/:batchId			@controllers.coursemanagement.CourseBatch
 POST     /v1/course/batch/search                @controllers.coursemanagement.CourseBatchController.search(request: play.mvc.Http.Request)
 POST	 /v1/batch/participants/list			@controllers.coursemanagement.CourseBatchController.getParticipants(request: play.mvc.Http.Request)
 POST	 /program/v2/batch/participants/list	@controllers.coursemanagement.CourseBatchController.getProgramBatchParticipants(request: play.mvc.Http.Request)
-
+POST     /v1/batch/admin/participants/list       @controllers.coursemanagement.CourseBatchController.adminGetParticipants(request: play.mvc.Http.Request)
 POST 	 /v1/activate-started/course/batches/status		@controllers.coursemanagement.CourseBatchController.updateStartBatchesStatus(request: play.mvc.Http.Request)
 
 # Textbook APIs
