@@ -2519,6 +2519,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                   java.util.Arrays.asList(
                     JsonKey.COURSE_ID,
                     JsonKey.BATCH_ID,
+                    JsonKey.COMPLETED_ON,
                     JsonKey.STATUS,
                     JsonKey.ACTIVE,
                     JsonKey.ISSUEDCERTIFICATES
@@ -2601,6 +2602,17 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
 
     contentMap.put(JsonKey.BATCH_ID, enrolment.get(JsonKey.BATCH_ID))
+
+    // Return completedOn as Cassandra shows it (UTC), e.g. 2024-08-21 10:18:00.836000+0000.
+    // Cassandra timestamps have millisecond precision, so the microsecond digits are always 000.
+    val completedOn = enrolment.get(JsonKey.COMPLETED_ON) match {
+      case date: Date =>
+        val formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'000'Z")
+        formatter.setTimeZone(TimeZone.getTimeZone("UTC"))
+        formatter.format(date)
+      case other => other
+    }
+    contentMap.put(JsonKey.COMPLETED_ON, completedOn)
 
     val status = Option(enrolment.get(JsonKey.STATUS))
       .map(_.toString.toInt)
