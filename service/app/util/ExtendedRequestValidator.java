@@ -239,6 +239,14 @@ public class ExtendedRequestValidator {
                         ResponseCode.invalidCourseCategory.getErrorMessage(),
                         ERROR_CODE);
             }
+            // Rejected regardless of courseCategory/program_categories config, since Blended
+            // Program is not itself a configured "program" category but must still reject
+            // progress tracking on its optional pre-assessment.
+            Map<String, Object> leafContent = getCourseContent(contentId);
+            String leafContextCategory = (String) leafContent.get(JsonKey.CONTEXT_CATEGORY);
+            if (JsonKey.OPTIONAL_PRE_ASSESSMENT.equalsIgnoreCase(leafContextCategory)) {
+                return true;
+            }
             if (isProgramCategory(courseCategory)) {
                 if (cumulativeTracking == null) {
                     throw new ProjectCommonException(
