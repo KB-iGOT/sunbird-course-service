@@ -629,7 +629,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, contentId,contextId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
-            EventEnrolmentSummaryCache.refresh(request, userId)
+            EventEnrolmentSummaryCache.invalidate(userId, "eventContentStateUpdate")
             if(updatedContent.get("status").asInstanceOf[Int] == 2 && inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
               pushKaramPointsKafkaTopic(userId, contentId, batchId);
               pushCertficateGenerateKafkaTopic(userId, contentId, batchId,completionPercentage);

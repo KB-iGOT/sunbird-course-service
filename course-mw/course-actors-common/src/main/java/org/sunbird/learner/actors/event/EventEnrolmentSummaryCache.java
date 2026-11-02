@@ -1,13 +1,14 @@
 package org.sunbird.learner.actors.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sunbird.common.models.util.JsonKey;
+import org.sunbird.common.models.util.ProjectUtil;
 import org.sunbird.common.request.Request;
+import org.sunbird.cache.platform.Platform;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.learner.actors.event.impl.EventEnrolmentDaoImpl;
 
@@ -19,18 +20,26 @@ import java.util.Map;
 
 public final class EventEnrolmentSummaryCache {
     private static final Logger logger = LoggerFactory.getLogger(EventEnrolmentSummaryCache.class);
-    private static final int TTL_SECONDS = 300;
+    private static final int DEFAULT_TTL_SECONDS = 3600;
+    private static final String TTL_CONFIG_KEY = "user_event_enrolment_summary_cache_ttl";
     private static final String CACHE_KEY_PREFIX = "user-event-enrolment-summary:";
+    static final String LOG_TAG = "[EVENT_SUMMARY_REDIS]";
+    // Same settings RedisCacheUtil connects with, logged so the key can be found with redis-cli.
+    private static final String REDIS_TARGET =
+            Platform.getString("sunbird_redis_host", "localhost") + ":"
+                    + Platform.getInteger("sunbird_redis_port", 6379)
+                    + " db=" + Platform.getInteger("redis.dbIndex", 0);
     private static final EventEnrolmentSummaryCache INSTANCE =
-            new EventEnrolmentSummaryCache(new RedisCacheUtil(), null);
+            new EventEnrolmentSummaryCache(new RedisCacheUtil(), getConfiguredTtl());
 
     private final RedisCacheUtil cache;
-    private final EventEnrolmentDaoImpl dao;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final int ttlSeconds;
 
-    EventEnrolmentSummaryCache(RedisCacheUtil cache, EventEnrolmentDaoImpl dao) {
+    EventEnrolmentSummaryCache(RedisCacheUtil cache, int ttlSeconds) {
         this.cache = cache;
-        this.dao = dao;
+        this.ttlSeconds = ttlSeconds;
+        logger.info("{} op=INIT redis={} ttl={}s keyPattern={}<userId>:retired:<true|false>",
+                LOG_TAG, REDIS_TARGET, ttlSeconds, CACHE_KEY_PREFIX);
     }
 
     public static String get(String userId, boolean retiredCoursesEnabled) {
@@ -41,40 +50,49 @@ public final class EventEnrolmentSummaryCache {
         INSTANCE.putSummary(userId, retiredCoursesEnabled, value);
     }
 
-    public static void refresh(Request request, String userId) {
-        INSTANCE.refreshSummary(request, userId);
+    /**
+     * Deletes the cached summaries for the user; {@code trigger} names the write path for the log.
+     */
+    public static void invalidate(String userId, String trigger) {
+        INSTANCE.invalidateSummary(userId, trigger);
     }
 
     String getCachedSummary(String userId, boolean retiredCoursesEnabled) {
-        return cacheOperation(
-                () -> cache.get(getCacheKey(userId, retiredCoursesEnabled), null, 0), null);
+        String key = getCacheKey(userId, retiredCoursesEnabled);
+        long start = System.currentTimeMillis();
+        String value = cacheOperation("READ", key, () -> cache.get(key, null, 0), null);
+        logger.info("{} op=READ result={} key={} redis={} bytes={} timeMs={}",
+                LOG_TAG, StringUtils.isNotBlank(value) ? "HIT" : "MISS", key, REDIS_TARGET,
+                value == null ? 0 : value.length(), System.currentTimeMillis() - start);
+        return value;
     }
 
     void putSummary(String userId, boolean retiredCoursesEnabled, String value) {
-        cacheOperation(() -> {
-            cache.set(getCacheKey(userId, retiredCoursesEnabled), value, TTL_SECONDS);
+        String key = getCacheKey(userId, retiredCoursesEnabled);
+        long start = System.currentTimeMillis();
+        cacheOperation("WRITE", key, () -> {
+            cache.set(key, value, ttlSeconds);
+            logger.info("{} op=WRITE result=OK key={} redis={} ttl={}s bytes={} timeMs={}",
+                    LOG_TAG, key, REDIS_TARGET, ttlSeconds, value == null ? 0 : value.length(),
+                    System.currentTimeMillis() - start);
             return null;
         }, null);
     }
 
-    void refreshSummary(Request request, String userId) {
-        try {
-            EventEnrolmentDaoImpl enrolmentDao =
-                    dao == null ? new EventEnrolmentDaoImpl() : dao;
-            List<Map<String, Object>> enrolledEvents =
-                    enrolmentDao.getEventEnrolmentList(request, userId);
-            putSummary(
-                    userId,
-                    false,
-                    mapper.writeValueAsString(
-                            calculateSummary(request, enrolledEvents, false, enrolmentDao)));
-            putSummary(
-                    userId,
-                    true,
-                    mapper.writeValueAsString(
-                            calculateSummary(request, enrolledEvents, true, enrolmentDao)));
-        } catch (Exception e) {
-            logger.warn("Unable to refresh event enrolment summary cache for user: " + userId, e);
+    void invalidateSummary(String userId, String trigger) {
+        if (StringUtils.isBlank(userId)) {
+            logger.warn("{} op=DELETE result=SKIPPED reason=blankUserId trigger={}", LOG_TAG, trigger);
+            return;
+        }
+        for (boolean retiredCoursesEnabled : new boolean[] {false, true}) {
+            String key = getCacheKey(userId, retiredCoursesEnabled);
+            long start = System.currentTimeMillis();
+            cacheOperation("DELETE", key, () -> {
+                cache.deleteKey(key);
+                logger.info("{} op=DELETE result=OK key={} redis={} trigger={} timeMs={}",
+                        LOG_TAG, key, REDIS_TARGET, trigger, System.currentTimeMillis() - start);
+                return null;
+            }, null);
         }
     }
 
@@ -144,11 +162,23 @@ public final class EventEnrolmentSummaryCache {
         return CACHE_KEY_PREFIX + userId + ":retired:" + retiredCoursesEnabled;
     }
 
-    private static <T> T cacheOperation(CacheOperation<T> operation, T fallback) {
+    private static int getConfiguredTtl() {
+        String ttl = ProjectUtil.getConfigValue(TTL_CONFIG_KEY);
+        try {
+            return StringUtils.isNotBlank(ttl) ? Integer.parseInt(ttl.trim()) : DEFAULT_TTL_SECONDS;
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid {} value: {}; using default {}s", TTL_CONFIG_KEY, ttl, DEFAULT_TTL_SECONDS);
+            return DEFAULT_TTL_SECONDS;
+        }
+    }
+
+    private static <T> T cacheOperation(
+            String op, String key, CacheOperation<T> operation, T fallback) {
         try {
             return operation.run();
         } catch (Exception e) {
-            logger.warn("Event enrolment summary cache operation failed; continuing without cache", e);
+            logger.error(LOG_TAG + " op=" + op + " result=FAILED key=" + key + " redis=" + REDIS_TARGET
+                    + " error=" + e.getMessage() + "; continuing without cache", e);
             return fallback;
         }
     }

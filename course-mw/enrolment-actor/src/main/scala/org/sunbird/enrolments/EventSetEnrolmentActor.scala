@@ -79,7 +79,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     })
     cacheUtil.delete(getCacheKey(userId))
     cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
-    EventEnrolmentSummaryCache.refresh(request, userId)
+    EventEnrolmentSummaryCache.invalidate(userId, "eventEnrol")
     sender().tell(successResponse(), self)
   }
 
@@ -106,7 +106,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     logger.info(request.getRequestContext, "EventSetEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
     cacheUtil.delete(getCacheKey(userId))
     cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
-    EventEnrolmentSummaryCache.refresh(request, userId)
+    EventEnrolmentSummaryCache.invalidate(userId, "eventUnenrol")
     sender().tell(successResponse(), self)
   }
 

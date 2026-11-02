@@ -399,7 +399,7 @@ public class EventsActor extends BaseActor {
                     userId, eventId, batchId, data, dataBatch,
                     enrolmentData == null, request.getRequestContext()
             );
-            EventEnrolmentSummaryCache.refresh(request, userId);
+            EventEnrolmentSummaryCache.invalidate(userId, "eventBatchEnrol");
 
             sender().tell(successResponse(), self());
             sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());

@@ -285,17 +285,25 @@ public class EventManagementActor extends BaseActor {
                                 mapper.readValue(cachedSummary, new TypeReference<Map<String, Object>>() {});
                         Response response = new Response();
                         response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, summary);
+                        logger.info(request.getRequestContext(), EventEnrolmentSummaryCache.LOG_TAG
+                                + " source=REDIS userId=" + userId + " retiredCoursesEnabled=" + retiredCoursesEnabled);
                         sender().tell(response, self());
                         return;
                     } catch (Exception e) {
                         logger.warn(
                                 request.getRequestContext(),
-                                "Ignoring invalid cached event enrolment summary for user: " + userId,
+                                EventEnrolmentSummaryCache.LOG_TAG + " op=READ result=INVALID_JSON userId=" + userId
+                                        + "; ignoring cached value",
                                 e);
                     }
                 }
+            } else {
+                logger.info(request.getRequestContext(), EventEnrolmentSummaryCache.LOG_TAG
+                        + " cache=DISABLED (query param cache=false) userId=" + userId);
             }
 
+            logger.info(request.getRequestContext(), EventEnrolmentSummaryCache.LOG_TAG
+                    + " source=CASSANDRA userId=" + userId + " retiredCoursesEnabled=" + retiredCoursesEnabled);
             List<Map<String, Object>> allEnrolledEvents = eventBatchDao.getEventEnrolmentList(request, userId);
             Map<String, Object> userCourseEnrolmentInfo =
                     EventEnrolmentSummaryCache.calculateSummary(
@@ -309,7 +317,7 @@ public class EventManagementActor extends BaseActor {
                 } catch (Exception e) {
                     logger.warn(
                             request.getRequestContext(),
-                            "Unable to serialize event enrolment summary for cache for user: " + userId,
+                            EventEnrolmentSummaryCache.LOG_TAG + " op=WRITE result=SERIALIZE_FAILED userId=" + userId,
                             e);
                 }
             }
