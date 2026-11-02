@@ -1,10 +1,7 @@
 package org.sunbird.learner.actors.event;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.Request;
@@ -15,9 +12,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,7 +27,7 @@ public class EventEnrolmentSummaryCacheTest {
     public void getAndPutUseUserScopedKeyAndTtl() {
         RedisCacheUtil redisCache = mock(RedisCacheUtil.class);
         EventEnrolmentSummaryCache cache =
-                new EventEnrolmentSummaryCache(redisCache, mock(EventEnrolmentDaoImpl.class));
+                new EventEnrolmentSummaryCache(redisCache, 300);
         String cachedValue = "{\"eventsEnrolled\":1}";
         when(redisCache.get(BASE_KEY + "false", null, 0)).thenReturn(cachedValue);
 
@@ -41,17 +39,26 @@ public class EventEnrolmentSummaryCacheTest {
     }
 
     @Test
-    public void refreshRecalculatesAndStoresBothRetiredCourseVariants() throws Exception {
+    public void invalidateDeletesBothRetiredCourseVariants() {
         RedisCacheUtil redisCache = mock(RedisCacheUtil.class);
+        EventEnrolmentSummaryCache cache = new EventEnrolmentSummaryCache(redisCache, 300);
+
+        cache.invalidateSummary(USER_ID, "test");
+
+        verify(redisCache).deleteKey(BASE_KEY + "false");
+        verify(redisCache).deleteKey(BASE_KEY + "true");
+        verify(redisCache, never()).set(anyString(), anyString(), anyInt());
+    }
+
+    @Test
+    public void calculateSummaryHonoursRetiredCoursesFlag() {
         EventEnrolmentDaoImpl dao = mock(EventEnrolmentDaoImpl.class);
-        EventEnrolmentSummaryCache cache = new EventEnrolmentSummaryCache(redisCache, dao);
         Request request = mock(Request.class);
 
         List<Map<String, Object>> enrollments = Arrays.asList(
                 enrollment("completed-event", 2, Arrays.asList("certificate")),
                 enrollment("live-event", 1, null),
                 enrollment("retired-event", 1, null));
-        when(dao.getEventEnrolmentList(request, USER_ID)).thenReturn(enrollments);
         when(dao.getEventDetails(null, "completed-event"))
                 .thenReturn(metadata(JsonKey.DURATION, "2"));
         when(dao.getEventDetails(null, "live-event"))
@@ -59,21 +66,8 @@ public class EventEnrolmentSummaryCacheTest {
         when(dao.getEventDetails(null, "retired-event"))
                 .thenReturn(metadata(JsonKey.STATUS, JsonKey.RETIRED));
 
-        cache.refreshSummary(request, USER_ID);
-
-        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
-        verify(redisCache, times(2)).set(keyCaptor.capture(), valueCaptor.capture(), eq(300));
-
-        Assert.assertEquals(Arrays.asList(BASE_KEY + "false", BASE_KEY + "true"), keyCaptor.getAllValues());
-        ObjectMapper mapper = new ObjectMapper();
-        Map<String, Object> standardSummary =
-                mapper.readValue(valueCaptor.getAllValues().get(0), new TypeReference<Map<String, Object>>() {});
-        Map<String, Object> retiredSummary =
-                mapper.readValue(valueCaptor.getAllValues().get(1), new TypeReference<Map<String, Object>>() {});
-
-        assertSummary(standardSummary, 2, 1, 120);
-        assertSummary(retiredSummary, 3, 1, 120);
+        assertSummary(EventEnrolmentSummaryCache.calculateSummary(request, enrollments, false, dao), 2, 1, 120);
+        assertSummary(EventEnrolmentSummaryCache.calculateSummary(request, enrollments, true, dao), 3, 1, 120);
     }
 
     private static Map<String, Object> enrollment(
