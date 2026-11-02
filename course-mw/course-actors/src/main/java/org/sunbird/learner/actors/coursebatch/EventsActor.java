@@ -24,6 +24,7 @@ import org.sunbird.learner.actors.coursebatch.dao.impl.BatchUserDaoImpl;
 import org.sunbird.learner.actors.coursebatch.dao.impl.UserEventsDaoImpl;
 import org.sunbird.learner.actors.eventbatch.EventBatchDao;
 import org.sunbird.learner.actors.eventbatch.impl.EventBatchDaoImpl;
+import org.sunbird.learner.actors.event.EventEnrolmentSummaryCache;
 import org.sunbird.learner.constants.CourseJsonKey;
 import org.sunbird.learner.util.ContentUtil;
 import org.sunbird.learner.util.EventBatchUtil;
@@ -398,6 +399,7 @@ public class EventsActor extends BaseActor {
                     userId, eventId, batchId, data, dataBatch,
                     enrolmentData == null, request.getRequestContext()
             );
+            EventEnrolmentSummaryCache.refresh(request, userId);
 
             sender().tell(successResponse(), self());
             sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());

@@ -11,6 +11,7 @@ import org.sunbird.common.responsecode.ResponseCode
 import org.sunbird.learner.actors.coursebatch.dao.impl.{CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.event.EventContentUtil
+import org.sunbird.learner.actors.event.EventEnrolmentSummaryCache
 import org.sunbird.learner.util._
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -78,6 +79,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     })
     cacheUtil.delete(getCacheKey(userId))
     cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
+    EventEnrolmentSummaryCache.refresh(request, userId)
     sender().tell(successResponse(), self)
   }
 
@@ -104,6 +106,7 @@ class EventSetEnrolmentActor @Inject()(@Named("course-batch-notification-actor")
     logger.info(request.getRequestContext, "EventSetEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
     cacheUtil.delete(getCacheKey(userId))
     cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
+    EventEnrolmentSummaryCache.refresh(request, userId)
     sender().tell(successResponse(), self)
   }
 

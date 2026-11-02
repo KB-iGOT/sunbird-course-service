@@ -15,6 +15,7 @@ import org.sunbird.helper.ServiceFactory
 import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
 import org.sunbird.learner.constants.{CourseJsonKey, InstructionEvent}
 import org.sunbird.learner.util.{ContentCacheHandlerV2, ContentUtil, Util}
+import org.sunbird.learner.actors.event.EventEnrolmentSummaryCache
 
 import java.time.{ZoneId, ZonedDateTime}
 import java.util
@@ -628,6 +629,7 @@ class ContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             val updateData = getLatestReadDetailsForEventStateUpdate(userId, batchId, contentId,contextId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             // Update enrolment records
             cassandraOperation.updateRecordV2(requestContext, eventenrolmentDBInfo.getKeySpace, eventenrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
+            EventEnrolmentSummaryCache.refresh(request, userId)
             if(updatedContent.get("status").asInstanceOf[Int] == 2 && inputContent.get("completionPercentage").toString.toDouble >= minPercetageToComplete) {
               pushKaramPointsKafkaTopic(userId, contentId, batchId);
               pushCertficateGenerateKafkaTopic(userId, contentId, batchId,completionPercentage);

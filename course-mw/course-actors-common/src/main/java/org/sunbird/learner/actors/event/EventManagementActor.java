@@ -272,8 +272,47 @@ public class EventManagementActor extends BaseActor {
         String userId = (String) request.get(JsonKey.USER_ID);
         logger.info(request.getRequestContext(), "EventManagementActor: getUserEnrolEventSummary : UserId = " + userId);
         try {
+            boolean retiredCoursesEnabled =
+                    Boolean.TRUE.equals(request.get(JsonKey.RETIRED_COURE_ENABLED));
+            boolean cacheEnabled =
+                    Boolean.TRUE.equals(request.getContext().get("cache"));
+            if (cacheEnabled) {
+                String cachedSummary =
+                        EventEnrolmentSummaryCache.get(userId, retiredCoursesEnabled);
+                if (StringUtils.isNotBlank(cachedSummary)) {
+                    try {
+                        Map<String, Object> summary =
+                                mapper.readValue(cachedSummary, new TypeReference<Map<String, Object>>() {});
+                        Response response = new Response();
+                        response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, summary);
+                        sender().tell(response, self());
+                        return;
+                    } catch (Exception e) {
+                        logger.warn(
+                                request.getRequestContext(),
+                                "Ignoring invalid cached event enrolment summary for user: " + userId,
+                                e);
+                    }
+                }
+            }
+
             List<Map<String, Object>> allEnrolledEvents = eventBatchDao.getEventEnrolmentList(request, userId);
-            Map<String, Object> userCourseEnrolmentInfo = getUserEnrolmentEventInfo(request, allEnrolledEvents);
+            Map<String, Object> userCourseEnrolmentInfo =
+                    EventEnrolmentSummaryCache.calculateSummary(
+                            request, allEnrolledEvents, retiredCoursesEnabled);
+            if (cacheEnabled) {
+                try {
+                    EventEnrolmentSummaryCache.set(
+                            userId,
+                            retiredCoursesEnabled,
+                            mapper.writeValueAsString(userCourseEnrolmentInfo));
+                } catch (Exception e) {
+                    logger.warn(
+                            request.getRequestContext(),
+                            "Unable to serialize event enrolment summary for cache for user: " + userId,
+                            e);
+                }
+            }
             Response response = new Response();
             response.put(JsonKey.USER_EVENT_ENROLMENT_INFO, userCourseEnrolmentInfo);
             sender().tell(response, self());
@@ -281,56 +320,6 @@ public class EventManagementActor extends BaseActor {
             logger.error(request.getRequestContext(), "Exception in enrolment list for user: " + userId, e);
             throw e;
         }
-    }
-
-    private Map<String, Object> getUserEnrolmentEventInfo(Request request,
-                                                          List<Map<String, Object>> finalEnrolment) {
-        int eventsCompleted = 0;
-        int eventsEnrolled = 0;
-        int hoursSpentOnEvents = 0;
-        Map<String, Object> addInfo = new HashMap<>();
-
-        boolean isRetiredCourseIncluded = Boolean.TRUE.equals(request.get(JsonKey.RETIRED_COURE_ENABLED));
-
-        for (Map<String, Object> eventDetails : finalEnrolment) {
-
-            boolean isCompleted = Integer.valueOf(2).equals(eventDetails.get(JsonKey.STATUS));
-            String eventId = (String) eventDetails.get(JsonKey.CONTENT_ID);
-
-            if (isCompleted) {
-                eventsCompleted++;
-                eventsEnrolled++;
-
-                if (CollectionUtils.isNotEmpty((Collection<?>) eventDetails.get(JsonKey.ISSUED_CERTIFICATES))
-                        && StringUtils.isNotBlank(eventId)) {
-                    Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
-                    if (MapUtils.isNotEmpty(eventMetadata) && eventMetadata.containsKey(JsonKey.DURATION)) {
-                        int durationInMinutes = parseDurationValue(String.valueOf(eventMetadata.get(JsonKey.DURATION)));
-                        hoursSpentOnEvents += (durationInMinutes * 60);
-                    }
-                }
-                continue;
-            }
-
-            if (isRetiredCourseIncluded) {
-                eventsEnrolled++;
-                continue;
-            }
-
-            if (StringUtils.isNotBlank(eventId)) {
-                Map<String, Object> eventMetadata = eventEnrolmentDao.getEventDetails(request.getRequestContext(), eventId);
-
-                if (MapUtils.isNotEmpty(eventMetadata) && JsonKey.LIVE.equalsIgnoreCase((String) eventMetadata.get(JsonKey.STATUS))) {
-                    eventsEnrolled++;
-                }
-            }
-        }
-
-        addInfo.put(JsonKey.EVENTS_ENROLLED, eventsEnrolled);
-        addInfo.put(JsonKey.EVENTS_ATTENDED, eventsCompleted);
-        addInfo.put(JsonKey.HOURS_SPENT, hoursSpentOnEvents);
-
-        return addInfo;
     }
 
     private void eventEnrollmentListForUserBasedOnEventTypes(Request request) throws Exception {
@@ -353,16 +342,4 @@ public class EventManagementActor extends BaseActor {
         }
     }
 
-    private static int parseDurationValue(String value) {
-        try {
-            // If value contains 'E' or 'e', it is likely in scientific notation
-            if (value.contains("E") || value.contains("e")) {
-                return new BigDecimal(value).intValue(); // Convert scientific notation to int
-            } else {
-                return Integer.parseInt(value); // Regular integer parsing
-            }
-        } catch (NumberFormatException e) {
-            return 0; // Default to 0 if parsing fails
-        }
-    }
 }
