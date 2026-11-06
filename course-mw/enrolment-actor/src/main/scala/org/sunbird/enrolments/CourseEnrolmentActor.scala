@@ -9,7 +9,7 @@ import java.util.{Calendar, Collections, Comparator, Date, TimeZone, UUID}
 import akka.actor.ActorRef
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.sunbird.common.models.util.JsonKey
-import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentSearchUtil, ContentUtil, CourseBatchSchedulerUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandler, ContentCacheHandlerV2, ContentSearchUtil, ContentUtil, CourseBatchSchedulerUtil, JsonUtil, UserEnrolmentCacheService, Util}
 
 import scala.collection.JavaConverters._
 import javax.inject.{Inject, Named}
@@ -409,6 +409,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             userCoursesDao.updateExtendedEnrollV2(requestContext, userId, courseId, batchId, dataMap)
             batchUserDao.updateBatchLookupRecord(requestContext, batchId, userId, dataBatchMap, dataMap)
         }
+        UserEnrolmentCacheService.getInstance.refreshEnrolment(requestContext, userId, courseId, batchId)
     }
 
     def createUserEnrolmentMap(userId: String, courseId: String, batchId: String, enrolmentData: UserCourses, requestedBy: String, requestContext: RequestContext): java.util.Map[String, AnyRef] =
