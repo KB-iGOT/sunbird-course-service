@@ -20,7 +20,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, CbPlanLookupException, CbPlanUtil, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, CbPlanLookupException, CbPlanUtil, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, CourseBatchUtil, ExtendedUtil, HelperMethodService, JsonUtil, UserEnrolmentCacheService, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -73,6 +73,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val badgeDbInfo = ExtendedUtil.dbInfoMap.get(ExtendedUtil.USER_BADGE_LOOKUP_DB)
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
+  private val enrolmentCache = UserEnrolmentCacheService.getInstance
   private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
   private val learningHoursExcludedCourseCategories: Set[String] =
     getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
@@ -481,6 +482,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         batchUserDao.updateBatchLookupRecord(requestContext, batchId, userId, dataBatchMap, dataMap)
       }
     }
+    enrolmentCache.refreshEnrolment(requestContext, userId, courseId, batchId)
   }
 
   def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue(JsonKey.ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX)}"
@@ -689,7 +691,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
       courseIdList.addAll(courseIdListFromRequest)
       if (courseIdListFromRequest.size() == 1) {
-        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] =  userCoursesDao.listEnrolments_v2(request.getRequestContext, userId, courseIdListFromRequest);
+        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] = listUserEnrolments(request.getRequestContext, userId, courseIdListFromRequest)
         if (CollectionUtils.isEmpty(courseEnrolment)) {
           return new util.ArrayList[java.util.Map[String, AnyRef]]()
         }
@@ -700,12 +702,12 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       batchId = request.get(Constants.BATCH_ID).asInstanceOf[String]
     }
     if (CollectionUtils.isNotEmpty(courseIdList)) {
-      enrolments = userCoursesDao.listEnrolments_v2(request.getRequestContext, userId, courseIdList);
+      enrolments = listUserEnrolments(request.getRequestContext, userId, courseIdList)
       if (StringUtils.isNotBlank(batchId)) {
         enrolments = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(request.getRequestContext, userId, courseIdList.get(0), batchId);
       }
     } else {
-      enrolments = userCoursesDao.listEnrolments_v2(request.getRequestContext, userId, null);
+      enrolments = listUserEnrolments(request.getRequestContext, userId, null)
     }
 
     val status: Array[String] = request.get(JsonKey.STATUS) match {
@@ -776,6 +778,19 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       enrolments
     } else
       new util.ArrayList[java.util.Map[String, AnyRef]]()
+  }
+
+  /**
+   * All enrolment rows for the user, via the user-enrolment cache when user_enrolment_cache_enabled=true
+   * (Cassandra on miss), straight from Cassandra otherwise. Optional in-memory filter by courseId.
+   * Returns null when nothing matches, matching userCoursesDao.listEnrolments_v2.
+   */
+  def listUserEnrolments(requestContext: RequestContext, userId: String, courseIdList: java.util.List[String]): java.util.List[java.util.Map[String, AnyRef]] = {
+    val rows = enrolmentCache.getCourseEnrolments(requestContext, userId)
+    val filtered =
+      if (CollectionUtils.isEmpty(courseIdList)) rows
+      else rows.asScala.filter(e => courseIdList.contains(e.get(JsonKey.COURSE_ID).asInstanceOf[String])).asJava
+    if (CollectionUtils.isEmpty(filtered)) null else filtered
   }
 
   def getUserEnrolmentCourseInfo(finalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request, userId: String) = {
@@ -2495,6 +2510,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       logger.info(request.getRequestContext,
         s"enrolmentDictionary :: userId=$userId")
 
+      if (UserEnrolmentCacheService.isEnabled) {
+        // rows come from the user-enrolment cache; the dictionary no longer keeps its own key
+        val enrolments = enrolmentCache.getCourseEnrolments(request.getRequestContext, userId)
+        sendResponse(JsonKey.RESPONSE, buildDictionary(enrolments))
+        return
+      }
+
       val redisKey = getEnrolmentDictionaryCacheKey(userId)
       val cachedResponse = cacheUtil.get(redisKey)
       if (StringUtils.isNotBlank(cachedResponse)) {
@@ -2538,15 +2560,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
 
 
-      val result = new java.util.HashMap[String, AnyRef]()
-      enrolments.asScala
-        .filter(e => Option(e.get(JsonKey.COURSE_ID))
-          .exists(id => StringUtils.isNotBlank(id.asInstanceOf[String])))
-        .groupBy(_.get(JsonKey.COURSE_ID).asInstanceOf[String])
-        .foreach { case (courseId, enrolList) =>
-          val courseContent = Try(getCourseContent(courseId)).getOrElse(null)
-          result.put(courseId, buildContentMap(enrolList.head, courseContent))
-        }
+      val result = buildDictionary(enrolments)
 
       cacheUtil.set(redisKey, mapper.writeValueAsString(result), enrolmentDictionaryCacheTtl)
       logger.info(request.getRequestContext,
@@ -2563,6 +2577,21 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           s"enrolmentDictionary :: Exception :: ${e.getMessage}", e)
         sender().tell(e, self)
     }
+  }
+
+  /** courseId -> dictionary entry, one per course (first enrolment row wins, as before). */
+  private def buildDictionary(enrolments: java.util.List[java.util.Map[String, AnyRef]]): java.util.Map[String, AnyRef] = {
+    val result = new java.util.HashMap[String, AnyRef]()
+    if (CollectionUtils.isEmpty(enrolments)) return result
+    enrolments.asScala
+      .filter(e => Option(e.get(JsonKey.COURSE_ID))
+        .exists(id => StringUtils.isNotBlank(id.asInstanceOf[String])))
+      .groupBy(_.get(JsonKey.COURSE_ID).asInstanceOf[String])
+      .foreach { case (courseId, enrolList) =>
+        val courseContent = Try(getCourseContent(courseId)).getOrElse(null)
+        result.put(courseId, buildContentMap(enrolList.head, courseContent))
+      }
+    result
   }
 
   private def sendResponse(key: String, value: AnyRef): Unit = {
