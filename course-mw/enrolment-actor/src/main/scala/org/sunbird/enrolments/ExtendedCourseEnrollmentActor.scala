@@ -946,7 +946,15 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     enrolmentCourseDetails
   }
 
+  /** One batched content lookup for every distinct courseId in the list, so the per-enrolment getCourseContent calls that follow are in-memory hits. */
+  private def prefetchCourseContents(enrolments: java.util.List[java.util.Map[String, AnyRef]]): Unit = {
+    if (CollectionUtils.isEmpty(enrolments)) return
+    val ids = enrolments.asScala.map(_.get(JsonKey.COURSE_ID).asInstanceOf[String]).filter(StringUtils.isNotBlank).distinct.asJava
+    ContentCacheHandlerV2.getInstance().getContents(ids)
+  }
+
   def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean, contentAttributes: util.List[String], isUnenrolledRequest: Boolean = false): java.util.List[java.util.Map[String, AnyRef]] = {
+    prefetchCourseContents(activeEnrolments)
     activeEnrolments.filter(enrolment => if (isUnenrolledRequest) true else isCourseEligible(enrolment)).map(enrolment => {
       val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
       if (courseContent != null && courseContent.containsKey(JsonKey.LEAF_NODE_COUNT)) {
@@ -2583,6 +2591,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private def buildDictionary(enrolments: java.util.List[java.util.Map[String, AnyRef]]): java.util.Map[String, AnyRef] = {
     val result = new java.util.HashMap[String, AnyRef]()
     if (CollectionUtils.isEmpty(enrolments)) return result
+    prefetchCourseContents(enrolments)
     enrolments.asScala
       .filter(e => Option(e.get(JsonKey.COURSE_ID))
         .exists(id => StringUtils.isNotBlank(id.asInstanceOf[String])))
