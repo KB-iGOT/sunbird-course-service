@@ -44,6 +44,11 @@ object UserEnrolmentRedisClient {
   private val username: String = if (passwordEnabled) prop("user_enrolment_redis_username", null) else null
   private val password: String = if (passwordEnabled) prop("user_enrolment_redis_password", null) else null
   private val poolMax: Int = intProp("user_enrolment_redis_pool_max", 64)
+  /** "host/ip:port db=n" for log lines; DNS resolved once, errors shown inline rather than thrown. */
+  private lazy val target: String = {
+    val ip = try java.net.InetAddress.getByName(host).getHostAddress catch { case e: Exception => s"unresolved(${e.getMessage})" }
+    s"$host/$ip:$port db=$index"
+  }
   private val timeoutMs: Int = intProp("user_enrolment_redis_timeout_ms", 2000)
 
   private lazy val pool: JedisPool = {
@@ -56,7 +61,11 @@ object UserEnrolmentRedisClient {
     cfg.setTimeBetweenEvictionRunsMillis(Duration.ofSeconds(300).toMillis)
     cfg.setBlockWhenExhausted(true)
     cfg.setMaxWaitMillis(timeoutMs)
-    logger.info(null, s"UserEnrolmentRedisClient: connecting to $host:$port db=$index poolMax=$poolMax auth=$passwordEnabled")
+    val source = if (StringUtils.isNotBlank(System.getenv("user_enrolment_redis_host"))) "env"
+      else if (props.getProperty("user_enrolment_redis_host") != "user_enrolment_redis_host") "externalresource.properties"
+      else "default (key not configured)"
+    logger.info(null, s"UserEnrolmentRedisClient: connecting to $target poolMax=$poolMax timeoutMs=$timeoutMs auth=$passwordEnabled" +
+      (if (passwordEnabled) s" user=${Option(username).getOrElse("<none>")}" else "") + s"; host taken from $source")
     if (!passwordEnabled) new JedisPool(cfg, host, port, timeoutMs, null, index)
     else if (StringUtils.isBlank(username)) new JedisPool(cfg, host, port, timeoutMs, password, index)
     else new JedisPool(cfg, host, port, timeoutMs, username, password, index)
@@ -70,7 +79,7 @@ object UserEnrolmentRedisClient {
       Some(f(jedis))
     } catch {
       case e: Exception =>
-        logger.error(null, s"UserEnrolmentRedisClient: $op failed for key $key: ${e.getMessage}", e)
+        logger.error(null, s"UserEnrolmentRedisClient: $op failed for key $key against $target: ${e.getMessage}", e)
         None
     } finally {
       if (jedis != null) jedis.close()
