@@ -5,6 +5,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.sunbird.auth.verifier.KeyManager;
+import org.sunbird.learner.util.ContentCacheHandlerV2;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerEnum;
 import org.sunbird.common.models.util.ProjectLogger;
@@ -48,6 +49,8 @@ public class ApplicationStart {
         });
     System.out.println("keymanger.init():starts");
     KeyManager.init();
+    // pre-warm the in-memory content cache from lms-top-course-ids before the app starts serving
+    ContentCacheHandlerV2.getInstance().warmFromTopCourses();
     System.out.println("ApplicationStart:ApplicationStart: End");
   }
 
