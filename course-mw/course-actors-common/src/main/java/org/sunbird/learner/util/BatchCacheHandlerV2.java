@@ -53,10 +53,11 @@ public class BatchCacheHandlerV2 {
     public Map<String, Object> getContent(String batchId, String courseId) throws Exception {
         Map<String, Object> content = batchCache.getIfPresent(batchId);
         if (content != null) {
+            logger.info(null, "BatchCacheHandlerV2:getContent: local cache (Caffeine) hit for batchId: " + batchId);
             return content;
         }
 
-        logger.info(null, "BatchCacheHandlerV2:getContent: Cache miss. Fetching from Cassandra for id: " + batchId);
+        logger.info(null, "BatchCacheHandlerV2:getContent: Cache miss. Fetching from Cassandra (DB) for id: " + batchId);
 
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.COURSE_ID, courseId);

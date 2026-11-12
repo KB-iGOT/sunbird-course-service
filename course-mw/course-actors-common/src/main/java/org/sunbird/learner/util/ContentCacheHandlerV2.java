@@ -75,6 +75,9 @@ public class ContentCacheHandlerV2 {
         for (String id : ids) if (StringUtils.isNotBlank(id)) distinct.add(id);
 
         result.putAll(contentCache.getAllPresent(distinct));
+        if (!result.isEmpty()) {
+            logger.info(null, "ContentCacheHandlerV2:getContents: local cache (Caffeine) hit for " + result.size() + " of " + distinct.size() + " ids");
+        }
         List<String> misses = new ArrayList<>();
         for (String id : distinct) if (!result.containsKey(id) && missingCache.getIfPresent(id) == null) misses.add(id);
         if (misses.isEmpty()) return result;
@@ -92,6 +95,7 @@ public class ContentCacheHandlerV2 {
         }
         ObjectMapper mapper = new ObjectMapper();
         List<String> stillMissing = new ArrayList<>();
+        int redisHits = 0;
         for (String id : misses) {
             String json = fromRedis.get(id);
             if (StringUtils.isNotBlank(json) && !StringUtils.equals(StringUtils.trim(json), "{}")) {
@@ -99,6 +103,7 @@ public class ContentCacheHandlerV2 {
                     Map<String, Object> content = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
                     contentCache.put(id, content);
                     result.put(id, content);
+                    redisHits++;
                     continue;
                 } catch (Exception e) {
                     logger.error(null, "ContentCacheHandlerV2:getContents: bad JSON in Redis for id: " + id, e);
@@ -106,9 +111,13 @@ public class ContentCacheHandlerV2 {
             }
             stillMissing.add(id);
         }
-        if (!stillMissing.isEmpty()) {
-            logger.info(null, "ContentCacheHandlerV2:getContents: " + stillMissing.size() + " of " + distinct.size() + " ids not in Redis, falling back to content API");
+        if (redisHits > 0) {
+            logger.info(null, "ContentCacheHandlerV2:getContents: cache hit (Redis) for " + redisHits + " of " + misses.size() + " ids");
         }
+        if (!stillMissing.isEmpty()) {
+            logger.info(null, "ContentCacheHandlerV2:getContents: " + stillMissing.size() + " of " + distinct.size() + " ids not in Redis, falling back to content API (DB)");
+        }
+        int apiHits = 0;
         for (String id : stillMissing) {
             Map<String, Object> content = id.endsWith("_rc")
                     ? ContentUtil.getAdminContentReadV4(id, null, null)
@@ -116,9 +125,13 @@ public class ContentCacheHandlerV2 {
             if (content != null && !content.isEmpty()) {
                 contentCache.put(id, content);
                 result.put(id, content);
+                apiHits++;
             } else {
                 missingCache.put(id, Boolean.TRUE);
             }
+        }
+        if (!stillMissing.isEmpty()) {
+            logger.info(null, "ContentCacheHandlerV2:getContents: content API (DB) resolved " + apiHits + " of " + stillMissing.size() + " ids");
         }
         return result;
     }
@@ -166,7 +179,10 @@ public class ContentCacheHandlerV2 {
 
     public Map<String, Object> getContent(String id) throws Exception {
         Map<String, Object> content = contentCache.getIfPresent(id);
-        if (content != null) return content;
+        if (content != null) {
+            logger.info(null, "ContentCacheHandlerV2:getContent: local cache (Caffeine) hit for id: " + id);
+            return content;
+        }
         if (missingCache.getIfPresent(id) != null) return null;
         int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
         ObjectMapper mapper = new ObjectMapper();
@@ -176,16 +192,18 @@ public class ContentCacheHandlerV2 {
             if (StringUtils.isNotBlank(cacheResponse) && !StringUtils.equals(StringUtils.trim(cacheResponse), "{}")) {
                 content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
                 contentCache.put(id, content);
+                logger.info(null, "ContentCacheHandlerV2:getContent: cache hit (Redis) for id: " + id);
                 return content;
             }
         } catch (Exception e) {
             logger.error(null, "ContentCacheHandlerV2:getContent: Error while reading content from Redis for id: " + id, e);
         }
-        logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id);
+        logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id + ", falling back to content API (DB)");
         content = ContentUtil.getContentReadV3(id, null, null);
 
         if (content != null && !content.isEmpty()) {
             contentCache.put(id, content);
+            logger.info(null, "ContentCacheHandlerV2:getContent: fetched from content API (DB) for id: " + id);
             //redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
             return content;
         }
@@ -213,27 +231,32 @@ public class ContentCacheHandlerV2 {
 
     public Map<String, Object> getAdminContent(String id) throws Exception {
         Map<String, Object> content = contentCache.getIfPresent(id);
-        if (content != null) return content;
+        if (content != null) {
+            logger.info(null, "ContentCacheHandlerV2:getAdminContent: local cache (Caffeine) hit for id: " + id);
+            return content;
+        }
         if (missingCache.getIfPresent(id) != null) return null;
         int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.CONTENT_TTL));
         ObjectMapper mapper = new ObjectMapper();
         try {
-            logger.info(null, "ContentCacheHandlerV2:getContent: Reading content from Redis for id: " + id);
+            logger.info(null, "ContentCacheHandlerV2:getAdminContent: Reading content from Redis for id: " + id);
             String cacheResponse = redisCacheUtil.getUsingIndex(id, null, ttl, 0);
             if (StringUtils.isNotBlank(cacheResponse) && !StringUtils.equals(StringUtils.trim(cacheResponse), "{}")) {
                 content = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {
                 });
                 contentCache.put(id, content);
+                logger.info(null, "ContentCacheHandlerV2:getAdminContent: cache hit (Redis) for id: " + id);
                 return content;
             }
         } catch (Exception e) {
-            logger.error(null, "ContentCacheHandlerV2:getContent: Error while reading content from Redis for id: " + id, e);
+            logger.error(null, "ContentCacheHandlerV2:getAdminContent: Error while reading content from Redis for id: " + id, e);
         }
-        logger.info(null, "ContentCacheHandlerV2:getContent: Content not found in Redis for id: " + id);
+        logger.info(null, "ContentCacheHandlerV2:getAdminContent: Content not found in Redis for id: " + id + ", falling back to content API (DB)");
         content = ContentUtil.getAdminContentReadV4(id, null, null);
 
         if (content != null && !content.isEmpty()) {
             contentCache.put(id, content);
+            logger.info(null, "ContentCacheHandlerV2:getAdminContent: fetched from content API (DB) for id: " + id);
             //redisCacheUtil.set(id, mapper.writeValueAsString(content), ttl);
             return content;
         }
