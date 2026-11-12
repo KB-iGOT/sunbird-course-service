@@ -619,14 +619,18 @@ public class CourseBatchUtil {
     return JsonKey.BLENDED + ':' + courseId + ':' + batchId + ':' + JsonKey.DURATION;
   }
 
+  private static volatile Set<String> assessmentDurationCourseCategories;
+
+  /** LEARNING_HOURS_ASSESSMENT_COURSE_CATEGORIES, parsed once (it was re-split on every completed course). */
   private static Set<String> getAssessmentDurationCourseCategories() {
+    Set<String> cached = assessmentDurationCourseCategories;
+    if (cached != null) return cached;
     String categories = ProjectUtil.getConfigValue(JsonKey.LEARNING_HOURS_ASSESSMENT_COURSE_CATEGORIES);
-
-    if (StringUtils.isBlank(categories)) {
-      return Collections.emptySet();
-    }
-
-    return Arrays.stream(categories.split(",")).map(String::trim).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+    cached = StringUtils.isBlank(categories)
+        ? Collections.emptySet()
+        : Arrays.stream(categories.split(",")).map(String::trim).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+    assessmentDurationCourseCategories = cached;
+    return cached;
   }
 
   public static void deleteBlendedBatchDurationCache(String courseId, String batchId, RequestContext requestContext) {

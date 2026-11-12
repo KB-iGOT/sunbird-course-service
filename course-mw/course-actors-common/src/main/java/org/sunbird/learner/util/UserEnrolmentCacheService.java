@@ -3,6 +3,7 @@ package org.sunbird.learner.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.sunbird.cache.util.UserEnrolmentRedisClient;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.models.util.LoggerUtil;
@@ -21,8 +22,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Read-through cache for a user's course enrolments, keyed course-enrolments:v1:{userId}
- * (HASH, field = {courseId}:{batchId}, value = allow-listed row JSON).
+ * Read-through cache for a user's course enrolments, keyed ce:v1:{userId}
+ * (HASH, field = courseId, value = JSON array of that course's enrolment rows, one per batch —
+ * normally one active and zero or more inactive). courseId as the field makes "is the user
+ * enrolled in course X" an O(1) HGET regardless of how many other enrolments the user has.
  *
  * Gated by user_enrolment_cache_enabled. When the flag is off every call goes straight to
  * Cassandra and returns the row exactly as the DAO does today. When it is on, rows are returned
@@ -31,8 +34,14 @@ import java.util.Set;
  */
 public class UserEnrolmentCacheService {
 
-  private static final String KEY_PREFIX = "course-enrolments:v1:";
-  private static final String EMPTY_MARKER = "_empty";
+  private static final String KEY_PREFIX = "ce:v1:";
+  /**
+   * Marker field: present (= "yes") once the hash holds the user's complete enrolment set. A hash
+   * without it is partial (built by single-field writes) and is authoritative for nothing: full reads
+   * reload it from Cassandra, scoped reads treat a missing field as "unknown", not "not enrolled".
+   * Underscore prefix so readers strip it like any other control field.
+   */
+  private static final String FULL_SCAN = "_fullScan";
 
   /** Fields written to Redis. Keys are the DAO map keys (camelCase per cassandratablecolumn.properties). */
   static final Set<String> ALLOWED_FIELDS = new LinkedHashSet<>(Arrays.asList(
@@ -45,7 +54,6 @@ public class UserEnrolmentCacheService {
       JsonKey.IDENTIFIER, JsonKey.NAME, "lastIssuedOn"));
 
   private static final ObjectMapper mapper = new ObjectMapper();
-  private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<Map<String, Object>>() {};
   private static UserEnrolmentCacheService instance;
 
   private final LoggerUtil logger = new LoggerUtil(UserEnrolmentCacheService.class);
@@ -70,9 +78,7 @@ public class UserEnrolmentCacheService {
     return KEY_PREFIX + userId;
   }
 
-  public static String field(String courseId, String batchId) {
-    return courseId + ":" + batchId;
-  }
+  private static final TypeReference<List<Map<String, Object>>> LIST_TYPE = new TypeReference<List<Map<String, Object>>>() {};
 
   /**
    * All enrolment rows for the user (active and inactive). Never returns null.
@@ -86,63 +92,123 @@ public class UserEnrolmentCacheService {
     }
     String key = cacheKey(userId);
     scala.Option<Map<String, String>> cached = UserEnrolmentRedisClient.hgetAll(key);
-    if (cached.isDefined()) {
+    if (cached.isDefined() && cached.get().containsKey(FULL_SCAN)) {
       logger.info(requestContext, "UserEnrolmentCacheService: cache hit (Redis) for userId " + userId);
       List<Map<String, Object>> rows = new ArrayList<>();
       for (Map.Entry<String, String> e : cached.get().entrySet()) {
         if (e.getKey().startsWith("_")) continue;
-        Map<String, Object> row = fromJson(e.getValue());
-        if (row != null) rows.add(row);
+        rows.addAll(fromJsonList(e.getValue()));
       }
       return rows;
     }
-    logger.info(requestContext, "UserEnrolmentCacheService: cache miss (Redis), fetching enrolments from Cassandra (DB) for userId " + userId);
+    logger.info(requestContext, "UserEnrolmentCacheService: " + (cached.isDefined() ? "partial hash" : "cache miss") + " (Redis), fetching enrolments from Cassandra (DB) for userId " + userId);
     List<Map<String, Object>> dbRows = userCoursesDao.listEnrolments_v2(requestContext, userId, null);
     List<Map<String, Object>> rows = new ArrayList<>();
-    Map<String, String> hash = new HashMap<>();
+    Map<String, List<Map<String, Object>>> byCourse = new HashMap<>();
     if (CollectionUtils.isNotEmpty(dbRows)) {
       for (Map<String, Object> dbRow : dbRows) {
         Map<String, Object> row = project(dbRow);
         rows.add(row);
-        String json = toJson(row);
-        if (json != null) {
-          hash.put(field((String) row.get(JsonKey.COURSE_ID), (String) row.get(JsonKey.BATCH_ID)), json);
-        }
+        byCourse.computeIfAbsent((String) row.get(JsonKey.COURSE_ID), k -> new ArrayList<>()).add(row);
       }
     }
-    if (hash.isEmpty()) hash.put(EMPTY_MARKER, "1");
+    Map<String, String> hash = new HashMap<>();
+    for (Map.Entry<String, List<Map<String, Object>>> e : byCourse.entrySet()) {
+      String json = toJsonList(e.getValue());
+      if (json != null) hash.put(e.getKey(), json);
+    }
+    hash.put(FULL_SCAN, "yes");
     UserEnrolmentRedisClient.hsetAll(key, hash);
     return rows;
   }
 
+  /** True when the user's hash exists and is complete. */
+  private boolean isFullyCached(String userId) {
+    return UserEnrolmentRedisClient.hget(cacheKey(userId), FULL_SCAN).isDefined();
+  }
+
   /**
-   * Re-read one enrolment from Cassandra and write it into the user's hash, if the user is cached.
-   * Called after every enrolment write (course-service APIs; Flink completion/certificate jobs use
-   * the same contract). Reading back rather than trusting the caller's partial update map keeps the
-   * cached value identical to what a miss would produce.
+   * Enrolment rows for the given course ids only (all batches of each). O(1) per course: one HMGET on
+   * a complete hash; on a partial/absent hash a missing field means "unknown", so that course is read from
+   * Cassandra by (userid, courseid) and the answer is written into the hash. Flag off: Cassandra per course.
+   */
+  public List<Map<String, Object>> getCourseEnrolments(RequestContext requestContext, String userId, List<String> courseIds) {
+    if (CollectionUtils.isEmpty(courseIds)) return getCourseEnrolments(requestContext, userId);
+    List<String> ids = new ArrayList<>();
+    for (String id : courseIds) if (StringUtils.isNotBlank(id) && !ids.contains(id)) ids.add(id);
+    List<Map<String, Object>> rows = new ArrayList<>();
+    if (!isEnabled()) {
+      for (String courseId : ids) {
+        List<Map<String, Object>> dbRows = userCoursesDao.listEnrolments_v2(requestContext, userId, Collections.singletonList(courseId));
+        if (CollectionUtils.isNotEmpty(dbRows)) rows.addAll(dbRows);
+      }
+      return rows;
+    }
+    String key = cacheKey(userId);
+    List<String> fields = new ArrayList<>(ids);
+    fields.add(FULL_SCAN);
+    scala.Option<Map<String, String>> got = UserEnrolmentRedisClient.hmget(key, fields);
+    Map<String, String> present = got.isDefined() ? got.get() : Collections.emptyMap();
+    boolean full = present.containsKey(FULL_SCAN);
+    for (String courseId : ids) {
+      String json = present.get(courseId);
+      if (json != null) {                       // a present field is always a real answer
+        rows.addAll(fromJsonList(json));
+      } else if (!full) {                       // partial/absent hash: ask Cassandra and remember
+        rows.addAll(loadCourseIntoCache(requestContext, userId, courseId));
+      }                                         // full hash + absent field: not enrolled
+    }
+    return rows;
+  }
+
+  /** Cassandra (userid, courseid) -> project -> HSET courseId = batches. Returns the projected rows. */
+  private List<Map<String, Object>> loadCourseIntoCache(RequestContext requestContext, String userId, String courseId) {
+    List<Map<String, Object>> dbRows = userCoursesDao.listEnrolments_v2(requestContext, userId, Collections.singletonList(courseId));
+    List<Map<String, Object>> rows = new ArrayList<>();
+    if (CollectionUtils.isEmpty(dbRows)) return rows;
+    for (Map<String, Object> dbRow : dbRows) rows.add(project(dbRow));
+    String json = toJsonList(rows);
+    if (json != null) UserEnrolmentRedisClient.hset(cacheKey(userId), courseId, json);
+    return rows;
+  }
+
+  /** One enrolment by (courseId, batchId): HGET courseId and pick the batch (flag on) -> Cassandra. Null when absent. */
+  public Map<String, Object> getEnrolment(RequestContext requestContext, String userId, String courseId, String batchId) {
+    if (isEnabled()) {
+      scala.Option<String> json = UserEnrolmentRedisClient.hget(cacheKey(userId), courseId);
+      List<Map<String, Object>> rows = json.isDefined() ? fromJsonList(json.get()) : loadCourseIntoCache(requestContext, userId, courseId);
+      for (Map<String, Object> row : rows) if (batchId.equals(row.get(JsonKey.BATCH_ID))) return row;
+      return null;
+    }
+    List<Map<String, Object>> dbRows = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(requestContext, userId, courseId, batchId);
+    return CollectionUtils.isEmpty(dbRows) ? null : dbRows.get(0);
+  }
+
+  /**
+   * After any write to (userId, courseId, batchId): re-read ALL of the course's rows from Cassandra and
+   * upsert the courseId field (HDEL when none remain). Called by course-service APIs; Flink completion /
+   * certificate jobs use the same contract. The hash may be absent or partial — the write creates/extends
+   * it without the _fullScan marker and the next full read completes it. Reading back keeps the cached
+   * value identical to what a miss would produce; on any failure the key is dropped.
    */
   public void refreshEnrolment(RequestContext requestContext, String userId, String courseId, String batchId) {
     if (!isEnabled()) return;
+    String key = cacheKey(userId);
     try {
-      String key = cacheKey(userId);
-      String f = field(courseId, batchId);
-      List<Map<String, Object>> rows =
-          userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(requestContext, userId, courseId, batchId);
-      if (CollectionUtils.isEmpty(rows)) {
-        UserEnrolmentRedisClient.hdel(key, f);
+      List<Map<String, Object>> dbRows = userCoursesDao.listEnrolments_v2(requestContext, userId, Collections.singletonList(courseId));
+      if (CollectionUtils.isEmpty(dbRows)) {
+        UserEnrolmentRedisClient.hdel(key, courseId);
         return;
       }
-      String json = toJson(project(rows.get(0)));
-      if (json == null || !UserEnrolmentRedisClient.hsetIfExists(key, f, json)) {
-        // hash absent (user not cached) is fine; a failed write must not leave a stale field
-        if (json == null) UserEnrolmentRedisClient.del(key);
-        return;
+      List<Map<String, Object>> rows = new ArrayList<>();
+      for (Map<String, Object> dbRow : dbRows) rows.add(project(dbRow));
+      String json = toJsonList(rows);
+      if (json == null || !UserEnrolmentRedisClient.hset(key, courseId, json)) {
+        UserEnrolmentRedisClient.del(key);
       }
-      // a newly cached user may still carry the empty marker
-      UserEnrolmentRedisClient.hdel(key, EMPTY_MARKER);
     } catch (Exception e) {
       logger.error(requestContext, "UserEnrolmentCacheService: refresh failed for " + userId + "/" + courseId + "/" + batchId, e);
-      UserEnrolmentRedisClient.del(cacheKey(userId));
+      UserEnrolmentRedisClient.del(key);
     }
   }
 
@@ -178,12 +244,16 @@ public class UserEnrolmentCacheService {
     return row;
   }
 
-  private String toJson(Map<String, Object> row) {
+  private String toJsonList(List<Map<String, Object>> rows) {
     try {
-      Map<String, Object> out = new HashMap<>(row);
-      for (String d : DATE_FIELDS) {
-        Object v = out.get(d);
-        if (v instanceof Date) out.put(d, ((Date) v).getTime());
+      List<Map<String, Object>> out = new ArrayList<>(rows.size());
+      for (Map<String, Object> row : rows) {
+        Map<String, Object> m = new HashMap<>(row);
+        for (String d : DATE_FIELDS) {
+          Object v = m.get(d);
+          if (v instanceof Date) m.put(d, ((Date) v).getTime());
+        }
+        out.add(m);
       }
       return mapper.writeValueAsString(out);
     } catch (Exception e) {
@@ -192,17 +262,19 @@ public class UserEnrolmentCacheService {
     }
   }
 
-  private Map<String, Object> fromJson(String json) {
+  private List<Map<String, Object>> fromJsonList(String json) {
     try {
-      Map<String, Object> row = mapper.readValue(json, MAP_TYPE);
-      for (String d : DATE_FIELDS) {
-        Object v = row.get(d);
-        if (v instanceof Number) row.put(d, new Date(((Number) v).longValue()));
+      List<Map<String, Object>> rows = mapper.readValue(json, LIST_TYPE);
+      for (Map<String, Object> row : rows) {
+        for (String d : DATE_FIELDS) {
+          Object v = row.get(d);
+          if (v instanceof Number) row.put(d, new Date(((Number) v).longValue()));
+        }
       }
-      return row;
+      return rows;
     } catch (Exception e) {
       logger.error(null, "UserEnrolmentCacheService: deserialise failed", e);
-      return null;
+      return new ArrayList<>();
     }
   }
 }

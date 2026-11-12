@@ -18,6 +18,7 @@ import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.coursebatch.dao.CourseBatchDao;
 import org.sunbird.learner.constants.CourseJsonKey;
+import org.sunbird.learner.util.CourseBatchCacheUtil;
 import org.sunbird.learner.util.CourseBatchUtil;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.course.batch.CourseBatch;
@@ -59,8 +60,10 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
           map.remove(JsonKey.END_TIME);
           courseBatch.setEndDate((Date)map.get(dateType));
       }
-    return cassandraOperation.insertRecord(
+    Response response = cassandraOperation.insertRecord(
             requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), map);
+    refreshCache(requestContext, courseBatch.getCourseId(), courseBatch.getBatchId());
+    return response;
   }
 
   @Override
@@ -74,33 +77,15 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
     attributeMap.remove(JsonKey.BATCH_ID);
     attributeMap = CassandraUtil.changeCassandraColumnMapping(attributeMap);
     CassandraUtil.convertMaptoJsonString(attributeMap, JsonKey.BATCH_ATTRIBUTES_KEY);
-    return cassandraOperation.updateRecord(
+    Response response = cassandraOperation.updateRecord(
             requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), attributeMap, primaryKey);
+    CourseBatchCacheUtil.evict(courseId, batchId);
+    refreshCache(requestContext, courseId, batchId);
+    return response;
   }
 
-  @Override
-  public CourseBatch readById(String courseId, String batchId, RequestContext requestContext) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.COURSE_ID, courseId);
-    primaryKey.put(JsonKey.BATCH_ID, batchId);
-    Response courseBatchResult =
-        cassandraOperation.getRecordByIdentifier(
-                requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), primaryKey,null);
-    List<Map<String, Object>> courseList =
-        (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
-    if (courseList.isEmpty()) {
-      throw new ProjectCommonException(
-          ResponseCode.invalidCourseBatchId.getErrorCode(),
-          ResponseCode.invalidCourseBatchId.getErrorMessage(),
-          ResponseCode.CLIENT_ERROR.getResponseCode());
-    } else {
-      courseList.get(0).remove(JsonKey.PARTICIPANT);
-      return mapper.convertValue(courseList.get(0), CourseBatch.class);
-    }
-  }
-
-  @Override
-  public Map<String, Object> getCourseBatch(RequestContext requestContext, String courseId, String batchId) {
+  /** Raw course_batch row from Cassandra (participant removed), or null when absent. */
+  private Map<String, Object> readRow(RequestContext requestContext, String courseId, String batchId) {
     Map<String, Object> primaryKey = new HashMap<>();
     primaryKey.put(JsonKey.COURSE_ID, courseId);
     primaryKey.put(JsonKey.BATCH_ID, batchId);
@@ -109,7 +94,49 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
                 requestContext, courseBatchDb.getKeySpace(), courseBatchDb.getTableName(), primaryKey, null);
     List<Map<String, Object>> courseList =
         (List<Map<String, Object>>) courseBatchResult.get(JsonKey.RESPONSE);
-    return courseList.get(0);
+    if (CollectionUtils.isEmpty(courseList)) return null;
+    Map<String, Object> row = courseList.get(0);
+    row.remove(JsonKey.PARTICIPANT);
+    return row;
+  }
+
+  /** Redis-first row read: Redis -> Cassandra (then cached). Null when the batch does not exist. */
+  private Map<String, Object> readRowCached(RequestContext requestContext, String courseId, String batchId) {
+    Map<String, Object> row = CourseBatchCacheUtil.get(courseId, batchId);
+    if (row != null) return row;
+    row = readRow(requestContext, courseId, batchId);
+    if (row != null) CourseBatchCacheUtil.put(row);
+    return row;
+  }
+
+  /** After a successful write: re-read the row and store it so the next read is warm and exact. */
+  private void refreshCache(RequestContext requestContext, String courseId, String batchId) {
+    if (!CourseBatchCacheUtil.isEnabled()) return;
+    try {
+      Map<String, Object> row = readRow(requestContext, courseId, batchId);
+      if (row != null) CourseBatchCacheUtil.put(row);
+    } catch (Exception e) {
+      log.error("CourseBatchDaoImpl: cache refresh failed for {}/{}", courseId, batchId, e);
+    }
+  }
+
+  @Override
+  public CourseBatch readById(String courseId, String batchId, RequestContext requestContext) {
+    Map<String, Object> row = readRowCached(requestContext, courseId, batchId);
+    if (row == null) {
+      throw new ProjectCommonException(
+          ResponseCode.invalidCourseBatchId.getErrorCode(),
+          ResponseCode.invalidCourseBatchId.getErrorMessage(),
+          ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    return mapper.convertValue(row, CourseBatch.class);
+  }
+
+  @Override
+  public Map<String, Object> getCourseBatch(RequestContext requestContext, String courseId, String batchId) {
+    Map<String, Object> row = readRowCached(requestContext, courseId, batchId);
+    if (row == null) throw new IndexOutOfBoundsException("No course_batch row for " + courseId + "/" + batchId);
+    return row;
   }
 
   @Override
@@ -131,6 +158,8 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
         CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
         templateId,
         templateDetails);
+    CourseBatchCacheUtil.evict(courseId, batchId);
+    refreshCache(requestContext, courseId, batchId);
   }
 
   @Override
@@ -145,6 +174,8 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
         primaryKey,
         CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
         templateId);
+    CourseBatchCacheUtil.evict(courseId, batchId);
+    refreshCache(requestContext, courseId, batchId);
   }
 
   @Override
@@ -272,6 +303,7 @@ public class CourseBatchDaoImpl implements CourseBatchDao {
               ResponseCode.CLIENT_ERROR.getResponseCode());
     }
     courseList.get(0).remove(JsonKey.PARTICIPANT);
+    CourseBatchCacheUtil.put(courseList.get(0));
     return mapper.convertValue(courseList.get(0), CourseBatch.class);
   }
 }

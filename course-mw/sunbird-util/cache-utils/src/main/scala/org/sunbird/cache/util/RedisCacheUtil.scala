@@ -440,6 +440,29 @@ class RedisCacheUtil {
         } finally returnConnection(jedis)
     }
 
+    /** SET key=data (with optional TTL) on the given DB index. Throws on failure (caller decides). */
+    def setUsingIndex(key: String, data: String, ttl: Int, index: Int): Unit = {
+        val jedis = getConnection(index)
+        try {
+            if (ttl > 0) jedis.setex(key, ttl.toLong, data) else jedis.set(key, data)
+        } catch {
+            case e: Exception =>
+                logger.error(null, "Exception Occurred While Saving String Data to Redis Cache for Key : " + key + "| Exception is:", e)
+                throw e
+        } finally returnConnection(jedis)
+    }
+
+    /** DEL key on the given DB index. Throws on failure (caller decides). */
+    def deleteUsingIndex(key: String, index: Int): Unit = {
+        val jedis = getConnection(index)
+        try jedis.del(Array(key): _*)
+        catch {
+            case e: Exception =>
+                logger.error(null, "Exception Occurred While Deleting Key from Redis Cache : " + key + "| Exception is:", e)
+                throw e
+        } finally returnConnection(jedis)
+    }
+
     def getUsingIndex(key: String, handler: (String) => String = defaultStringHandler, ttl: Int = 0, index: Int): String = {
         val jedis = getConnection(index)
         try {
