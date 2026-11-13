@@ -401,6 +401,7 @@ public class EventsActor extends BaseActor {
 
             sender().tell(successResponse(), self());
             sendEventEnrolmentAlert(userId, eventId, batchId, request.getRequestContext());
+            sendSankalpEventEnrolment(userId, eventId, resourceType, enrolmentData, request.getRequestContext());
             generateTelemetryAudit(userId, eventId, batchId, data, "enrol", JsonKey.CREATE, request.getContext());
             notifyUser(userId, batchData, JsonKey.ADD);
             helperMethodService.sendNotificationToMDOs(eventId,userId,request.getRequestContext());
@@ -662,6 +663,40 @@ public class EventsActor extends BaseActor {
             throw new ProjectCommonException("BE_JOB_REQUEST_EXCEPTION",
                     "Event is not generated properly.",
                     ResponseCode.CLIENT_ERROR.getResponseCode());
+        }
+    }
+
+    /**
+     * Publishes {event_id, event_type, user_id, enrolled_on} to the Sankalp event topic when a user
+     * enrols in an event whose resourceType is in sankalp_event_resource_types. enrolled_on is the
+     * original enrolment time (epoch milliseconds) for a re-enrolment, otherwise now. Failures are logged
+     * only, so they never fail the enrolment.
+     */
+    private void sendSankalpEventEnrolment(String userId, String eventId, String resourceType,
+                                           UserEvents enrolmentData, RequestContext requestContext) {
+        try {
+            String resourceTypes = ProjectUtil.getConfigValue(JsonKey.SANKALP_EVENT_RESOURCE_TYPES);
+            if (StringUtils.isBlank(resourceTypes) || StringUtils.isBlank(resourceType)
+                    || Arrays.stream(resourceTypes.split(",")).map(String::trim)
+                    .noneMatch(type -> type.equalsIgnoreCase(resourceType.trim()))) {
+                return;
+            }
+            String topic = ProjectUtil.getConfigValue(JsonKey.SANKALP_EVENT_ENROL_TOPIC);
+            if (StringUtils.isBlank(topic)) {
+                logger.info(requestContext, "Sankalp event enrolment not published: topic not configured, eventId: " + eventId);
+                return;
+            }
+            long enrolledOn = (enrolmentData != null && enrolmentData.getEnrolledDate() != null)
+                    ? enrolmentData.getEnrolledDate().getTime() : System.currentTimeMillis();
+            Map<String, Object> message = new LinkedHashMap<>();
+            message.put(JsonKey.SANKALP_EVENT_ID, eventId);
+            message.put(JsonKey.SANKALP_EVENT_TYPE, resourceType);
+            message.put(JsonKey.SANKALP_EVENT_USER_ID, userId);
+            message.put(JsonKey.SANKALP_EVENT_ENROLLED_ON, enrolledOn);
+            InstructionEventGenerator.EventEnrolmentTopic(userId, topic, message);
+            logger.info(requestContext, "Sankalp event enrolment published, eventId: " + eventId + ", userId: " + userId + ", topic: " + topic);
+        } catch (Exception e) {
+            logger.error(requestContext, "Error while publishing Sankalp event enrolment, eventId: " + eventId + ", userId: " + userId, e);
         }
     }
 }
