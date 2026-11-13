@@ -49,7 +49,7 @@ public class ActorConfigApplicationLoader extends GuiceApplicationLoader {
   }
 
   @Override
-  protected GuiceApplicationBuilder builder(ApplicationLoader.Context context) {
+  public GuiceApplicationBuilder builder(ApplicationLoader.Context context) {
     Map<String, Object> overrides = new HashMap<>();
     PropertiesCache props = PropertiesCache.getInstance();
     for (Map.Entry<String, String> e : SETTINGS.entrySet()) {
