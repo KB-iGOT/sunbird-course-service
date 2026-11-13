@@ -395,6 +395,27 @@ class RedisCacheUtil {
       * @param handler
       * @return
       */
+    /** MGET on the default DB index (the one get/set use). Missing keys are absent from the result. */
+    def mget(keys: java.util.List[String]): java.util.Map[String, String] = {
+        val result = new java.util.HashMap[String, String]()
+        if (keys == null || keys.isEmpty) return result
+        val jedis = getConnection
+        try {
+            val values = jedis.mget(keys.asScala: _*)
+            var i = 0
+            while (i < keys.size()) {
+                val v = values.get(i)
+                if (v != null) result.put(keys.get(i), v)
+                i += 1
+            }
+            result
+        } catch {
+            case e: Exception =>
+                logger.error(null, "Exception Occurred While MGET of " + keys.size() + " keys from Redis Cache | Exception is:", e)
+                throw e
+        } finally returnConnection(jedis)
+    }
+
     /**
       * MGET for many keys on one DB index in a single round-trip. Returns key -> value for keys that
       * exist; missing keys are absent from the result. Throws on connection failure (caller decides).
