@@ -3,7 +3,9 @@ package org.sunbird.learner.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import net.logstash.logback.encoder.org.apache.commons.lang3.StringUtils;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.common.models.util.JsonKey;
@@ -24,7 +26,7 @@ public class ContentCacheHandlerV2 {
     private LoggerUtil logger = new LoggerUtil(ContentCacheHandlerV2.class);
     private RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
 
-    private final Cache<String, Map<String, Object>> contentCache;
+    private final LoadingCache<String, Map<String, Object>> contentCache;
     /** Max keys per MGET against the shared Redis (content_cache_mget_batch_size, default 50). */
     private final int mgetBatchSize;
     /**
@@ -43,11 +45,19 @@ public class ContentCacheHandlerV2 {
                 .expireAfterWrite(Duration.ofSeconds(negativeTtl))
                 .build();
 
+        // refreshAfterWrite: a touched entry older than ttlMinutes is served as-is and refreshed in the
+        // background (Redis read-only, then content API). reload: error -> keep old; not found -> remove.
         contentCache = Caffeine.newBuilder()
                 .maximumSize(maxSize)
-                .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
+                .refreshAfterWrite(Duration.ofMinutes(ttlMinutes))
                 .recordStats()
-                .build();
+                .build(new CacheLoader<String, Map<String, Object>>() {
+                    @Override public Map<String, Object> load(String id) throws Exception { return loadFresh(id); }
+                    @Override public Map<String, Object> reload(String id, Map<String, Object> old) {
+                        try { return loadFresh(id); }            // null = source has nothing -> entry removed
+                        catch (Exception e) { return old; }      // transient failure -> keep serving old
+                    }
+                });
     }
 
 
@@ -175,6 +185,21 @@ public class ContentCacheHandlerV2 {
 
     private static int intProp(PropertiesCache props, String key, int def) {
         try { return Integer.parseInt(prop(props, key, String.valueOf(def))); } catch (NumberFormatException e) { return def; }
+    }
+
+    /**
+     * Redis (read-only) -> content API for one id, with no cache side effects. Null when both sources
+     * answer cleanly that there is nothing; throws when either source fails, so a refresh keeps the old entry.
+     */
+    private Map<String, Object> loadFresh(String id) throws Exception {
+        String json = redisCacheUtil.getUsingIndex(id, null, 0, 0);
+        if (StringUtils.isNotBlank(json) && !StringUtils.equals(StringUtils.trim(json), "{}")) {
+            return new ObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+        }
+        Map<String, Object> content = id.endsWith("_rc")
+                ? ContentUtil.getAdminContentReadV4(id, null, null)
+                : ContentUtil.getContentReadV3(id, null, null);
+        return (content == null || content.isEmpty()) ? null : content;
     }
 
     public Map<String, Object> getContent(String id) throws Exception {

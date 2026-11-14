@@ -21,6 +21,7 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.event.EventEnrolmentDao;
 import org.sunbird.learner.util.ContentUtil;
+import org.sunbird.learner.util.EventBatchCacheUtil;
 import org.sunbird.learner.util.EventCacheHandlerV2;
 
 import java.time.LocalDate;
@@ -138,10 +139,15 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     }
 
     public List<Map<String, Object>> getBatchList(Request request, String contentId,String contextId, String batchId) {
-        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + contentId + " batchId = " + batchId);
+        logger.debug(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + contentId + " batchId = " + batchId);
         List<Map<String, Object>> userBatchList = new ArrayList<>();
+        // Caffeine -> Redis {eventId}_{batchId} (EventBatchCacheUtil) -> Cassandra
+        Map<String, Object> cached = EventBatchCacheUtil.get(contextId, batchId);
+        if (cached != null) {
+            userBatchList.add(cached);
+            return userBatchList;
+        }
         Map<String, Object> propertyMap = new HashMap<>();
-
         if (contextId != null && !contextId.isEmpty()) {
             propertyMap.put(JsonKey.EVENTID, contextId);
         }
@@ -156,6 +162,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         );
         if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
             userBatchList = ((List<Map<String, Object>>) res.getResult().get(JsonKey.RESPONSE));
+            for (Map<String, Object> row : userBatchList) EventBatchCacheUtil.put(row);
         }
         return userBatchList;
     }
@@ -204,11 +211,14 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     private void prefetchEvents(List<Map<String, Object>> enrolments) {
         if (CollectionUtils.isEmpty(enrolments)) return;
         List<String> ids = new ArrayList<>();
+        List<String[]> pairs = new ArrayList<>();
         for (Map<String, Object> e : enrolments) {
             String id = (String) e.get(JsonKey.CONTENT_ID);
             if (StringUtils.isNotBlank(id) && !ids.contains(id)) ids.add(id);
+            pairs.add(new String[] {(String) e.get(JsonKey.CONTEXT_ID_KEY), (String) e.get(JsonKey.BATCH_ID)});
         }
-        EventCacheHandlerV2.getInstance().getEvents(ids);
+        EventCacheHandlerV2.getInstance().getEvents(ids);   // event metadata: Caffeine -> MGET -> API
+        EventBatchCacheUtil.getAll(pairs);                  // event batches:  Caffeine -> MGET
     }
 
     public Map<String, Object> getUserDetails(String userId, RequestContext requestContext) {

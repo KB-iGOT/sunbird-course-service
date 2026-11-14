@@ -3,7 +3,9 @@ package org.sunbird.learner.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
@@ -25,18 +27,32 @@ public class BatchCacheHandlerV2 {
 
     private LoggerUtil logger = new LoggerUtil(BatchCacheHandlerV2.class);
     private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
-    private Cache<String, Map<String, Object>> batchCache;
+    private LoadingCache<String, Map<String, Object>> batchCache;
     private ObjectMapper mapper = new ObjectMapper();
 
     private BatchCacheHandlerV2() {
         long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_TTL_MINUTES"));
         long maxSize = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_MAX_SIZE"));
 
+       // refreshAfterWrite from Redis/Cassandra (courseId taken from the cached row). reload: error -> old; gone -> removed.
        batchCache  = Caffeine.newBuilder()
                 .maximumSize(maxSize)
-                .expireAfterWrite(Duration.ofMinutes(ttlMinutes))
+                .refreshAfterWrite(Duration.ofMinutes(ttlMinutes))
                 .recordStats()
-                .build();
+                .build(new CacheLoader<String, Map<String, Object>>() {
+                    @Override public Map<String, Object> load(String batchId) { return null; } // courseId unknown: callers use getIfPresent/put
+                    @Override public Map<String, Object> reload(String batchId, Map<String, Object> old) {
+                        String courseId = old == null ? null : (String) old.get(JsonKey.COURSE_ID);
+                        if (courseId == null) return old;
+                        try {
+                            Map<String, Object> row = CourseBatchCacheUtil.get(courseId, batchId);
+                            if (row == null) row = readFromCassandra(batchId, courseId);
+                            return row == null ? null : decorate(new HashMap<>(row), batchId);
+                        } catch (Exception e) {
+                            return old;
+                        }
+                    }
+                });
     }
 
     public static BatchCacheHandlerV2 getInstance() {

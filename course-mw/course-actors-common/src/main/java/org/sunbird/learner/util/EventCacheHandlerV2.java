@@ -3,7 +3,9 @@ package org.sunbird.learner.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.apache.commons.lang3.StringUtils;
 import org.sunbird.cache.util.RedisCacheUtil;
 import org.sunbird.common.models.util.JsonKey;
@@ -38,7 +40,7 @@ public class EventCacheHandlerV2 {
 
     private final LoggerUtil logger = new LoggerUtil(EventCacheHandlerV2.class);
     private final RedisCacheUtil redisCacheUtil = new RedisCacheUtil();
-    private final Cache<String, Map<String, Object>> eventCache;
+    private final LoadingCache<String, Map<String, Object>> eventCache;
     private final Cache<String, Boolean> missingCache;
     private final int mgetBatchSize;
     private final int redisTtl;
@@ -50,7 +52,16 @@ public class EventCacheHandlerV2 {
         long negativeTtl = Math.max(1, intProp(props, "content_cache_negative_ttl_seconds", 60));
         mgetBatchSize = Math.max(1, intProp(props, "content_cache_mget_batch_size", 50));
         redisTtl = intProp(props, JsonKey.EVENT_REDIS_TTL, 0);
-        eventCache = Caffeine.newBuilder().maximumSize(maxSize).expireAfterWrite(Duration.ofMinutes(ttlMinutes)).recordStats().build();
+        eventCache = Caffeine.newBuilder().maximumSize(maxSize)
+                .refreshAfterWrite(Duration.ofMinutes(ttlMinutes))
+                .recordStats()
+                .build(new CacheLoader<String, Map<String, Object>>() {
+                    @Override public Map<String, Object> load(String id) throws Exception { return loadFresh(id); }
+                    @Override public Map<String, Object> reload(String id, Map<String, Object> old) {
+                        try { return loadFresh(id); }            // null = source has nothing -> entry removed
+                        catch (Exception e) { return old; }      // transient failure -> keep serving old
+                    }
+                });
         missingCache = Caffeine.newBuilder().maximumSize(maxSize).expireAfterWrite(Duration.ofSeconds(negativeTtl)).build();
     }
 
@@ -165,17 +176,31 @@ public class EventCacheHandlerV2 {
                 logger.info(null, "EventCacheHandlerV2:warmFromTopEvents: " + key + " is empty, skipping pre-warm");
                 return;
             }
-            int loaded = 0;
+            int loaded = 0, batches = 0;
             for (int from = 0; from < ids.size(); from += mgetBatchSize) {
                 List<String> chunk = ids.subList(from, Math.min(from + mgetBatchSize, ids.size()));
                 loaded += getEvents(chunk).size();
+                batches += EventBatchCacheUtil.warmByEvents(chunk);   // one Cassandra partition read per event
                 if (pauseMs > 0 && from + mgetBatchSize < ids.size()) Thread.sleep(pauseMs);
             }
             logger.info(null, "EventCacheHandlerV2:warmFromTopEvents: loaded " + loaded + " of " + ids.size()
-                    + " events from " + key + " in " + (System.currentTimeMillis() - start) + " ms");
+                    + " events and " + batches + " event batches from " + key + " in " + (System.currentTimeMillis() - start) + " ms");
         } catch (Exception e) {
             logger.error(null, "EventCacheHandlerV2:warmFromTopEvents: pre-warm aborted after " + (System.currentTimeMillis() - start) + " ms", e);
         }
+    }
+
+    /** Redis (complete events only) -> content API for one id; no cache side effects. Null = nothing; throws on failure. */
+    private Map<String, Object> loadFresh(String id) throws Exception {
+        Map<String, Object> fromRedis = parseIfComplete(redisCacheUtil.get(redisKey(id), null, 0), id);
+        if (fromRedis != null) return fromRedis;
+        Map<String, Object> resp = ContentUtil.getContent(id);
+        Object content = resp == null ? null : resp.get("content");
+        if (!(content instanceof Map) || ((Map<?, ?>) content).isEmpty()) return null;
+        @SuppressWarnings("unchecked") Map<String, Object> event = (Map<String, Object>) content;
+        try { redisCacheUtil.set(redisKey(id), mapper.writeValueAsString(event), redisTtl); }
+        catch (Exception e) { logger.error(null, "EventCacheHandlerV2:loadFresh: Redis write failed for id: " + id, e); }
+        return event;
     }
 
     public void invalidate(String eventId) {
