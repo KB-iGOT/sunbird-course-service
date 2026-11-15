@@ -69,16 +69,16 @@ public class BatchCacheHandlerV2 {
     public Map<String, Object> getContent(String batchId, String courseId) throws Exception {
         Map<String, Object> content = batchCache.getIfPresent(batchId);
         if (content != null) {
-            logger.info(null, "BatchCacheHandlerV2:getContent: local cache (Caffeine) hit for batchId: " + batchId);
+            logger.debug(null, "BatchCacheHandlerV2:getContent: local cache (Caffeine) hit for batchId: " + batchId);
             return content;
         }
 
         // Redis first (shared cache written on batch create/update), then Cassandra
         Map<String, Object> row = CourseBatchCacheUtil.get(courseId, batchId);
         if (row != null) {
-            logger.info(null, "BatchCacheHandlerV2:getContent: cache hit (Redis) for batchId: " + batchId);
+            logger.debug(null, "BatchCacheHandlerV2:getContent: cache hit (Redis) for batchId: " + batchId);
         } else {
-            logger.info(null, "BatchCacheHandlerV2:getContent: Cache miss. Fetching from Cassandra (DB) for id: " + batchId);
+            logger.debug(null, "BatchCacheHandlerV2:getContent: Cache miss. Fetching from Cassandra (DB) for id: " + batchId);
             row = readFromCassandra(batchId, courseId);
             if (row == null) return null;
             CourseBatchCacheUtil.put(row);

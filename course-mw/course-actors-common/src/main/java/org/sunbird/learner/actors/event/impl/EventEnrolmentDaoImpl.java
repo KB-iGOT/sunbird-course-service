@@ -55,7 +55,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
     @Override
     public List<Map<String, Object>> getEnrolmentList(Request request, String userId) {
-        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
+        logger.debug(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
         List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
 
         Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(request.getRequestContext(),
@@ -94,20 +94,48 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
 
             prefetchEvents(userEnrollmentList);
+            Map<String, List<Map<String, Object>>> consumptionByKey = loadUserEventConsumption(request, userId);
             for (Map<String, Object> enrollment : userEnrollmentList) {
                 String contentId= (String) enrollment.get(JsonKey.CONTENT_ID);
                 String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
-                String userid = (String) enrollment.get(JsonKey.USER_ID);
                 String batchId = (String) enrollment.get(JsonKey.BATCH_ID);
                 Map<String, Object> contentDetails = getEventDetails(request.getRequestContext(), (String) enrollment.get(JsonKey.CONTENT_ID));
                 List<Map<String, Object>> batchDetails = getBatchList(request, contentId,contextId, batchId);
-                List<Map<String, Object>> userEventConsumption = getUserEventConsumption(request, userid,contentId,contextId,batchId);
+                List<Map<String, Object>> userEventConsumption =
+                        consumptionByKey.getOrDefault(consumptionKey(contentId, contextId, batchId), new ArrayList<>());
                 enrollment.put("event", contentDetails);
                 enrollment.put("batchDetails", batchDetails);
                 enrollment.put("userEventConsumption", userEventConsumption);
             }
         }
         return userEnrollmentList;
+    }
+
+    /**
+     * All of the user's event consumption rows in ONE partition read (user_entity_consumption is partitioned
+     * by userid), grouped by contentid:contextid:batchid. Replaces one point read per enrolment in the lists.
+     */
+    private Map<String, List<Map<String, Object>>> loadUserEventConsumption(Request request, String userId) {
+        Map<String, List<Map<String, Object>>> byKey = new HashMap<>();
+        Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(request.getRequestContext(),
+                JsonKey.KEYSPACE_SUNBIRD_COURSES,
+                JsonKey.TABLE_USER_EVENT_CONSUMPTION,
+                JsonKey.USER_ID_KEY,
+                userId,
+                null);
+        List<Map<String, Object>> rows = res == null ? null : (List<Map<String, Object>>) res.get(JsonKey.RESPONSE);
+        if (CollectionUtils.isNotEmpty(rows)) {
+            for (Map<String, Object> row : rows) {
+                byKey.computeIfAbsent(consumptionKey(
+                        (String) row.get(JsonKey.CONTENT_ID), (String) row.get(JsonKey.CONTEXT_ID_KEY), (String) row.get(JsonKey.BATCH_ID)),
+                        k -> new ArrayList<>()).add(row);
+            }
+        }
+        return byKey;
+    }
+
+    private static String consumptionKey(String contentId, String contextId, String batchId) {
+        return contentId + ":" + contextId + ":" + batchId;
     }
 
     private List<Map<String, Object>> getUserEventConsumption(Request request, String userId, String contentId,String contextId,String batchId) {
@@ -243,7 +271,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
 
     @Override
     public List<Map<String, Object>> getEventEnrolmentList(Request request, String userId) {
-        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
+        logger.debug(request.getRequestContext(), "EventEnrolmentDaoImpl:getEnrolmentList: UserId = " + userId);
         List<Map<String, Object>> userEnrollmentList = new ArrayList<>();
 
         Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(request.getRequestContext(),
@@ -346,6 +374,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                 }
                 String requestedEventType = (String) request.get("eventType");
                 prefetchEvents(userEnrollmentList);
+                Map<String, List<Map<String, Object>>> consumptionByKey = loadUserEventConsumption(request, userId);
             for (Map<String, Object> enrollment : userEnrollmentList) {
                     String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
                     String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
@@ -369,7 +398,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                                     contentDetails,
                                     actualEventType,
                                     requestedEventType,
-                                    endDateStr);
+                                    endDateStr,
+                                    consumptionByKey);
                         } else {
                             actualEventType = determineEventType(endTime, contentDetails);
                             addEventDetailsToEnrollment(
@@ -382,7 +412,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                                     contentDetails,
                                     actualEventType,
                                     requestedEventType,
-                                    false);
+                                    false,
+                                    consumptionByKey);
                         }
                     }
                 }
@@ -406,7 +437,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             Map<String, Object> contentDetails,
             String actualEventType,
             String requestedEventType,
-            String endDateStr) {
+            String endDateStr,
+            Map<String, List<Map<String, Object>>> consumptionByKey) {
         String startDateStr = (String) request.get("eventStartDate");
         if (StringUtils.isNotEmpty(startDateStr) && StringUtils.isNotEmpty(endDateStr)) {
             LocalDate startDate = LocalDate.parse(startDateStr);
@@ -434,7 +466,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                             contentDetails,
                             actualEventType,
                             requestedEventType,
-                            true);
+                            true,
+                            consumptionByKey);
                 }
             }
         }
@@ -477,11 +510,12 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             Map<String, Object> contentDetails,
             String actualEventType,
             String requestedEventType,
-            boolean calendarEventEnabled) {
+            boolean calendarEventEnabled,
+            Map<String, List<Map<String, Object>>> consumptionByKey) {
         if (calendarEventEnabled || requestedEventType.equalsIgnoreCase(actualEventType)) {
             List<Map<String, Object>> batchDetails = getBatchList(request, contentId, contextId, batchId);
             List<Map<String, Object>> userEventConsumption =
-                    getUserEventConsumption(request, userid, contentId, contextId, batchId);
+                    consumptionByKey.getOrDefault(consumptionKey(contentId, contextId, batchId), new ArrayList<>());
             enrollment.put("event", contentDetails);
             enrollment.put("batchDetails", batchDetails);
             enrollment.put("userEventConsumption", userEventConsumption);

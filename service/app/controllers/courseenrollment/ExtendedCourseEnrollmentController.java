@@ -106,14 +106,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
     }
 
     public CompletionStage<Result> getEnrolledCoursesListV4(Http.Request httpRequest) {
-        String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
-        if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
-                || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
-            throw new ProjectCommonException(
-                    ResponseCode.unAuthorized.getErrorCode(),
-                    ResponseCode.unAuthorized.getErrorMessage(),
-                    ResponseCode.UNAUTHORIZED.getResponseCode());
-        }
+        String tokenUserId = tokenUserIdOrThrow(httpRequest); // verified once in OnRequestHandler
 
         return handleRequest(extendedCourseEnrolmentActor, "list",
                 httpRequest.body().asJson(),
@@ -137,14 +130,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
     }
 
     public CompletionStage<Result> getEnrolledCoursesV4(Http.Request httpRequest) {
-        String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
-        if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
-                || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
-            throw new ProjectCommonException(
-                    ResponseCode.unAuthorized.getErrorCode(),
-                    ResponseCode.unAuthorized.getErrorMessage(),
-                    ResponseCode.UNAUTHORIZED.getResponseCode());
-        }
+        String tokenUserId = tokenUserIdOrThrow(httpRequest); // verified once in OnRequestHandler
 
         return handleRequest(extendedCourseEnrolmentActor, "list",
                 httpRequest.body().asJson(),
@@ -195,14 +181,7 @@ public class ExtendedCourseEnrollmentController extends BaseController {
     // userId is strictly derived from the caller's own token (RequestInterceptor.verifyRequestData) -
     // never taken from caller input, matching the convention used by getEnrolledCoursesV4/ListV4.
     public CompletionStage<Result> autoEnrollComprehensiveAssessment(String doId, Http.Request httpRequest) {
-        String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
-        if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
-                || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
-            throw new ProjectCommonException(
-                    ResponseCode.unAuthorized.getErrorCode(),
-                    ResponseCode.unAuthorized.getErrorMessage(),
-                    ResponseCode.UNAUTHORIZED.getResponseCode());
-        }
+        String tokenUserId = tokenUserIdOrThrow(httpRequest); // verified once in OnRequestHandler
         return handleRequest(extendedCourseEnrolmentActor, "autoEnrollComprehensiveAssessment",
                 httpRequest.body().asJson(),
                 (req) -> {

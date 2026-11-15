@@ -90,7 +90,7 @@ public class EventBatchCacheUtil {
     String k = key(eventId, batchId);
     Map<String, Object> row = local.getIfPresent(k);
     if (row != null) {
-      logger.info(null, "EventBatchCacheUtil:get: local cache (Caffeine) hit for " + k);
+      logger.debug(null, "EventBatchCacheUtil:get: local cache (Caffeine) hit for " + k);
       return row;
     }
     try {
@@ -98,7 +98,7 @@ public class EventBatchCacheUtil {
       if (StringUtils.isBlank(json)) return null;
       row = fromJson(json);
       local.put(k, row);
-      logger.info(null, "EventBatchCacheUtil:get: cache hit (Redis) for " + k);
+      logger.debug(null, "EventBatchCacheUtil:get: cache hit (Redis) for " + k);
       return row;
     } catch (Exception e) {
       logger.error(null, "EventBatchCacheUtil:get failed for " + k, e);
@@ -130,7 +130,7 @@ public class EventBatchCacheUtil {
         logger.error(null, "EventBatchCacheUtil:getAll: Redis MGET failed for a chunk of " + chunk.size(), e);
       }
     }
-    logger.info(null, "EventBatchCacheUtil:getAll: " + result.size() + " of " + keys.size() + " event batches from cache");
+    logger.debug(null, "EventBatchCacheUtil:getAll: " + result.size() + " of " + keys.size() + " event batches from cache");
     return result;
   }
 

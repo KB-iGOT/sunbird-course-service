@@ -342,18 +342,35 @@ public class BaseController extends Controller {
     code.setResponseCode(ResponseCode.OK.getResponseCode());
     response.setParams(createResponseParamObj(code, null, request.attrs().getOptional(Attrs.REQUEST_ID).orElse(null)));
 
-    String value = null;
+    // Serialise once with Play's mapper (same output as Json.toJson) and take X-Response-Length, which only
+    // feeds the gzip threshold in CustomGzipFilter, from those bytes. Previously the result was serialised
+    // twice per request: once with a fresh ObjectMapper just to measure it, then again for the body.
     try {
-      if (response.getResult() != null) {
-        String json = new ObjectMapper().writeValueAsString(response.getResult());
-        value = getResponseSize(json);
-      }
+      byte[] body = Json.mapper().writeValueAsBytes(response);
+      return Results.ok(body).as("application/json")
+          .withHeader(HeaderParam.X_Response_Length.getName(), String.valueOf(body.length));
     } catch (Exception e) {
-      value = "0.0";
+      return Results.ok(Json.toJson(response))
+          .withHeader(HeaderParam.X_Response_Length.getName(), "0.0");
     }
+  }
 
-    return Results.ok(Json.toJson(response))
-        .withHeader(HeaderParam.X_Response_Length.getName(), value);
+  /**
+   * The caller's user id as established by OnRequestHandler (JWT already verified there and stored in
+   * Attrs.USER_ID). Replaces a second RequestInterceptor.verifyRequestData call, i.e. a second RSA signature
+   * verification per request, in controllers. Absent = unauthorised or anonymous.
+   */
+  protected static String tokenUserIdOrThrow(Request httpRequest) {
+    String userId = httpRequest.attrs().getOptional(Attrs.USER_ID).orElse(null);
+    if (StringUtils.isBlank(userId)
+        || JsonKey.UNAUTHORIZED.equalsIgnoreCase(userId)
+        || JsonKey.ANONYMOUS.equalsIgnoreCase(userId)) {
+      throw new ProjectCommonException(
+          ResponseCode.unAuthorized.getErrorCode(),
+          ResponseCode.unAuthorized.getErrorMessage(),
+          ResponseCode.UNAUTHORIZED.getResponseCode());
+    }
+    return userId;
   }
 
   /**

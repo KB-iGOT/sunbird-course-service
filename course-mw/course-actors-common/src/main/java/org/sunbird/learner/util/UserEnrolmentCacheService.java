@@ -86,14 +86,14 @@ public class UserEnrolmentCacheService {
    */
   public List<Map<String, Object>> getCourseEnrolments(RequestContext requestContext, String userId) {
     if (!isEnabled()) {
-      logger.info(requestContext, "UserEnrolmentCacheService: cache disabled, fetching enrolments from Cassandra (DB) for userId " + userId);
+      logger.debug(requestContext, "UserEnrolmentCacheService: cache disabled, fetching enrolments from Cassandra (DB) for userId " + userId);
       List<Map<String, Object>> rows = userCoursesDao.listEnrolments_v2(requestContext, userId, null);
       return rows == null ? new ArrayList<>() : rows;
     }
     String key = cacheKey(userId);
     scala.Option<Map<String, String>> cached = UserEnrolmentRedisClient.hgetAll(key);
     if (cached.isDefined() && cached.get().containsKey(FULL_SCAN)) {
-      logger.info(requestContext, "UserEnrolmentCacheService: cache hit (Redis) for userId " + userId);
+      logger.debug(requestContext, "UserEnrolmentCacheService: cache hit (Redis) for userId " + userId);
       List<Map<String, Object>> rows = new ArrayList<>();
       for (Map.Entry<String, String> e : cached.get().entrySet()) {
         if (e.getKey().startsWith("_")) continue;

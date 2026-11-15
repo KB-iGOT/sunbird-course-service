@@ -83,7 +83,7 @@ public class EventCacheHandlerV2 {
         if (StringUtils.isBlank(eventId)) return null;
         Map<String, Object> hit = eventCache.getIfPresent(eventId);
         if (hit != null) {
-            logger.info(null, "EventCacheHandlerV2:getEvent: local cache (Caffeine) hit for id: " + eventId);
+            logger.debug(null, "EventCacheHandlerV2:getEvent: local cache (Caffeine) hit for id: " + eventId);
             return hit;
         }
         Map<String, Map<String, Object>> r = getEvents(java.util.Collections.singletonList(eventId));
@@ -103,7 +103,7 @@ public class EventCacheHandlerV2 {
 
         result.putAll(eventCache.getAllPresent(distinct));
         if (!result.isEmpty()) {
-            logger.info(null, "EventCacheHandlerV2:getEvents: local cache (Caffeine) hit for " + result.size() + " of " + distinct.size() + " ids");
+            logger.debug(null, "EventCacheHandlerV2:getEvents: local cache (Caffeine) hit for " + result.size() + " of " + distinct.size() + " ids");
         }
         List<String> misses = new ArrayList<>();
         for (String id : distinct) if (!result.containsKey(id) && missingCache.getIfPresent(id) == null) misses.add(id);
@@ -138,7 +138,7 @@ public class EventCacheHandlerV2 {
             }
         }
         if (redisHits > 0) {
-            logger.info(null, "EventCacheHandlerV2:getEvents: cache hit (Redis) for " + redisHits + " of " + misses.size() + " ids");
+            logger.debug(null, "EventCacheHandlerV2:getEvents: cache hit (Redis) for " + redisHits + " of " + misses.size() + " ids");
         }
         if (stillMissing.isEmpty()) return result;
 

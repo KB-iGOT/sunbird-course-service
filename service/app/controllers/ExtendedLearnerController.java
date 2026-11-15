@@ -12,7 +12,6 @@ import play.mvc.Http;
 import play.mvc.Result;
 import util.Attrs;
 import util.ExtendedRequestValidator;
-import util.RequestInterceptor;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -125,14 +124,7 @@ public class ExtendedLearnerController extends BaseController {
 
     public CompletionStage<Result> getNgoContentState(Http.Request httpRequest) {
         try {
-            String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
-            if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
-                    || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
-                throw new ProjectCommonException(
-                        ResponseCode.unAuthorized.getErrorCode(),
-                        ResponseCode.unAuthorized.getErrorMessage(),
-                        ResponseCode.UNAUTHORIZED.getResponseCode());
-            }
+            String tokenUserId = tokenUserIdOrThrow(httpRequest); // verified once in OnRequestHandler
 
             Map<String, Object> contextMap = new HashMap<>();
             JsonNode requestJson = httpRequest.body().asJson();
@@ -206,14 +198,7 @@ public class ExtendedLearnerController extends BaseController {
         String loggingHeaders =  httpRequest.attrs().getOptional(Attrs.X_LOGGING_HEADERS).orElse(null);
         String apiDebugLog = "UpdateNgoContentState Request: " + requestData.toString();
         try {
-            String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
-            if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
-                    || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
-                throw new ProjectCommonException(
-                        ResponseCode.unAuthorized.getErrorCode(),
-                        ResponseCode.unAuthorized.getErrorMessage(),
-                        ResponseCode.UNAUTHORIZED.getResponseCode());
-            }
+            String tokenUserId = tokenUserIdOrThrow(httpRequest); // verified once in OnRequestHandler
 
             Request reqObj = (Request) mapper.RequestMapper.mapRequest(requestData, Request.class);
             String requestedFor = (String) reqObj.getRequest().getOrDefault(JsonKey.USER_ID, null);

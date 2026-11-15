@@ -527,7 +527,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def list(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    logger.debug(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
       val response = getEnrolmentList(request, userId, false, false)
       sender().tell(response, self)
@@ -575,7 +575,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def enrolmentInfoStats(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext,"enrolmentInfoStats :: list :: UserId = " + userId)
+    logger.debug(request.getRequestContext,"enrolmentInfoStats :: list :: UserId = " + userId)
     val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
     val externalEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getExternalEnrollments(userId, request)
     val allEnrolledCourses = new java.util.ArrayList[java.util.Map[String, AnyRef]]
@@ -605,7 +605,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def enrolV3Details(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    logger.debug(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
       val response = getEnrolmentList(request, userId, true, false)
       sender().tell(response, self)
@@ -618,7 +618,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean, includeInactiveEnrolments: Boolean = false): Response = {
     try {
-      logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
+      logger.debug(request.getRequestContext, "ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
       val status = request.get(JsonKey.STATUS) match {
         case arr: Array[String] => arr
@@ -994,7 +994,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   def isCourseEligible(courseId: String, courseContent: java.util.Map[String, AnyRef]): Boolean = {
     if (null == courseContent || (!JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])
       && !isRetiredCoursesIncludedInEnrolList)) {
-      logger.info(null,"ExtendedCourseEnrollmentActor :: isCourseEligible :: Failed to fetch data from cache for courseId " + courseId)
+      logger.debug(null,"ExtendedCourseEnrollmentActor :: isCourseEligible :: Failed to fetch data from cache for courseId " + courseId)
       false
     }
     else {
@@ -1579,7 +1579,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   def enrolDetailsWithProgress(request: Request): Unit = {
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-    logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
+    logger.debug(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
       val response = getEnrolmentList(request, userId, true, true, includeInactiveEnrolments = true)
       sender().tell(response, self)
