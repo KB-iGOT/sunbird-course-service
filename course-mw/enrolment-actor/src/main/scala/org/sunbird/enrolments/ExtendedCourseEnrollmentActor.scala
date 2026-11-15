@@ -60,6 +60,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val cassandraOperation = ServiceFactory.getInstance
   val jsonFields = Set[String]("lrcProgressDetails")
   private val mapper = new ObjectMapper
+  private val scalaMapper = new ObjectMapper().registerModule(DefaultScalaModule)
   private val courseAllowedPrimaryCategories: java.util.List[String] =
     java.util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*)
   private val programAllowedPrimaryCategories: Set[String] =
@@ -688,26 +689,34 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     var enrolments: java.util.List[java.util.Map[String, AnyRef]] = new java.util.ArrayList()
     var batchId: String = null
     if (request.get(Constants.COURSE_ID) != null) {
-      val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
-      courseIdList.addAll(courseIdListFromRequest)
-      if (courseIdListFromRequest.size() == 1) {
-        val courseEnrolment: java.util.List[java.util.Map[String, AnyRef]] = listUserEnrolments(request.getRequestContext, userId, courseIdListFromRequest)
-        if (CollectionUtils.isEmpty(courseEnrolment)) {
-          return new util.ArrayList[java.util.Map[String, AnyRef]]()
-        }
-        enrichCourseIdFromProgram(request, courseIdList)
-      }
+      courseIdList.addAll(request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]])
     }
     if (request.get(Constants.BATCH_ID) != null) {
       batchId = request.get(Constants.BATCH_ID).asInstanceOf[String]
     }
-    if (CollectionUtils.isNotEmpty(courseIdList)) {
-      enrolments = listUserEnrolments(request.getRequestContext, userId, courseIdList)
-      if (StringUtils.isNotBlank(batchId)) {
-        enrolments = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(request.getRequestContext, userId, courseIdList.get(0), batchId);
+    val ctx = request.getRequestContext
+    // Every read is scoped to what was asked; the user's full enrolment set is read only when nothing was asked.
+    if (CollectionUtils.isNotEmpty(courseIdList) && StringUtils.isNotBlank(batchId)) {
+      // (course, batch): one HGET / one Cassandra point read
+      val one = enrolmentCache.getEnrolment(ctx, userId, courseIdList.get(0), batchId)
+      if (one != null) enrolments.add(one)
+    } else if (courseIdList.size() == 1) {
+      // one course: read it; if not enrolled, stop before touching content. If it is a program,
+      // enrichCourseIdFromProgram appends its child course ids and only those are read in addition.
+      enrolments = enrolmentCache.getCourseEnrolments(ctx, userId, courseIdList)
+      if (CollectionUtils.isEmpty(enrolments)) {
+        return new util.ArrayList[java.util.Map[String, AnyRef]]()
       }
+      enrichCourseIdFromProgram(request, courseIdList)
+      if (courseIdList.size() > 1) {
+        val childIds = new java.util.ArrayList[String](courseIdList.subList(1, courseIdList.size()))
+        enrolments = new java.util.ArrayList[java.util.Map[String, AnyRef]](enrolments)
+        enrolments.addAll(enrolmentCache.getCourseEnrolments(ctx, userId, childIds))
+      }
+    } else if (CollectionUtils.isNotEmpty(courseIdList)) {
+      enrolments = enrolmentCache.getCourseEnrolments(ctx, userId, courseIdList)
     } else {
-      enrolments = listUserEnrolments(request.getRequestContext, userId, null)
+      enrolments = enrolmentCache.getCourseEnrolments(ctx, userId)
     }
 
     val status: Array[String] = request.get(JsonKey.STATUS) match {
@@ -780,19 +789,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       new util.ArrayList[java.util.Map[String, AnyRef]]()
   }
 
-  /**
-   * All enrolment rows for the user, via the user-enrolment cache when user_enrolment_cache_enabled=true
-   * (Cassandra on miss), straight from Cassandra otherwise. Optional in-memory filter by courseId.
-   * Returns null when nothing matches, matching userCoursesDao.listEnrolments_v2.
-   */
-  def listUserEnrolments(requestContext: RequestContext, userId: String, courseIdList: java.util.List[String]): java.util.List[java.util.Map[String, AnyRef]] = {
-    val rows = enrolmentCache.getCourseEnrolments(requestContext, userId)
-    val filtered =
-      if (CollectionUtils.isEmpty(courseIdList)) rows
-      else rows.asScala.filter(e => courseIdList.contains(e.get(JsonKey.COURSE_ID).asInstanceOf[String])).asJava
-    if (CollectionUtils.isEmpty(filtered)) null else filtered
-  }
-
   def getUserEnrolmentCourseInfo(finalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request, userId: String) = {
     var certificateIssued: Int = 0
     var coursesInProgress: Int = 0
@@ -834,8 +830,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       Option(dbResponse.get(0)).flatMap(record => Option(record.get(JsonKey.ADD_INFO)).collect { case str: String => str }).getOrElse("")
     }
     if (addInfoString != null && addInfoString.nonEmpty) {
-      val objectMapper = new ObjectMapper().registerModule(DefaultScalaModule)
-      addInfo = objectMapper.readValue(addInfoString, classOf[util.Map[String, AnyRef]])
+      addInfo = scalaMapper.readValue(addInfoString, classOf[util.Map[String, AnyRef]])
     }
     val userKarmaCoinWallet = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
       actorMessage.getRequestContext,
@@ -947,50 +942,45 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   }
 
   /** One batched content lookup for every distinct courseId in the list, so the per-enrolment getCourseContent calls that follow are in-memory hits. */
-  private def prefetchCourseContents(enrolments: java.util.List[java.util.Map[String, AnyRef]]): Unit = {
-    if (CollectionUtils.isEmpty(enrolments)) return
+  private def prefetchCourseContents(enrolments: java.util.List[java.util.Map[String, AnyRef]]): java.util.Map[String, java.util.Map[String, AnyRef]] = {
+    if (CollectionUtils.isEmpty(enrolments)) return new java.util.HashMap[String, java.util.Map[String, AnyRef]]()
     val ids = enrolments.asScala.map(_.get(JsonKey.COURSE_ID).asInstanceOf[String]).filter(StringUtils.isNotBlank).distinct.asJava
     ContentCacheHandlerV2.getInstance().getContents(ids)
   }
 
+  /** COURSE_CONTENT_ALLOWED_FIELDS, parsed once per request rather than once per enrolment. */
+  private def allowedContentFields(contentAttributes: util.List[String]): java.util.List[String] =
+    if (CollectionUtils.isNotEmpty(contentAttributes)) contentAttributes
+    else ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS).split(",").map(_.trim).filter(_.nonEmpty).toList.asJava
+
   def addCourseDetails_v2(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean, contentAttributes: util.List[String], isUnenrolledRequest: Boolean = false): java.util.List[java.util.Map[String, AnyRef]] = {
-    prefetchCourseContents(activeEnrolments)
-    activeEnrolments.filter(enrolment => if (isUnenrolledRequest) true else isCourseEligible(enrolment)).map(enrolment => {
-      val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
-      if (courseContent != null && courseContent.containsKey(JsonKey.LEAF_NODE_COUNT)) {
-        enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
-      }
-      if (isDetailsRequired) {
-        if (courseContent != null) {
+    val contents = prefetchCourseContents(activeEnrolments)
+    val configuredFields = allowedContentFields(contentAttributes)
+    activeEnrolments.asScala.flatMap { enrolment =>
+      val courseId = enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String]
+      val courseContent = contents.get(courseId)
+      if (!isUnenrolledRequest && !isCourseEligible(courseId, courseContent)) None
+      else {
+        if (courseContent != null && courseContent.containsKey(JsonKey.LEAF_NODE_COUNT)) {
+          enrolment.put(JsonKey.LEAF_NODE_COUNT, courseContent.get(JsonKey.LEAF_NODE_COUNT))
+        }
+        if (isDetailsRequired && courseContent != null) {
           enrolment.put(JsonKey.COURSE_NAME, courseContent.get(JsonKey.NAME))
           enrolment.put(JsonKey.DESCRIPTION, courseContent.get(JsonKey.DESCRIPTION))
           enrolment.put(JsonKey.COURSE_LOGO_URL, courseContent.get(JsonKey.APP_ICON))
-          enrolment.put(JsonKey.CONTENT_ID, enrolment.get(JsonKey.COURSE_ID))
-          enrolment.put(JsonKey.COLLECTION_ID, enrolment.get(JsonKey.COURSE_ID))
+          enrolment.put(JsonKey.CONTENT_ID, courseId)
+          enrolment.put(JsonKey.COLLECTION_ID, courseId)
         }
-      }
-      val configuredFields: java.util.List[String] =
-        if (CollectionUtils.isNotEmpty(contentAttributes)) {
-          contentAttributes
-        } else {
-          ProjectUtil.getConfigValue(JsonKey.COURSE_CONTENT_ALLOWED_FIELDS)
-            .split(",")
-            .map(_.trim)
-            .filter(_.nonEmpty)
-            .toList
-            .asJava
-        }
-      val filteredCourseContent = new java.util.HashMap[String, AnyRef]()
-      if (courseContent != null) {
-        configuredFields.foreach { field =>
-          if (courseContent.containsKey(field)) {
-            filteredCourseContent.put(field, courseContent.get(field))
+        val filteredCourseContent = new java.util.HashMap[String, AnyRef]()
+        if (courseContent != null) {
+          configuredFields.asScala.foreach { field =>
+            if (courseContent.containsKey(field)) filteredCourseContent.put(field, courseContent.get(field))
           }
         }
+        enrolment.put(JsonKey.CONTENT, filteredCourseContent)
+        Some(enrolment)
       }
-      enrolment.put(JsonKey.CONTENT, filteredCourseContent)
-      enrolment
-    }).toList.asJava
+    }.asJava
   }
 
   def addExternalCourseDetails(activeEnrolments: java.util.List[java.util.Map[String, AnyRef]], isDetailsRequired: Boolean): java.util.List[java.util.Map[String, AnyRef]] = {
@@ -1001,11 +991,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }).toList.asJava
   }
 
-  def isCourseEligible(enrolment: java.util.Map[String, AnyRef]): Boolean = {
-    val courseContent = getCourseContent(enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
+  def isCourseEligible(courseId: String, courseContent: java.util.Map[String, AnyRef]): Boolean = {
     if (null == courseContent || (!JsonKey.LIVE.equalsIgnoreCase(courseContent.get(JsonKey.STATUS).asInstanceOf[String])
       && !isRetiredCoursesIncludedInEnrolList)) {
-      logger.info(null,"ExtendedCourseEnrollmentActor :: isCourseEligible :: Failed to fetch data from cache for courseId " + enrolment.get(JsonKey.COURSE_ID).asInstanceOf[String])
+      logger.info(null,"ExtendedCourseEnrollmentActor :: isCourseEligible :: Failed to fetch data from cache for courseId " + courseId)
       false
     }
     else {
@@ -2591,14 +2580,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private def buildDictionary(enrolments: java.util.List[java.util.Map[String, AnyRef]]): java.util.Map[String, AnyRef] = {
     val result = new java.util.HashMap[String, AnyRef]()
     if (CollectionUtils.isEmpty(enrolments)) return result
-    prefetchCourseContents(enrolments)
+    val contents = prefetchCourseContents(enrolments)
     enrolments.asScala
       .filter(e => Option(e.get(JsonKey.COURSE_ID))
         .exists(id => StringUtils.isNotBlank(id.asInstanceOf[String])))
       .groupBy(_.get(JsonKey.COURSE_ID).asInstanceOf[String])
       .foreach { case (courseId, enrolList) =>
-        val courseContent = Try(getCourseContent(courseId)).getOrElse(null)
-        result.put(courseId, buildContentMap(enrolList.head, courseContent))
+        result.put(courseId, buildContentMap(enrolList.head, contents.get(courseId)))
       }
     result
   }

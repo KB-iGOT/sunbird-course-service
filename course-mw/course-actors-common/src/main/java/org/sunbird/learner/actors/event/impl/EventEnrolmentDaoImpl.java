@@ -21,6 +21,8 @@ import org.sunbird.common.request.RequestContext;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.event.EventEnrolmentDao;
 import org.sunbird.learner.util.ContentUtil;
+import org.sunbird.learner.util.EventBatchCacheUtil;
+import org.sunbird.learner.util.EventCacheHandlerV2;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -91,6 +93,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
             }
 
 
+            prefetchEvents(userEnrollmentList);
             for (Map<String, Object> enrollment : userEnrollmentList) {
                 String contentId= (String) enrollment.get(JsonKey.CONTENT_ID);
                 String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
@@ -136,10 +139,15 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     }
 
     public List<Map<String, Object>> getBatchList(Request request, String contentId,String contextId, String batchId) {
-        logger.info(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + contentId + " batchId = " + batchId);
+        logger.debug(request.getRequestContext(), "EventEnrolmentDaoImpl:getBatchList: eventId = " + contentId + " batchId = " + batchId);
         List<Map<String, Object>> userBatchList = new ArrayList<>();
+        // Caffeine -> Redis {eventId}_{batchId} (EventBatchCacheUtil) -> Cassandra
+        Map<String, Object> cached = EventBatchCacheUtil.get(contextId, batchId);
+        if (cached != null) {
+            userBatchList.add(cached);
+            return userBatchList;
+        }
         Map<String, Object> propertyMap = new HashMap<>();
-
         if (contextId != null && !contextId.isEmpty()) {
             propertyMap.put(JsonKey.EVENTID, contextId);
         }
@@ -154,6 +162,7 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
         );
         if (!((List<Map<String, Object>>) res.get(JsonKey.RESPONSE)).isEmpty()) {
             userBatchList = ((List<Map<String, Object>>) res.getResult().get(JsonKey.RESPONSE));
+            for (Map<String, Object> row : userBatchList) EventBatchCacheUtil.put(row);
         }
         return userBatchList;
     }
@@ -193,39 +202,23 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
     }
 
     public Map<String, Object> getEventDetails(RequestContext requestContext, String eventId) {
-        logger.info(requestContext, "EventEnrolmentDaoImpl:getEventDetails: eventId: " + eventId, null, null);
-        Map<String, Object> response = new HashMap<>();
-        try {
-            String key = getCacheKey(eventId);
-            int ttl = Integer.parseInt(PropertiesCache.getInstance().getProperty(JsonKey.EVENT_REDIS_TTL));
-            String cacheResponse = redisCacheUtil.get(key,null,ttl);
-            ObjectMapper mapper = new ObjectMapper();
-            if (cacheResponse != null && !cacheResponse.trim().isEmpty() && !cacheResponse.trim().equals("{}")) {
-                logger.info(requestContext, "EventEnrolmentDaoImpl:getContentDetails: Data reading from cache ", null,
-                        null);
-                Map<String, Object> redisResponse = mapper.readValue(cacheResponse, new TypeReference<Map<String, Object>>() {});
-                // check if redisResponse contains keys endDate, endTime, startDate, startTime
-                if (redisResponse.containsKey("contentType") && redisResponse.get("contentType").toString().equalsIgnoreCase("event") &&
-                        redisResponse.containsKey("endDate") && redisResponse.containsKey("endTime")
-                        && redisResponse.containsKey("startDate") && redisResponse.containsKey("startTime"))
-                    return redisResponse;
-            }
-
-            Map<String, Object> ekStepContent = ContentUtil.getContent(eventId);
-            logger.debug(requestContext, "EventEnrolmentDaoImpl:getContentDetails: courseId: " + eventId, null,
-                    ekStepContent);
-            response = (Map<String, Object>) ekStepContent.getOrDefault("content", new HashMap<>());
-                redisCacheUtil.set(key, mapper.writeValueAsString(response), ttl);
-            return response;
-            
-        } catch (Exception e) {
-            logger.error(requestContext, "Error found during event read api " + e.getMessage(), e);
-        }
-        return response;
+        // Caffeine -> Redis ({eventId}:user-event-enrolments) -> content API, via EventCacheHandlerV2
+        Map<String, Object> event = EventCacheHandlerV2.getInstance().getEvent(eventId);
+        return event == null ? new HashMap<>() : event;
     }
 
-    private String getCacheKey(String eventId) {
-        return eventId + ":user-event-enrolments";
+    /** One batched lookup for the distinct event ids so the per-row getEventDetails calls are in-memory hits. */
+    private void prefetchEvents(List<Map<String, Object>> enrolments) {
+        if (CollectionUtils.isEmpty(enrolments)) return;
+        List<String> ids = new ArrayList<>();
+        List<String[]> pairs = new ArrayList<>();
+        for (Map<String, Object> e : enrolments) {
+            String id = (String) e.get(JsonKey.CONTENT_ID);
+            if (StringUtils.isNotBlank(id) && !ids.contains(id)) ids.add(id);
+            pairs.add(new String[] {(String) e.get(JsonKey.CONTEXT_ID_KEY), (String) e.get(JsonKey.BATCH_ID)});
+        }
+        EventCacheHandlerV2.getInstance().getEvents(ids);   // event metadata: Caffeine -> MGET -> API
+        EventBatchCacheUtil.getAll(pairs);                  // event batches:  Caffeine -> MGET
     }
 
     public Map<String, Object> getUserDetails(String userId, RequestContext requestContext) {
@@ -352,7 +345,8 @@ public class EventEnrolmentDaoImpl implements EventEnrolmentDao {
                     }
                 }
                 String requestedEventType = (String) request.get("eventType");
-                for (Map<String, Object> enrollment : userEnrollmentList) {
+                prefetchEvents(userEnrollmentList);
+            for (Map<String, Object> enrollment : userEnrollmentList) {
                     String contentId = (String) enrollment.get(JsonKey.CONTENT_ID);
                     String contextId = (String) enrollment.get(JsonKey.CONTEXT_ID_KEY);
                     String userid = (String) enrollment.get(JsonKey.USER_ID);
