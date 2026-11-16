@@ -1389,5 +1389,6 @@ public final class JsonKey {
   public static final String BE_JOB_REQUEST_EXCEPTION = "BE_JOB_REQUEST_EXCEPTION";
   public static final String EVENT_NOT_GENERATED_PROPERLY = "Event is not generated properly.";
   public static final String INVALID_TOPIC_ID = "Invalid topic id.";
+  public static final String BEST_SCORE_CATEGORY_CONFIG = "best_score_comprehensive_assessment_category";
   private JsonKey() {}
 }

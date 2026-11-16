@@ -58,7 +58,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     ProjectUtil.getConfigValue("bp_batch_stats_cache_ttl").toInt else 14400
   private val externalCourseEnrolDbInfo = Util.dbInfoMap.get(JsonKey.EXTERNAL_COURSES_ENROLMENT_DB)
   private val cassandraOperation = ServiceFactory.getInstance
-  val jsonFields = Set[String]("lrcProgressDetails")
   private val mapper = new ObjectMapper
   private val courseAllowedPrimaryCategories: java.util.List[String] =
     java.util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*)
@@ -79,7 +78,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
   private val learningHoursProgramCourseCategories: Set[String] =
     getConfigValue(JsonKey.LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES).split(",").map(_.trim).filter(_.nonEmpty).toSet
-
+  val jsonFields = Set[String]("lrcProgressDetails", "additionalProperties")
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
 
