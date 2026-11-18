@@ -737,44 +737,55 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
 
 
   /**
-   * Computes the merged `additionalproperties` JSON for a Comprehensive Assessment enrolment,
+   * Computes the merged `additionalproperties` map for a Comprehensive Assessment enrolment,
    * or None when no write is needed. bestScore never decreases across retakes (max of existing
    * vs. incoming); currentScore always reflects this attempt. Gated on courseCategory matching
-   * [[JsonKey.BEST_SCORE_CATEGORY_CONFIG]] so ordinary (non-CA) content never pays the extra
-   * Cassandra read below.
+   * one of the comma-separated categories in [[JsonKey.BEST_SCORE_CATEGORY_CONFIG]] (e.g.
+   * "Comprehensive Assessment,Course,Moderated Course"), so ordinary content outside that list
+   * never pays the extra Cassandra read below.
+   *
+   * `additionalproperties` is a native Cassandra map column, not a JSON-text column — the
+   * driver hands back a `java.util.Map` on read and expects one on write, so this method stays
+   * in `Map` form throughout rather than serializing to/from JSON.
    *
    * @param incomingAdditionalProperties payload sent by cb-ext-assessment-service for this
    *                                     attempt; expected keys: assessmentId, currentScore
-   * @return Some(serialized JSON) to merge into the enrolment row, or None to leave it untouched
+   * @return Some(merged map) to write into the enrolment row's additionalproperties column, or
+   *         None to leave it untouched
    */
   def computeAdditionalPropertiesUpdate(requestContext: RequestContext, incomingAdditionalProperties: java.util.Map[String, AnyRef],
                                         userId: String, courseId: String, batchId: String,
-                                        courseCategory: String): Option[String] = {
+                                        courseCategory: String): Option[java.util.Map[String, AnyRef]] = {
     val configuredCategory = ProjectUtil.getConfigValue(JsonKey.BEST_SCORE_CATEGORY_CONFIG)
-    if (StringUtils.isBlank(configuredCategory) || !configuredCategory.equalsIgnoreCase(courseCategory)) {
+    val configuredCategories: Set[String] = if (StringUtils.isNotBlank(configuredCategory))
+      configuredCategory.split(",").map(_.trim).filter(StringUtils.isNotBlank).toSet
+    else Set.empty[String]
+    logger.info(requestContext, "computeAdditionalPropertiesUpdate: courseCategory=[" + courseCategory + "], configuredCategories=[" + configuredCategories.mkString(",") + "]")
+    if (configuredCategories.isEmpty || StringUtils.isBlank(courseCategory) || !configuredCategories.exists(_.equalsIgnoreCase(courseCategory))) {
       None
     } else {
       val assessmentId = if (incomingAdditionalProperties != null) incomingAdditionalProperties.get("assessmentId").asInstanceOf[String] else null
       if (incomingAdditionalProperties == null || StringUtils.isBlank(assessmentId) || !incomingAdditionalProperties.containsKey("currentScore")) {
         None
       } else {
-        val currentScore = incomingAdditionalProperties.get("currentScore").asInstanceOf[Number].doubleValue()
+        val currentScore = incomingAdditionalProperties.get("currentScore").asInstanceOf[Number].floatValue()
         val existingRows = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(requestContext, userId, courseId, batchId)
-        val existingRaw = if (CollectionUtils.isNotEmpty(existingRows)) existingRows.get(0).get(JsonKey.ADDITIONAL_PROPERTIES).asInstanceOf[String] else null
-        val existingMap: java.util.Map[String, AnyRef] =
-          if (StringUtils.isNotBlank(existingRaw)) mapper.readValue(existingRaw, classOf[java.util.Map[String, AnyRef]])
-          else new java.util.HashMap[String, AnyRef]()
+        val existingRaw = if (CollectionUtils.isNotEmpty(existingRows)) existingRows.get(0).get(JsonKey.ADDITIONAL_PROPERTIES) else null
+        val existingMap: java.util.Map[String, AnyRef] = existingRaw match {
+          case m: java.util.Map[_, _] => new java.util.HashMap[String, AnyRef](m.asInstanceOf[java.util.Map[String, AnyRef]])
+          case _ => new java.util.HashMap[String, AnyRef]()
+        }
         val existingScores = existingMap.get(assessmentId).asInstanceOf[java.util.Map[String, AnyRef]]
         val existingBest = if (existingScores != null)
-          existingScores.getOrDefault("bestScore", 0.0.asInstanceOf[AnyRef]).asInstanceOf[Number].doubleValue()
-        else 0.0
+          existingScores.getOrDefault("bestScore", 0.0f.asInstanceOf[AnyRef]).asInstanceOf[Number].floatValue()
+        else 0.0f
         val newScores = new java.util.HashMap[String, AnyRef]()
         newScores.put("bestScore", Math.max(existingBest, currentScore).asInstanceOf[AnyRef])
         newScores.put("currentScore", currentScore.asInstanceOf[AnyRef])
         existingMap.put(assessmentId, newScores)
         logger.info(requestContext, "computeAdditionalPropertiesUpdate: userId: " + userId + ", courseId: " + courseId
           + ", assessmentId: " + assessmentId + ", currentScore: " + currentScore + ", bestScore: " + Math.max(existingBest, currentScore))
-        Some(mapper.writeValueAsString(existingMap))
+        Some(existingMap)
       }
     }
   }
