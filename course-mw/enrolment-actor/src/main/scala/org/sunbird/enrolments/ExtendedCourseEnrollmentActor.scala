@@ -1141,7 +1141,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
       jsonFields.foreach { field =>
         if (enrolment.containsKey(field) && null != enrolment.get(field)) {
-          enrolment.put(field, mapper.readTree(enrolment.get(field).asInstanceOf[String]))
+          enrolment.put(field, toJsonNode(enrolment.get(field)))
         } else {
           enrolment.put(field, new java.util.HashMap[String, AnyRef]())
         }
@@ -1622,7 +1622,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         m.put(JsonKey.COLLECTION_ID, m.getOrDefault(JsonKey.COURSE_ID, ""))
         jsonFields.foreach { field =>
           if (m.get(field) != null)
-            m.put(field, mapper.readTree(m.get(field).asInstanceOf[String]))
+            m.put(field, toJsonNode(m.get(field)))
         }
         val resultMap = new java.util.HashMap[String, AnyRef]()
         if (Option(m.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) != 2) {
@@ -2677,6 +2677,11 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
     }
     contentMap
+  }
+
+  private def toJsonNode(value: AnyRef): com.fasterxml.jackson.databind.JsonNode = value match {
+    case jsonString: String => mapper.readTree(jsonString)
+    case _ => mapper.valueToTree(value)
   }
 
 }
