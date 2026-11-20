@@ -749,7 +749,8 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
    * in `Map` form throughout rather than serializing to/from JSON.
    *
    * @param incomingAdditionalProperties payload sent by cb-ext-assessment-service for this
-   *                                     attempt; expected keys: assessmentId, currentScore
+   *                                     attempt; expected keys: assessmentId, currentScore;
+   *                                     optional key: minimumPassPercentage
    * @return Some(merged map) to write into the enrolment row's additionalproperties column, or
    *         None to leave it untouched
    */
@@ -769,6 +770,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         None
       } else {
         val currentScore = incomingAdditionalProperties.get("currentScore").asInstanceOf[Number].floatValue()
+        val minimumPassPercentage = incomingAdditionalProperties.get("minimumPassPercentage").asInstanceOf[Number]
         val existingRows = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(requestContext, userId, courseId, batchId)
         val existingRaw = if (CollectionUtils.isNotEmpty(existingRows)) existingRows.get(0).get(JsonKey.ADDITIONAL_PROPERTIES) else null
         val existingMap: java.util.Map[String, AnyRef] = existingRaw match {
@@ -782,9 +784,13 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
         val newScores = new java.util.HashMap[String, AnyRef]()
         newScores.put("bestScore", Math.max(existingBest, currentScore).asInstanceOf[AnyRef])
         newScores.put("currentScore", currentScore.asInstanceOf[AnyRef])
+        if (minimumPassPercentage != null) {
+          newScores.put("minimumPassPercentage", minimumPassPercentage)
+        }
         existingMap.put(assessmentId, newScores)
         logger.info(requestContext, "computeAdditionalPropertiesUpdate: userId: " + userId + ", courseId: " + courseId
-          + ", assessmentId: " + assessmentId + ", currentScore: " + currentScore + ", bestScore: " + Math.max(existingBest, currentScore))
+          + ", assessmentId: " + assessmentId + ", currentScore: " + currentScore + ", bestScore: " + Math.max(existingBest, currentScore)
+          + ", minimumPassPercentage: " + minimumPassPercentage)
         Some(existingMap)
       }
     }
