@@ -58,7 +58,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     ProjectUtil.getConfigValue("bp_batch_stats_cache_ttl").toInt else 14400
   private val externalCourseEnrolDbInfo = Util.dbInfoMap.get(JsonKey.EXTERNAL_COURSES_ENROLMENT_DB)
   private val cassandraOperation = ServiceFactory.getInstance
-  val jsonFields = Set[String]("lrcProgressDetails")
   private val mapper = new ObjectMapper
   private val courseAllowedPrimaryCategories: java.util.List[String] =
     java.util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*)
@@ -79,7 +78,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
   private val learningHoursProgramCourseCategories: Set[String] =
     getConfigValue(JsonKey.LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES).split(",").map(_.trim).filter(_.nonEmpty).toSet
-
+  val jsonFields = Set[String]("lrcProgressDetails", "additionalProperties")
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
 
@@ -1142,7 +1141,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
       jsonFields.foreach { field =>
         if (enrolment.containsKey(field) && null != enrolment.get(field)) {
-          enrolment.put(field, mapper.readTree(enrolment.get(field).asInstanceOf[String]))
+          enrolment.put(field, toJsonNode(enrolment.get(field)))
         } else {
           enrolment.put(field, new java.util.HashMap[String, AnyRef]())
         }
@@ -1623,7 +1622,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         m.put(JsonKey.COLLECTION_ID, m.getOrDefault(JsonKey.COURSE_ID, ""))
         jsonFields.foreach { field =>
           if (m.get(field) != null)
-            m.put(field, mapper.readTree(m.get(field).asInstanceOf[String]))
+            m.put(field, toJsonNode(m.get(field)))
         }
         val resultMap = new java.util.HashMap[String, AnyRef]()
         if (Option(m.get(JsonKey.STATUS)).map(_.asInstanceOf[Integer].intValue()).getOrElse(0) != 2) {
@@ -2678,6 +2677,11 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
     }
     contentMap
+  }
+
+  private def toJsonNode(value: AnyRef): com.fasterxml.jackson.databind.JsonNode = value match {
+    case jsonString: String => mapper.readTree(jsonString)
+    case _ => mapper.valueToTree(value)
   }
 
 }

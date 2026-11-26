@@ -13,6 +13,8 @@ import org.sunbird.common.responsecode.ResponseCode
 import org.sunbird.common.util.JsonUtil
 import org.sunbird.helper.ServiceFactory
 import org.sunbird.kafka.client.{InstructionEventGenerator, KafkaClient}
+import org.sunbird.learner.actors.coursebatch.dao.UserCoursesDao
+import org.sunbird.learner.actors.coursebatch.dao.impl.UserCoursesDaoImpl
 import org.sunbird.learner.constants.{CourseJsonKey, InstructionEvent}
 import org.sunbird.learner.util.{ContentCacheHandlerV2, ContentUtil, ExtendedUtil, Util}
 
@@ -35,8 +37,10 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
   private val consumptionDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_CONTENT_DB)
   private val assessmentAggregatorDBInfo = Util.dbInfoMap.get(JsonKey.ASSESSMENT_AGGREGATOR_DB)
   private val enrolmentDBInfo = ExtendedUtil.dbInfoMap.get(JsonKey.LEARNER_COURSE_DB)
+  var userCoursesDao: UserCoursesDao = new UserCoursesDaoImpl()
   val dateFormatter = ProjectUtil.getDateFormatter
   val jsonFields = Set[String]("progressdetails")
+  val ADDITIONAL_PROPERTIES_COLUMN = "additionalproperties"
 
   override def onReceive(request: Request): Unit = {
     Util.initializeContext(request, TelemetryEnvKey.BATCH, this.getClass.getName)
@@ -442,6 +446,7 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
           if (validUserIds.contains(userId)) {
             val contentId = inputContent.get(JsonKey.CONTENT_ID).asInstanceOf[String]
             contentIds.add(contentId)
+            val incomingAdditionalProperties = inputContent.remove(JsonKey.ADDITIONAL_PROPERTIES).asInstanceOf[java.util.Map[String, AnyRef]]
             val existingContents = getContentsConsumption(userId, courseId, contentIds, batchId, language, requestContext).groupBy(x => x.get("contentId").asInstanceOf[String]).map(e => e._1 -> e._2.toList.head).toMap
             val existingContent = existingContents.getOrElse(contentId, new java.util.HashMap[String, AnyRef])
             val updatedContent = CassandraUtil.changeCassandraColumnMapping(processContentConsumption(inputContent, existingContent, userId))
@@ -453,6 +458,9 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
             cassandraOperation.batchInsertLogged(requestContext, consumptionDBInfo.getKeySpace, consumptionDBInfo.getTableName, updatedContentList)
             val updateData = getLatestReadDetails(userId, batchId, updatedContentList.asInstanceOf[List[java.util.Map[String, AnyRef]]])
             updateData._2.put(JsonKey.RECENT_LANGUAGE, language)
+            val courseCategory = contentInfoMap.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
+            computeAdditionalPropertiesUpdate(requestContext, incomingAdditionalProperties, userId, courseId, batchId, courseCategory)
+              .foreach(updatedAdditionalProperties => updateData._2.put(ADDITIONAL_PROPERTIES_COLUMN, updatedAdditionalProperties))
             cassandraOperation.updateRecordV2(requestContext, enrolmentDBInfo.getKeySpace, enrolmentDBInfo.getTableName, updateData._1, updateData._2, true)
           }
         }
@@ -727,4 +735,64 @@ class ExtendedContentConsumptionActor @Inject() extends BaseEnrolmentActor {
   }
 
 
+
+  /**
+   * Computes the merged `additionalproperties` map for a Comprehensive Assessment enrolment,
+   * or None when no write is needed. bestScore never decreases across retakes (max of existing
+   * vs. incoming); currentScore always reflects this attempt. Gated on courseCategory matching
+   * one of the comma-separated categories in [[JsonKey.BEST_SCORE_CATEGORY_CONFIG]] (e.g.
+   * "Comprehensive Assessment,Course,Moderated Course"), so ordinary content outside that list
+   * never pays the extra Cassandra read below.
+   *
+   * `additionalproperties` is a native Cassandra map column, not a JSON-text column — the
+   * driver hands back a `java.util.Map` on read and expects one on write, so this method stays
+   * in `Map` form throughout rather than serializing to/from JSON.
+   *
+   * @param incomingAdditionalProperties payload sent by cb-ext-assessment-service for this
+   *                                     attempt; expected keys: assessmentId, currentScore;
+   *                                     optional key: minimumPassPercentage
+   * @return Some(merged map) to write into the enrolment row's additionalproperties column, or
+   *         None to leave it untouched
+   */
+  def computeAdditionalPropertiesUpdate(requestContext: RequestContext, incomingAdditionalProperties: java.util.Map[String, AnyRef],
+                                        userId: String, courseId: String, batchId: String,
+                                        courseCategory: String): Option[java.util.Map[String, AnyRef]] = {
+    val configuredCategory = ProjectUtil.getConfigValue(JsonKey.BEST_SCORE_CATEGORY_CONFIG)
+    val configuredCategories: Set[String] = if (StringUtils.isNotBlank(configuredCategory))
+      configuredCategory.split(",").map(_.trim).filter(StringUtils.isNotBlank).toSet
+    else Set.empty[String]
+    logger.info(requestContext, "computeAdditionalPropertiesUpdate: courseCategory=[" + courseCategory + "], configuredCategories=[" + configuredCategories.mkString(",") + "]")
+    if (configuredCategories.isEmpty || StringUtils.isBlank(courseCategory) || !configuredCategories.exists(_.equalsIgnoreCase(courseCategory))) {
+      None
+    } else {
+      val assessmentId = if (incomingAdditionalProperties != null) incomingAdditionalProperties.get("assessmentId").asInstanceOf[String] else null
+      if (incomingAdditionalProperties == null || StringUtils.isBlank(assessmentId) || !incomingAdditionalProperties.containsKey("currentScore")) {
+        None
+      } else {
+        val currentScore = incomingAdditionalProperties.get("currentScore").asInstanceOf[Number].floatValue()
+        val minimumPassPercentage = incomingAdditionalProperties.get("minimumPassPercentage").asInstanceOf[Number]
+        val existingRows = userCoursesDao.getEnrolmentByBatchIdAndCourseId_v2(requestContext, userId, courseId, batchId)
+        val existingRaw = if (CollectionUtils.isNotEmpty(existingRows)) existingRows.get(0).get(JsonKey.ADDITIONAL_PROPERTIES) else null
+        val existingMap: java.util.Map[String, AnyRef] = existingRaw match {
+          case m: java.util.Map[_, _] => new java.util.HashMap[String, AnyRef](m.asInstanceOf[java.util.Map[String, AnyRef]])
+          case _ => new java.util.HashMap[String, AnyRef]()
+        }
+        val existingScores = existingMap.get(assessmentId).asInstanceOf[java.util.Map[String, AnyRef]]
+        val existingBest = if (existingScores != null)
+          existingScores.getOrDefault("bestScore", 0.0f.asInstanceOf[AnyRef]).asInstanceOf[Number].floatValue()
+        else 0.0f
+        val newScores = new java.util.HashMap[String, AnyRef]()
+        newScores.put("bestScore", Math.max(existingBest, currentScore).asInstanceOf[AnyRef])
+        newScores.put("currentScore", currentScore.asInstanceOf[AnyRef])
+        if (minimumPassPercentage != null) {
+          newScores.put("minimumPassPercentage", minimumPassPercentage)
+        }
+        existingMap.put(assessmentId, newScores)
+        logger.info(requestContext, "computeAdditionalPropertiesUpdate: userId: " + userId + ", courseId: " + courseId
+          + ", assessmentId: " + assessmentId + ", currentScore: " + currentScore + ", bestScore: " + Math.max(existingBest, currentScore)
+          + ", minimumPassPercentage: " + minimumPassPercentage)
+        Some(existingMap)
+      }
+    }
+  }
 }
