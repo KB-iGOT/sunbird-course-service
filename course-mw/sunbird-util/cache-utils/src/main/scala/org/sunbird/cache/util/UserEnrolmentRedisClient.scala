@@ -8,7 +8,7 @@ import java.time.Duration
 import scala.collection.JavaConverters._
 
 /**
-  * Client for the dedicated user-enrolment Redis (keys course-enrolments:v1:{userId}).
+  * Client for the dedicated user-enrolment Redis (keys ce:v1:{userId}, ee:v1:{userId}).
   * One pool per JVM, bound to a fixed DB index (no SELECT per checkout).
   * Every operation is best-effort: a Redis failure is logged and reported as a miss/false,
   * never thrown, so callers fall back to Cassandra.
@@ -94,22 +94,40 @@ object UserEnrolmentRedisClient {
       else { j.expire(key, ttl); m }
     }.flatMap(Option(_))
 
-  /** Replace the whole hash in one pipeline: DEL, HSET fields, EXPIRE. */
+  /** HGET one field. None = disabled, error, key or field absent. */
+  def hget(key: String, field: String): Option[String] =
+    withJedis("hget", key) { j => j.hget(key, field) }.flatMap(Option(_))
+
+  /** HMGET several fields; absent fields are omitted. None = disabled, error, or key absent. */
+  def hmget(key: String, fields: java.util.List[String]): Option[java.util.Map[String, String]] =
+    withJedis("hmget", key) { j =>
+      if (fields.isEmpty || !j.exists(key)) null
+      else {
+        val values = j.hmget(key, fields.asScala: _*)
+        val out = new java.util.HashMap[String, String]()
+        var k = 0
+        while (k < fields.size()) { if (values.get(k) != null) out.put(fields.get(k), values.get(k)); k += 1 }
+        out
+      }
+    }.flatMap(Option(_))
+
+  /**
+    * Replace the whole hash atomically (MULTI: DEL, HSET fields, EXPIRE, EXEC) so no reader sees it
+    * between delete and refill, and no field from a previous partial hash survives a full load.
+    */
   def hsetAll(key: String, fields: java.util.Map[String, String]): Boolean =
     withJedis("hsetAll", key) { j =>
-      val p = j.pipelined()
-      p.del(Array(key): _*)
-      if (!fields.isEmpty) p.hset(key, fields)
-      p.expire(key, ttl)
-      p.sync()
+      val t = j.multi()
+      t.del(Array(key): _*)
+      if (!fields.isEmpty) t.hset(key, fields)
+      t.expire(key, ttl)
+      t.exec()
       true
     }.getOrElse(false)
 
-  /** HSET one field only if the hash already exists (never materialises a partial user). */
-  def hsetIfExists(key: String, field: String, value: String): Boolean =
-    withJedis("hsetIfExists", key) { j =>
-      if (j.exists(key)) { j.hset(key, field, value); j.expire(key, ttl); true } else false
-    }.getOrElse(false)
+  /** HSET one field + EXPIRE. Creates the hash if absent (a partial hash is allowed; see _fullScan). */
+  def hset(key: String, field: String, value: String): Boolean =
+    withJedis("hset", key) { j => j.hset(key, field, value); j.expire(key, ttl); true }.getOrElse(false)
 
   def hdel(key: String, field: String): Boolean =
     withJedis("hdel", key) { j => j.hdel(key, field); true }.getOrElse(false)

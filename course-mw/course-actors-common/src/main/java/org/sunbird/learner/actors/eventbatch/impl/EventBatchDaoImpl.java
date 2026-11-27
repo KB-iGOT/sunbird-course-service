@@ -14,6 +14,7 @@ import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.eventbatch.EventBatchDao;
 import org.sunbird.learner.constants.CourseJsonKey;
+import org.sunbird.learner.util.EventBatchCacheUtil;
 import org.sunbird.learner.util.EventBatchUtil;
 import org.sunbird.learner.util.Util;
 import org.sunbird.models.event.batch.EventBatch;
@@ -31,22 +32,48 @@ public class EventBatchDaoImpl implements EventBatchDao {
 
     @Override
     public EventBatch readById(String eventId, String batchId, RequestContext requestContext) {
+        Map<String, Object> row = readRowCached(requestContext, eventId, batchId);
+        if (row == null) {
+            throw new ProjectCommonException(
+                    ResponseCode.invalidEventBatchId.getErrorCode(),
+                    ResponseCode.invalidEventBatchId.getErrorMessage(),
+                    ResponseCode.CLIENT_ERROR.getResponseCode());
+        }
+        return mapper.convertValue(row, EventBatch.class);
+    }
+
+    /** Raw user_event_batches row from Cassandra (participant removed), or null when absent. */
+    private Map<String, Object> readRow(RequestContext requestContext, String eventId, String batchId) {
         Map<String, Object> primaryKey = new HashMap<>();
         primaryKey.put(JsonKey.EVENT_ID, eventId);
         primaryKey.put(JsonKey.BATCH_ID, batchId);
         Response eventBatchResult =
                 cassandraOperation.getRecordByIdentifier(
-                        requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), primaryKey,null);
-        List<Map<String, Object>> eventList =
-                (List<Map<String, Object>>) eventBatchResult.get(JsonKey.RESPONSE);
-        if (eventList.isEmpty()) {
-            throw new ProjectCommonException(
-                    ResponseCode.invalidEventBatchId.getErrorCode(),
-                    ResponseCode.invalidEventBatchId.getErrorMessage(),
-                    ResponseCode.CLIENT_ERROR.getResponseCode());
-        } else {
-            eventList.get(0).remove(JsonKey.PARTICIPANT);
-            return mapper.convertValue(eventList.get(0), EventBatch.class);
+                        requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), primaryKey, null);
+        List<Map<String, Object>> eventList = (List<Map<String, Object>>) eventBatchResult.get(JsonKey.RESPONSE);
+        if (eventList == null || eventList.isEmpty()) return null;
+        Map<String, Object> row = eventList.get(0);
+        row.remove(JsonKey.PARTICIPANT);
+        return row;
+    }
+
+    /** Caffeine -> Redis -> Cassandra (then cached). Null when the batch does not exist. */
+    private Map<String, Object> readRowCached(RequestContext requestContext, String eventId, String batchId) {
+        Map<String, Object> row = EventBatchCacheUtil.get(eventId, batchId);
+        if (row != null) return row;
+        row = readRow(requestContext, eventId, batchId);
+        if (row != null) EventBatchCacheUtil.put(row);
+        return row;
+    }
+
+    /** After a successful write: re-read the row and cache it so the next read is warm and exact. */
+    private void refreshCache(RequestContext requestContext, String eventId, String batchId) {
+        if (!EventBatchCacheUtil.isEnabled()) return;
+        try {
+            Map<String, Object> row = readRow(requestContext, eventId, batchId);
+            if (row != null) EventBatchCacheUtil.put(row);
+        } catch (Exception e) {
+            log.error("EventBatchDaoImpl: cache refresh failed for {}/{}", eventId, batchId, e);
         }
     }
 
@@ -69,8 +96,10 @@ public class EventBatchDaoImpl implements EventBatchDao {
             map.remove(JsonKey.END_TIME);
             eventBatch.setEndDate((Date)map.get(dateType));
         }
-        return cassandraOperation.insertRecord(
+        Response response = cassandraOperation.insertRecord(
                 requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), map);
+        refreshCache(requestContext, eventBatch.getEventId(), eventBatch.getBatchId());
+        return response;
     }
 
     /**
@@ -124,6 +153,8 @@ public class EventBatchDaoImpl implements EventBatchDao {
         CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
         templateId,
         templateDetails);
+    EventBatchCacheUtil.evict(eventId, batchId);
+    refreshCache(requestContext, eventId, batchId);
   }
 
   @Override
@@ -138,18 +169,14 @@ public class EventBatchDaoImpl implements EventBatchDao {
         primaryKey,
         CourseJsonKey.CERTIFICATE_TEMPLATES_COLUMN,
         templateId);
+    EventBatchCacheUtil.evict(eventId, batchId);
+    refreshCache(requestContext, eventId, batchId);
   }
 
   @Override
   public Map<String, Object> getEventBatch(RequestContext requestContext, String eventId, String batchId) {
-    Map<String, Object> primaryKey = new HashMap<>();
-    primaryKey.put(JsonKey.EVENT_ID, eventId);
-    primaryKey.put(JsonKey.BATCH_ID, batchId);
-    Response eventBatchResult =
-        cassandraOperation.getRecordByIdentifier(
-                requestContext, eventBatchDb.getKeySpace(), eventBatchDb.getTableName(), primaryKey, null);
-    List<Map<String, Object>> eventList =
-        (List<Map<String, Object>>) eventBatchResult.get(JsonKey.RESPONSE);
-    return eventList.get(0);
+    Map<String, Object> row = readRowCached(requestContext, eventId, batchId);
+    if (row == null) throw new IndexOutOfBoundsException("No user_event_batches row for " + eventId + "/" + batchId);
+    return row;
   }
 }

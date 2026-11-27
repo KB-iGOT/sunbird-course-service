@@ -1373,6 +1373,12 @@ public final class JsonKey {
   public static final String CERTIFICATE_ID  = "certificateId";
   public static final String ISSUEDCERTIFICATES = "issued_certificates";
   public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
+  public static final String SANKALP_EVENT_ENROL_TOPIC = "sankalp_event_enrol_topic";
+  public static final String SANKALP_EVENT_RESOURCE_TYPES = "sankalp_event_resource_types";
+  public static final String SANKALP_EVENT_ID = "event_id";
+  public static final String SANKALP_EVENT_TYPE = "event_type";
+  public static final String SANKALP_EVENT_USER_ID = "user_id";
+  public static final String SANKALP_EVENT_ENROLLED_ON = "enrolled_on";
   public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
   public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
   public static final String REASONS ="reasons";
